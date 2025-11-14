@@ -62,6 +62,7 @@ for dirname in $(ls -d */ 2>/dev/null | grep -vE "^(website|images|api)/$"); do
         cp -r "$dirname" website/docs/
     fi
 done
+mkdir -p website/docs/api/
 cp -r api/* website/docs/api/
 
 
