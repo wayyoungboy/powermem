@@ -54,14 +54,15 @@ find docs/website/docs -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} + 
 echo "  Copying documentation files from docs/ to docs/website/docs/..."
 cd docs
 # List all directories and copy them (excluding website and images folders)
-for dirname in $(ls -d */ 2>/dev/null | grep -vE "^(website|images)/$"); do
+for dirname in $(ls -d */ 2>/dev/null | grep -vE "^(website|images|api)/$"); do
     dirname="${dirname%/}"  # Remove trailing slash
+    echo "dirname: $dirname"
     if [ -d "$dirname" ]; then
         echo "    Copying directory: $dirname"
         cp -r "$dirname" website/docs/
     fi
 done
-tree website/docs/
+cp -r api/* website/docs/api/
 
 
 cd "$PROJECT_ROOT"
