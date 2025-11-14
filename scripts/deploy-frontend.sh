@@ -50,14 +50,14 @@ echo "  Cleaning docs/website/docs directory..."
 rm -rf docs/website/docs/*
 find docs/website/docs -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} + 2>/dev/null || true
 
-# Copy all files from docs/ to docs/website/docs/ (excluding website folder)
+# Copy all files from docs/ to docs/website/docs/ (excluding website and images folders)
 echo "  Copying documentation files from docs/ to docs/website/docs/..."
 cd docs
-for item in */; do
-    if [ "$item" != "website/" ]; then
-        dirname="${item%/}"  # Remove trailing slash
+# List all directories and copy them (excluding website and images folders)
+for dirname in $(ls -d */ 2>/dev/null | grep -vE "^(website|images)/$"); do
+    dirname="${dirname%/}"  # Remove trailing slash
+    if [ -d "$dirname" ]; then
         echo "    Copying directory: $dirname"
-        echo "cp -r $dirname website/docs/"
         cp -r "$dirname" website/docs/
     fi
 done
