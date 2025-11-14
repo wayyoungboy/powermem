@@ -61,6 +61,7 @@ for item in */; do
         cp -r "$dirname" website/docs/
     fi
 done
+tree website/docs/
 
 
 cd "$PROJECT_ROOT"
