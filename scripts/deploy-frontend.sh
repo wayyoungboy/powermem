@@ -61,13 +61,6 @@ for item in */; do
     fi
 done
 
-# Copy any files directly in docs/ (not in subdirectories)
-for file in *; do
-    if [ -f "$file" ] && [ "$file" != "website" ]; then
-        echo "    Copying file: $file"
-        cp "$file" website/docs/
-    fi
-done
 
 cd "$PROJECT_ROOT"
 
