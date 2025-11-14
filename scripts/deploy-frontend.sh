@@ -57,6 +57,7 @@ for item in */; do
     if [ "$item" != "website/" ]; then
         dirname="${item%/}"  # Remove trailing slash
         echo "    Copying directory: $dirname"
+        echo "cp -r $dirname website/docs/"
         cp -r "$dirname" website/docs/
     fi
 done
