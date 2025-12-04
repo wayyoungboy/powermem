@@ -527,6 +527,17 @@ body {
 .navbar__brand {
   transition: all 0.3s ease;
   position: relative;
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 0;
+  width: auto !important;
+  height: auto !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+.navbar__brand .navbar__logo {
+  margin-right: 0 !important;
 }
 
 .navbar__brand:hover {
@@ -536,31 +547,50 @@ body {
 .navbar__logo {
   transition: all 0.3s ease;
   filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
+  height: 16px !important;
+  width: auto !important;
+  transform: none !important;
 }
 
 .navbar__brand:hover .navbar__logo {
   filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.8));
-  transform: rotate(5deg) scale(1.1);
+  transform: scale(1.1) !important;
 }
 
 .navbar__title {
-  color: #ffffff !important;
-  background: linear-gradient(135deg, #ffffff, #60a5fa, #a78bfa);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: gradientText 3s linear infinite;
-  font-weight: 700;
-  text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
-  transition: all 0.3s ease;
-  opacity: 1 !important;
-  visibility: visible !important;
+  display: none !important;
 }
 
 .navbar__brand:hover .navbar__title {
   filter: drop-shadow(0 0 15px rgba(96, 165, 250, 0.8));
   -webkit-text-fill-color: transparent;
+}
+
+/* Adjust navbar items spacing to match scaled logo - make them stick to logo */
+.navbar__items {
+  margin-left: 1.5rem !important;
+}
+
+.navbar__items--left {
+  margin-left: 1.5rem !important;
+}
+
+/* Ensure navbar brand doesn't take extra space and items stick to left */
+.navbar__inner {
+  gap: 1.5rem !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* Ensure navbar items are properly aligned and stick to left */
+.navbar__items--left {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+}
+
+.navbar__items--left .navbar__item {
+  margin-right: 0.5rem;
 }
 
 @keyframes gradientText {
