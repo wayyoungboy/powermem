@@ -17,11 +17,13 @@ class LLMConfig(BaseModel):
             "ollama",
             "anthropic",
             "openai_structured",
+            "azure",
             "gemini",
             "deepseek",
             "vllm",
             "langchain",
             "qwen",
+            "siliconflow",
         )
         if provider in initialized_providers or provider in LLMFactory.provider_to_class:
             return v

@@ -9,6 +9,7 @@ import hashlib
 import json
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from powermem.utils.utils import get_current_datetime
 from copy import deepcopy
 
 from .base import MemoryBase
@@ -228,7 +229,8 @@ class Memory(MemoryBase):
 
         # Extract embedder config
         embedder_config = self._get_component_config('embedder')
-        self.embedding = EmbedderFactory.create(self.embedding_provider, embedder_config, None)
+        # Pass vector_store_config so factory can extract embedding_model_dims for mock embeddings
+        self.embedding = EmbedderFactory.create(self.embedding_provider, embedder_config, vector_store_config)
         
         # Initialize storage adapter with embedding service
         # Automatically select adapter based on sub_stores configuration
@@ -483,7 +485,24 @@ class Memory(MemoryBase):
         prompt: Optional[str] = None,
         infer: bool = True,
     ) -> Dict[str, Any]:
-        """Add a new memory with optional intelligent processing."""
+        """Add a new memory with optional intelligent processing.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the add operation results with the following structure:
+                - "results" (List[Dict]): List of memory operation results, where each result contains:
+                    - "id" (int): Memory ID
+                    - "memory" (str): The memory content
+                    - "event" (str): Operation event type (e.g., "ADD", "UPDATE", "DELETE")
+                    - "user_id" (str, optional): User ID associated with the memory
+                    - "agent_id" (str, optional): Agent ID associated with the memory
+                    - "run_id" (str, optional): Run ID associated with the memory
+                    - "metadata" (Dict, optional): Metadata dictionary
+                    - "created_at" (str, optional): Creation timestamp in ISO format
+                    - "previous_memory" (str, optional): Previous memory content (for UPDATE events)
+                - "relations" (Dict, optional): Graph relations if graph store is enabled, containing:
+                    - "deleted_entities" (List): List of deleted graph entities
+                    - "added_entities" (List): List of added graph entities
+        """
         try:
             # Handle messages parameter
             if messages is None:
@@ -538,7 +557,23 @@ class Memory(MemoryBase):
         memory_type: Optional[str] = None,
         prompt: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Simple add mode: direct storage without intelligence."""
+        """Simple add mode: direct storage without intelligence.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the add operation results with the following structure:
+                - "results" (List[Dict]): List containing a single memory operation result with:
+                    - "id" (int): Memory ID
+                    - "memory" (str): The memory content
+                    - "event" (str): Operation event type ("ADD")
+                    - "user_id" (str, optional): User ID associated with the memory
+                    - "agent_id" (str, optional): Agent ID associated with the memory
+                    - "run_id" (str, optional): Run ID associated with the memory
+                    - "metadata" (Dict, optional): Metadata dictionary
+                    - "created_at" (str): Creation timestamp in ISO format
+                - "relations" (Dict, optional): Graph relations if graph store is enabled, containing:
+                    - "deleted_entities" (List): List of deleted graph entities
+                    - "added_entities" (List): List of added graph entities
+        """
         # Parse messages into content
         if isinstance(messages, str):
             content = messages
@@ -599,8 +634,8 @@ class Memory(MemoryBase):
             "category": category,
             "metadata": enhanced_metadata or {},
             "filters": filters or {},
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": get_current_datetime(),
+            "updated_at": get_current_datetime(),
         }
 
         if extra_fields:
@@ -940,8 +975,8 @@ class Memory(MemoryBase):
             "category": category,
             "metadata": enhanced_metadata or {},
             "filters": filters or {},
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": get_current_datetime(),
+            "updated_at": get_current_datetime(),
         }
         
         memory_id = self.storage.add_memory(memory_data)
@@ -987,7 +1022,7 @@ class Memory(MemoryBase):
             "content": content,
             "embedding": embedding,
             "hash": content_hash,  # Update hash
-            "updated_at": datetime.utcnow(),
+            "updated_at": get_current_datetime(),
         }
         
         logger.debug(f"Updating memory {memory_id} with content: '{content[:50]}...'")
@@ -1004,7 +1039,22 @@ class Memory(MemoryBase):
         limit: int = 30,
         threshold: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Search for memories."""
+        """Search for memories.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing search results with the following structure:
+                - "results" (List[Dict]): List of memory search results, where each result contains:
+                    - "memory" (str): The memory content
+                    - "metadata" (Dict): Metadata associated with the memory
+                    - "score" (float): Similarity score for the result
+                    - "id" (int, optional): Memory ID
+                    - "created_at" (datetime, optional): Creation timestamp
+                    - "updated_at" (datetime, optional): Update timestamp
+                    - "user_id" (str, optional): User ID
+                    - "agent_id" (str, optional): Agent ID
+                    - "run_id" (str, optional): Run ID
+                - "relations" (List, optional): Graph relations if graph store is enabled
+        """
         try:
             # Select embedding service based on filters (for sub-store routing)
             embedding_service = self._get_embedding_service(filters)
@@ -1101,7 +1151,21 @@ class Memory(MemoryBase):
         user_id: Optional[str] = None,
         agent_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Get a specific memory by ID."""
+        """Get a specific memory by ID.
+        
+        Returns:
+            Optional[Dict[str, Any]]: A dictionary containing the memory data if found, None otherwise.
+                The dictionary contains the following fields:
+                    - "id" (int): Memory ID
+                    - "content" (str): The memory content
+                    - "user_id" (str, optional): User ID associated with the memory
+                    - "agent_id" (str, optional): Agent ID associated with the memory
+                    - "run_id" (str, optional): Run ID associated with the memory
+                    - "metadata" (Dict): Metadata dictionary associated with the memory
+                    - "created_at" (datetime, optional): Creation timestamp
+                    - "updated_at" (datetime, optional): Update timestamp
+                Returns None if the memory is not found or access is denied.
+        """
         try:
 
             result = self.storage.get_memory(memory_id, user_id, agent_id)
@@ -1138,7 +1202,23 @@ class Memory(MemoryBase):
         agent_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Update an existing memory."""
+        """Update an existing memory.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the updated memory data if successful, None if memory not found or access denied.
+                The dictionary contains the following fields:
+                    - "id" (int): Memory ID
+                    - "content" (str): The updated memory content (stored as "data" in payload)
+                    - "user_id" (str, optional): User ID associated with the memory
+                    - "agent_id" (str, optional): Agent ID associated with the memory
+                    - "run_id" (str, optional): Run ID associated with the memory
+                    - "metadata" (Dict): Metadata dictionary associated with the memory
+                    - "created_at" (str, optional): Creation timestamp in ISO format
+                    - "updated_at" (str): Update timestamp in ISO format
+                    - "hash" (str): Content hash for deduplication
+                    - "category" (str, optional): Category of the memory
+                Returns None if the memory is not found or access is denied.
+        """
         try:
             # Validate content is not empty
             if not content or not content.strip():
@@ -1191,7 +1271,7 @@ class Memory(MemoryBase):
                 "metadata": enhanced_metadata,
                 "hash": content_hash,  # Update hash
                 "category": category,
-                "updated_at": datetime.utcnow(),
+                "updated_at": get_current_datetime(),
             }
             
             result = self.storage.update_memory(memory_id, update_data, user_id, agent_id)
@@ -1275,7 +1355,21 @@ class Memory(MemoryBase):
         offset: int = 0,
         filters: Optional[Dict[str, Any]] = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        """Get all memories with optional filtering."""
+        """Get all memories with optional filtering.
+        
+        Returns:
+            dict[str, list[dict[str, Any]]]: A dictionary containing all memories with the following structure:
+                - "results" (List[Dict]): List of memory dictionaries, where each memory contains:
+                    - "id" (int): Memory ID
+                    - "content" (str): The memory content
+                    - "user_id" (str, optional): User ID associated with the memory
+                    - "agent_id" (str, optional): Agent ID associated with the memory
+                    - "run_id" (str, optional): Run ID associated with the memory
+                    - "metadata" (Dict): Metadata dictionary associated with the memory
+                    - "created_at" (datetime or str, optional): Creation timestamp
+                    - "updated_at" (datetime or str, optional): Update timestamp
+                - "relations" (List[Dict], optional): Graph relations if graph store is enabled
+        """
         try:
             results = self.storage.get_all_memories(user_id, agent_id, run_id, limit, offset)
             
@@ -1404,10 +1498,12 @@ class Memory(MemoryBase):
                 if key not in sub_embedding_params and key in main_embedding_config:
                     sub_embedding_params[key] = main_embedding_config[key]
 
+            # Create a config dict with embedding_model_dims for mock embeddings
+            sub_vector_config = {'embedding_model_dims': embedding_model_dims}
             sub_embedding = EmbedderFactory.create(
                 sub_embedding_provider,
                 sub_embedding_params,
-                None
+                sub_vector_config
             )
             logger.info(f"Created sub embedding service for store {index}: {sub_embedding_provider}")
         else:
@@ -1523,7 +1619,9 @@ class Memory(MemoryBase):
             delete_source: Whether to delete source data
 
         Returns:
-            Migration record count for each sub store {store_name: count}
+            Dict[str, int]: A dictionary mapping sub store names to the number of migrated records.
+                Each key is a sub store name (str), and each value is the count of migrated records (int).
+                If migration fails for a sub store, its count will be 0.
         """
         results = {}
         for index, sub_config in enumerate(self.sub_stores_config):
