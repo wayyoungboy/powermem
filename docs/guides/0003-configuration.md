@@ -105,16 +105,16 @@ SQLite is the default database provider, recommended for development and single-
 
 | Configuration | Type | Required | Default | Description |
 |--------------|------|----------|---------|-------------|
-| `DATABASE_PATH` | string | Yes* | `./data/powermem_dev.db` | Path to the SQLite database file. Required when `DATABASE_PROVIDER=sqlite` |
-| `DATABASE_ENABLE_WAL` | boolean | No | `true` | Enable Write-Ahead Logging (WAL) mode for better concurrency |
-| `DATABASE_TIMEOUT` | integer | No | `30` | Connection timeout in seconds |
+| `SQLITE_PATH` | string | Yes* | `./data/powermem_dev.db` | Path to the SQLite database file. Required when `DATABASE_PROVIDER=sqlite` |
+| `SQLITE_ENABLE_WAL` | boolean | No | `true` | Enable Write-Ahead Logging (WAL) mode for better concurrency |
+| `SQLITE_TIMEOUT` | integer | No | `30` | Connection timeout in seconds |
 
 **Environment Variables Example:**
 ```env
 DATABASE_PROVIDER=sqlite
-DATABASE_PATH=./data/powermem_dev.db
-DATABASE_ENABLE_WAL=true
-DATABASE_TIMEOUT=30
+SQLITE_PATH=./data/powermem_dev.db
+SQLITE_ENABLE_WAL=true
+SQLITE_TIMEOUT=30
 ```
 
 **JSON Configuration Example:**
@@ -151,33 +151,33 @@ OceanBase is recommended for production deployments and enterprise applications 
 
 | Configuration | Type | Required | Default | Description |
 |--------------|------|----------|---------|-------------|
-| `DATABASE_HOST` | string | Yes* | `localhost` | OceanBase server hostname or IP address. Required when `DATABASE_PROVIDER=oceanbase` |
-| `DATABASE_PORT` | integer | Yes* | `2881` | OceanBase server port. Required when `DATABASE_PROVIDER=oceanbase` |
-| `DATABASE_USER` | string | Yes* | `root` | Database username. Required when `DATABASE_PROVIDER=oceanbase` |
-| `DATABASE_PASSWORD` | string | Yes* | - | Database password. Required when `DATABASE_PROVIDER=oceanbase` |
-| `DATABASE_NAME` | string | Yes* | `powermem` | Database name. Required when `DATABASE_PROVIDER=oceanbase` |
-| `DATABASE_COLLECTION_NAME` | string | No | `memories` | Collection/table name for storing memories |
-| `DATABASE_INDEX_TYPE` | string | No | `IVF_FLAT` | Vector index type. Options: `IVF_FLAT`, `HNSW`, etc. |
-| `DATABASE_VECTOR_METRIC_TYPE` | string | No | `cosine` | Vector similarity metric. Options: `cosine`, `euclidean`, `dot_product` |
-| `DATABASE_TEXT_FIELD` | string | No | `document` | Field name for storing text content |
-| `DATABASE_VECTOR_FIELD` | string | No | `embedding` | Field name for storing vector embeddings |
-| `DATABASE_EMBEDDING_MODEL_DIMS` | integer | Yes* | `1536` | Vector dimensions. Must match your embedding model dimensions. Required when `DATABASE_PROVIDER=oceanbase` |
-| `DATABASE_PRIMARY_FIELD` | string | No | `id` | Primary key field name |
-| `DATABASE_METADATA_FIELD` | string | No | `metadata` | Field name for storing metadata |
-| `DATABASE_VIDX_NAME` | string | No | `memories_vidx` | Vector index name |
+| `OCEANBASE_HOST` | string | Yes* | `127.0.0.1` | OceanBase server hostname or IP address. Required when `DATABASE_PROVIDER=oceanbase` |
+| `OCEANBASE_PORT` | integer | Yes* | `2881` | OceanBase server port. Required when `DATABASE_PROVIDER=oceanbase` |
+| `OCEANBASE_USER` | string | Yes* | `root` | Database username. Required when `DATABASE_PROVIDER=oceanbase` |
+| `OCEANBASE_PASSWORD` | string | Yes* | - | Database password. Required when `DATABASE_PROVIDER=oceanbase` |
+| `OCEANBASE_DATABASE` | string | Yes* | `powermem` | Database name. Required when `DATABASE_PROVIDER=oceanbase` |
+| `OCEANBASE_COLLECTION` | string | No | `memories` | Collection/table name for storing memories |
+| `OCEANBASE_INDEX_TYPE` | string | No | `IVF_FLAT` | Vector index type. Options: `IVF_FLAT`, `HNSW`, etc. |
+| `OCEANBASE_VECTOR_METRIC_TYPE` | string | No | `cosine` | Vector similarity metric. Options: `cosine`, `euclidean`, `dot_product` |
+| `OCEANBASE_TEXT_FIELD` | string | No | `document` | Field name for storing text content |
+| `OCEANBASE_VECTOR_FIELD` | string | No | `embedding` | Field name for storing vector embeddings |
+| `OCEANBASE_EMBEDDING_MODEL_DIMS` | integer | Yes* | `1536` | Vector dimensions. Must match your embedding model dimensions. Required when `DATABASE_PROVIDER=oceanbase` |
+| `OCEANBASE_PRIMARY_FIELD` | string | No | `id` | Primary key field name |
+| `OCEANBASE_METADATA_FIELD` | string | No | `metadata` | Field name for storing metadata |
+| `OCEANBASE_VIDX_NAME` | string | No | `memories_vidx` | Vector index name |
 
 **Environment Variables Example:**
 ```env
 DATABASE_PROVIDER=oceanbase
-DATABASE_HOST=localhost
-DATABASE_PORT=2881
-DATABASE_USER=root
-DATABASE_PASSWORD=your_password
-DATABASE_NAME=powermem
-DATABASE_COLLECTION_NAME=memories
-DATABASE_INDEX_TYPE=IVF_FLAT
-DATABASE_VECTOR_METRIC_TYPE=cosine
-DATABASE_EMBEDDING_MODEL_DIMS=1536
+OCEANBASE_HOST=127.0.0.1
+OCEANBASE_PORT=2881
+OCEANBASE_USER=root
+OCEANBASE_PASSWORD=your_password
+OCEANBASE_DATABASE=powermem
+OCEANBASE_COLLECTION=memories
+OCEANBASE_INDEX_TYPE=IVF_FLAT
+OCEANBASE_VECTOR_METRIC_TYPE=cosine
+OCEANBASE_EMBEDDING_MODEL_DIMS=1536
 ```
 
 **JSON Configuration Example:**
@@ -188,7 +188,7 @@ DATABASE_EMBEDDING_MODEL_DIMS=1536
     "config": {
       "collection_name": "memories",
       "connection_args": {
-        "host": "localhost",
+        "host": "127.0.0.1",
         "port": 2881,
         "user": "root",
         "password": "your_password",
@@ -215,7 +215,7 @@ config = {
         'config': {
             'collection_name': 'memories',
             'connection_args': {
-                'host': 'localhost',
+                'host': '127.0.0.1',
                 'port': 2881,
                 'user': 'root',
                 'password': 'your_password',
@@ -235,11 +235,11 @@ PostgreSQL with pgvector extension is supported for vector storage.
 
 | Configuration | Type | Required | Default | Description |
 |--------------|------|----------|---------|-------------|
-| `DATABASE_HOST` | string | Yes* | `localhost` | PostgreSQL server hostname or IP address. Required when `DATABASE_PROVIDER=postgres` |
-| `DATABASE_PORT` | integer | Yes* | `5432` | PostgreSQL server port. Required when `DATABASE_PROVIDER=postgres` |
-| `DATABASE_USER` | string | Yes* | `postgres` | Database username. Required when `DATABASE_PROVIDER=postgres` |
-| `DATABASE_PASSWORD` | string | Yes* | - | Database password. Required when `DATABASE_PROVIDER=postgres` |
-| `DATABASE_NAME` | string | Yes* | `powermem` | Database name. Required when `DATABASE_PROVIDER=postgres` |
+| `POSTGRES_HOST` | string | Yes* | `127.0.0.1` | PostgreSQL server hostname or IP address. Required when `DATABASE_PROVIDER=postgres` |
+| `POSTGRES_PORT` | integer | Yes* | `5432` | PostgreSQL server port. Required when `DATABASE_PROVIDER=postgres` |
+| `POSTGRES_USER` | string | Yes* | `postgres` | Database username. Required when `DATABASE_PROVIDER=postgres` |
+| `POSTGRES_PASSWORD` | string | Yes* | - | Database password. Required when `DATABASE_PROVIDER=postgres` |
+| `POSTGRES_DATABASE` | string | Yes* | `powermem` | Database name. Required when `DATABASE_PROVIDER=postgres` |
 | `DATABASE_SSLMODE` | string | No | `prefer` | SSL connection mode. Options: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` |
 | `DATABASE_POOL_SIZE` | integer | No | `10` | Connection pool size |
 | `DATABASE_MAX_OVERFLOW` | integer | No | `20` | Maximum overflow connections in the pool |
@@ -247,11 +247,12 @@ PostgreSQL with pgvector extension is supported for vector storage.
 **Environment Variables Example:**
 ```env
 DATABASE_PROVIDER=postgres
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=postgres
-DATABASE_PASSWORD=your_password
-DATABASE_NAME=powermem
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
+POSTGRES_DATABASE=powermem
+POSTGRES_COLLECTION=memories
 DATABASE_SSLMODE=prefer
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
@@ -265,7 +266,7 @@ DATABASE_MAX_OVERFLOW=20
     "config": {
       "collection_name": "memories",
       "dbname": "powermem",
-      "host": "localhost",
+      "host": "127.0.0.1",
       "port": 5432,
       "user": "postgres",
       "password": "your_password",
@@ -285,7 +286,7 @@ config = {
         'config': {
             'collection_name': 'memories',
             'dbname': 'powermem',
-            'host': 'localhost',
+            'host': '127.0.0.1',
             'port': 5432,
             'user': 'postgres',
             'password': 'your_password',
@@ -315,7 +316,7 @@ Qwen is the default LLM provider, powered by Alibaba Cloud DashScope.
 |--------------|------|----------|---------|-------------|
 | `LLM_API_KEY` | string | Yes* | - | DashScope API key. Required when `LLM_PROVIDER=qwen` |
 | `LLM_MODEL` | string | No | `qwen-plus` | Qwen model name. Options: `qwen-plus`, `qwen-max`, `qwen-turbo`, `qwen-long`, etc. |
-| `LLM_BASE_URL` | string | No | `https://dashscope.aliyuncs.com/api/v1` | API base URL for DashScope |
+| `QWEN_LLM_BASE_URL` | string | No | `https://dashscope.aliyuncs.com/api/v1` | API base URL for DashScope |
 | `LLM_TEMPERATURE` | float | No | `0.7` | Sampling temperature (0.0-2.0). Higher values make output more random |
 | `LLM_MAX_TOKENS` | integer | No | `1000` | Maximum number of tokens to generate |
 | `LLM_TOP_P` | float | No | `0.8` | Nucleus sampling parameter (0.0-1.0). Controls diversity of output |
@@ -327,7 +328,7 @@ Qwen is the default LLM provider, powered by Alibaba Cloud DashScope.
 LLM_PROVIDER=qwen
 LLM_API_KEY=your_api_key_here
 LLM_MODEL=qwen-plus
-LLM_BASE_URL=https://dashscope.aliyuncs.com/api/v1
+QWEN_LLM_BASE_URL=https://dashscope.aliyuncs.com/api/v1
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=1000
 LLM_TOP_P=0.8
@@ -381,7 +382,7 @@ OpenAI GPT models are supported.
 |--------------|------|----------|---------|-------------|
 | `LLM_API_KEY` | string | Yes* | - | OpenAI API key. Required when `LLM_PROVIDER=openai` |
 | `LLM_MODEL` | string | No | `gpt-4` | OpenAI model name. Options: `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo`, etc. |
-| `LLM_BASE_URL` | string | No | `https://api.openai.com/v1` | API base URL for OpenAI |
+| `OPENAI_LLM_BASE_URL` | string | No | `https://api.openai.com/v1` | API base URL for OpenAI |
 | `LLM_TEMPERATURE` | float | No | `0.7` | Sampling temperature (0.0-2.0) |
 | `LLM_MAX_TOKENS` | integer | No | `1000` | Maximum number of tokens to generate |
 | `LLM_TOP_P` | float | No | `1.0` | Nucleus sampling parameter (0.0-1.0) |
@@ -391,7 +392,7 @@ OpenAI GPT models are supported.
 LLM_PROVIDER=openai
 LLM_API_KEY=your-openai-api-key
 LLM_MODEL=gpt-4
-LLM_BASE_URL=https://api.openai.com/v1
+OPENAI_LLM_BASE_URL=https://api.openai.com/v1
 LLM_TEMPERATURE=0.7
 LLM_MAX_TOKENS=1000
 LLM_TOP_P=1.0
@@ -452,7 +453,7 @@ Qwen embeddings are provided by Alibaba Cloud DashScope.
 | `EMBEDDING_API_KEY` | string | Yes* | - | DashScope API key. Required when `EMBEDDING_PROVIDER=qwen` |
 | `EMBEDDING_MODEL` | string | No | `text-embedding-v4` | Qwen embedding model name |
 | `EMBEDDING_DIMS` | integer | Yes* | `1536` | Vector dimensions. Must match `DATABASE_EMBEDDING_MODEL_DIMS` if using OceanBase. Required when `EMBEDDING_PROVIDER=qwen` |
-| `EMBEDDING_BASE_URL` | string | No | `https://dashscope.aliyuncs.com/api/v1` | API base URL for DashScope |
+| `QWEN_EMBEDDING_BASE_URL` | string | No | `https://dashscope.aliyuncs.com/api/v1` | API base URL for DashScope |
 
 **Environment Variables Example:**
 ```env
@@ -460,7 +461,7 @@ EMBEDDING_PROVIDER=qwen
 EMBEDDING_API_KEY=your_api_key_here
 EMBEDDING_MODEL=text-embedding-v4
 EMBEDDING_DIMS=1536
-EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/api/v1
+QWEN_EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/api/v1
 ```
 
 **JSON Configuration Example:**
@@ -500,7 +501,7 @@ OpenAI provides text embedding models.
 | `EMBEDDING_API_KEY` | string | Yes* | - | OpenAI API key. Required when `EMBEDDING_PROVIDER=openai` |
 | `EMBEDDING_MODEL` | string | No | `text-embedding-ada-002` | OpenAI embedding model name. Options: `text-embedding-ada-002`, `text-embedding-3-small`, `text-embedding-3-large` |
 | `EMBEDDING_DIMS` | integer | Yes* | `1536` | Vector dimensions. Varies by model (ada-002: 1536, 3-small: 1536, 3-large: 3072). Required when `EMBEDDING_PROVIDER=openai` |
-| `EMBEDDING_BASE_URL` | string | No | `https://api.openai.com/v1` | API base URL for OpenAI |
+| `OPEN_EMBEDDING_BASE_URL` | string | No | `https://api.openai.com/v1` | API base URL for OpenAI |
 
 **Environment Variables Example:**
 ```env
@@ -508,7 +509,7 @@ EMBEDDING_PROVIDER=openai
 EMBEDDING_API_KEY=your-openai-api-key
 EMBEDDING_MODEL=text-embedding-ada-002
 EMBEDDING_DIMS=1536
-EMBEDDING_BASE_URL=https://api.openai.com/v1
+OPEN_EMBEDDING_BASE_URL=https://api.openai.com/v1
 ```
 
 **JSON Configuration Example:**
@@ -908,7 +909,7 @@ config = {
 ```env
 # Required: Database
 DATABASE_PROVIDER=sqlite
-DATABASE_PATH=./data/powermem_dev.db
+SQLITE_PATH=./data/powermem_dev.db
 
 # Required: LLM
 LLM_PROVIDER=qwen
@@ -985,12 +986,12 @@ memory = Memory(config=config)
 ```env
 # Database
 DATABASE_PROVIDER=oceanbase
-DATABASE_HOST=prod-db.example.com
-DATABASE_PORT=2881
-DATABASE_USER=prod_user
-DATABASE_PASSWORD=secure_password
-DATABASE_NAME=powermem_prod
-DATABASE_EMBEDDING_MODEL_DIMS=1536
+OCEANBASE_HOST=prod-db.example.com
+OCEANBASE_PORT=2881
+OCEANBASE_USER=prod_user
+OCEANBASE_PASSWORD=secure_password
+OCEANBASE_DATABASE=powermem_prod
+OCEANBASE_EMBEDDING_MODEL_DIMS=1536
 
 # LLM
 LLM_PROVIDER=qwen

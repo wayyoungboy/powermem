@@ -72,44 +72,44 @@ def load_config_from_env() -> Dict[str, Any]:
     if db_provider == 'oceanbase':
         # OceanBase configuration
         connection_args = {
-            "host": os.getenv('DATABASE_HOST', '127.0.0.1'),
-            "port": int(os.getenv('DATABASE_PORT', '2881')),
-            "user": os.getenv('DATABASE_USER', 'root@sys'),
-            "password": os.getenv('DATABASE_PASSWORD', 'password'),
-            "db_name": os.getenv('DATABASE_NAME', 'powermem')
+            "host": os.getenv('OCEANBASE_HOST', '127.0.0.1'),
+            "port": int(os.getenv('OCEANBASE_PORT', '2881')),
+            "user": os.getenv('OCEANBASE_USER', 'root@sys'),
+            "password": os.getenv('OCEANBASE_PASSWORD', 'password'),
+            "db_name": os.getenv('OCEANBASE_DATABASE', 'powermem')
         }
         db_config = {
-            'collection_name': os.getenv('DATABASE_COLLECTION_NAME', 'memories'),
+            'collection_name': os.getenv('OCEANBASE_COLLECTION', 'memories'),
             'connection_args': connection_args,
-            'vidx_metric_type': os.getenv('DATABASE_VECTOR_METRIC_TYPE', 'cosine'),
-            'index_type': os.getenv('DATABASE_INDEX_TYPE', 'IVF_FLAT'),
-            'embedding_model_dims': int(os.getenv('DATABASE_EMBEDDING_MODEL_DIMS', '1536')),
-            'primary_field': os.getenv('DATABASE_PRIMARY_FIELD', 'id'),
-            'vector_field': os.getenv('DATABASE_VECTOR_FIELD', 'embedding'),
-            'text_field': os.getenv('DATABASE_TEXT_FIELD', 'document'),
-            'metadata_field': os.getenv('DATABASE_METADATA_FIELD', 'metadata'),
-            'vidx_name': os.getenv('DATABASE_VIDX_NAME', 'memories_vidx')
+            'vidx_metric_type': os.getenv('OCEANBASE_VECTOR_METRIC_TYPE', 'cosine'),
+            'index_type': os.getenv('OCEANBASE_INDEX_TYPE', 'IVF_FLAT'),
+            'embedding_model_dims': int(os.getenv('OCEANBASE_EMBEDDING_MODEL_DIMS', '1536')),
+            'primary_field': os.getenv('OCEANBASE_PRIMARY_FIELD', 'id'),
+            'vector_field': os.getenv('OCEANBASE_VECTOR_FIELD', 'embedding'),
+            'text_field': os.getenv('OCEANBASE_TEXT_FIELD', 'document'),
+            'metadata_field': os.getenv('OCEANBASE_METADATA_FIELD', 'metadata'),
+            'vidx_name': os.getenv('OCEANBASE_VIDX_NAME', 'memories_vidx')
         }
     elif db_provider == 'postgres':
         # PostgreSQL configuration (pgvector)
         db_config = {
-            'collection_name': os.getenv('DATABASE_COLLECTION_NAME', 'memories'),
-            'dbname': os.getenv('DATABASE_NAME', 'powermem'),
-            'host': os.getenv('DATABASE_HOST', 'localhost'),
-            'port': int(os.getenv('DATABASE_PORT', '5432')),
-            'user': os.getenv('DATABASE_USER', 'postgres'),
-            'password': os.getenv('DATABASE_PASSWORD', 'password'),
-            'embedding_model_dims': int(os.getenv('DATABASE_EMBEDDING_MODEL_DIMS', '1536')),
-            'diskann': os.getenv('DATABASE_DISKANN', 'true').lower() == 'true',
-            'hnsw': os.getenv('DATABASE_HNSW', 'true').lower() == 'true',
+            'collection_name': os.getenv('POSTGRES_COLLECTION', 'memories'),
+            'dbname': os.getenv('POSTGRES_DATABASE', 'powermem'),
+            'host': os.getenv('POSTGRES_HOST', '127.0.0.1'),    
+            'port': int(os.getenv('POSTGRES_PORT', '5432')),
+            'user': os.getenv('POSTGRES_USER', 'postgres'),
+            'password': os.getenv('POSTGRES_PASSWORD', 'password'),
+            'embedding_model_dims': int(os.getenv('POSTGRES_EMBEDDING_MODEL_DIMS', '1536')),
+            'diskann': os.getenv('POSTGRES_DISKANN', 'true').lower() == 'true',
+            'hnsw': os.getenv('POSTGRES_HNSW', 'true').lower() == 'true',
         }
     else:
         # SQLite configuration (default)
         db_config = {
-            'database_path': os.getenv('DATABASE_PATH', './data/powermem_dev.db'),
-            'collection_name': os.getenv('DATABASE_COLLECTION_NAME', 'memories'),
-            'enable_wal': os.getenv('DATABASE_ENABLE_WAL', 'true').lower() == 'true',
-            'timeout': int(os.getenv('DATABASE_TIMEOUT', '30'))
+            'database_path': os.getenv('SQLITE_PATH', './data/powermem_dev.db'),
+            'collection_name': os.getenv('SQLITE_COLLECTION', 'memories'),
+            'enable_wal': os.getenv('SQLITE_ENABLE_WAL', 'true').lower() == 'true',
+            'timeout': int(os.getenv('SQLITE_TIMEOUT', '30'))
         }
     
     # Build LLM config based on provider
@@ -124,17 +124,41 @@ def load_config_from_env() -> Dict[str, Any]:
     }
     
     # Add provider-specific config
-    if llm_provider == 'qwen':
-        llm_config['dashscope_base_url'] = os.getenv('LLM_BASE_URL', 'https://dashscope.aliyuncs.com/api/v1')
+    def _configure_qwen():
+        llm_config['dashscope_base_url'] = os.getenv('QWEN_LLM_BASE_URL','https://dashscope.aliyuncs.com/api/v1')
         llm_config['enable_search'] = os.getenv('LLM_ENABLE_SEARCH', 'false').lower() == 'true'
-    elif llm_provider == 'openai':
-        base_url = os.getenv('LLM_BASE_URL')
-        if base_url:
-            llm_config['openai_base_url'] = base_url
-    elif llm_provider == 'siliconflow':
-        # SiliconFlow uses OpenAI-compatible API
-        base_url = os.getenv('LLM_BASE_URL', 'https://api.siliconflow.cn/v1')
-        llm_config['openai_base_url'] = base_url
+    
+    def _configure_openai():
+        llm_config['openai_base_url'] = os.getenv('OPENAI_LLM_BASE_URL','https://api.openai.com/v1')
+    
+    def _configure_siliconflow():
+        llm_config['openai_base_url'] = os.getenv('SILICONFLOW_LLM_BASE_URL','https://api.siliconflow.cn/v1')
+
+    def _configure_ollama():
+        llm_config['ollama_base_url'] = os.getenv('OLLAMA_LLM_BASE_URL')
+    
+    def _configure_vllm():
+        llm_config['vllm_base_url'] = os.getenv('VLLM_LLM_BASE_URL')
+
+    def _configure_anthropic():
+        llm_config['anthropic_base_url'] = os.getenv('ANTHROPIC_LLM_BASE_URL','https://api.anthropic.com')
+
+    def _configure_deepseek():
+        llm_config['deepseek_base_url'] = os.getenv('DEEPSEEK_LLM_BASE_URL','https://api.deepseek.com')
+
+    provider_configs = {
+        'qwen': _configure_qwen,
+        'openai': _configure_openai,
+        'siliconflow': _configure_siliconflow,
+        'ollama': _configure_ollama,
+        'vllm': _configure_vllm,
+        'anthropic': _configure_anthropic,
+        'deepseek': _configure_deepseek,
+    }
+    
+    # Apply provider-specific configuration
+    if llm_provider in provider_configs:
+        provider_configs[llm_provider]()
 
 
     # Build Embedding config based on provider
@@ -147,18 +171,16 @@ def load_config_from_env() -> Dict[str, Any]:
 
     # Add provider-specific config
     provider_base_url_map = {
-        'qwen': ('dashscope_base_url', 'https://dashscope.aliyuncs.com/api/v1'),
-        'openai': ('openai_base_url', 'https://api.openai.com/v1'),
-        'huggingface': ('huggingface_base_url', None),
-        'lmstudio': ('lmstudio_base_url', None),
-        'ollama': ('ollama_base_url', None),
+        'qwen': ('dashscope_base_url', os.getenv('QWEN_EMBEDDING_BASE_URL')),
+        'openai': ('openai_base_url', os.getenv('OPENAI_EMBEDDING_BASE_URL')),
+        'huggingface': ('huggingface_base_url', os.getenv('HUGGINFACE_EMBEDDING_BASE_URL')),
+        'lmstudio': ('lmstudio_base_url', os.getenv('LMSTUDIO_EMBEDDING_BASE_URL')),
+        'ollama': ('ollama_base_url', os.getenv('OLLAMA_EMBEDDING_BASE_URL')),
     }
     
     if embedding_provider in provider_base_url_map:
         config_key, default_value = provider_base_url_map[embedding_provider]
-        base_url = os.getenv('EMBEDDING_BASE_URL', default_value)
-        if base_url:
-            embedding_config[config_key] = base_url
+        embedding_config[config_key] = default_value
     
     config = {
         'vector_store': {
@@ -230,11 +252,11 @@ def load_config_from_env() -> Dict[str, Any]:
         if graph_store_provider == 'oceanbase':
             # OceanBase graph configuration
             graph_connection_args = {
-                "host": os.getenv('GRAPH_STORE_HOST', os.getenv('DATABASE_HOST', '127.0.0.1')),
-                "port": os.getenv('GRAPH_STORE_PORT', os.getenv('DATABASE_PORT', '2881')),
-                "user": os.getenv('GRAPH_STORE_USER', os.getenv('DATABASE_USER', 'root@sys')),
-                "password": os.getenv('GRAPH_STORE_PASSWORD', os.getenv('DATABASE_PASSWORD', 'password')),
-                "db_name": os.getenv('GRAPH_STORE_DB_NAME', os.getenv('DATABASE_NAME', 'powermem'))
+                "host": os.getenv('GRAPH_STORE_HOST', os.getenv('OCEANBASE_HOST', '127.0.0.1')),
+                "port": os.getenv('GRAPH_STORE_PORT', os.getenv('OCEANBASE_PORT', '2881')),
+                "user": os.getenv('GRAPH_STORE_USER', os.getenv('OCEANBASE_USER', 'root@sys')),
+                "password": os.getenv('GRAPH_STORE_PASSWORD', os.getenv('OCEANBASE_PASSWORD', 'password')),
+                "db_name": os.getenv('GRAPH_STORE_DB_NAME', os.getenv('OCEANBASE_DATABASE', 'powermem'))
             }
             graph_config = {
                 'host': graph_connection_args['host'],
@@ -242,9 +264,9 @@ def load_config_from_env() -> Dict[str, Any]:
                 'user': graph_connection_args['user'],
                 'password': graph_connection_args['password'],
                 'db_name': graph_connection_args['db_name'],
-                'vidx_metric_type': os.getenv('GRAPH_STORE_VECTOR_METRIC_TYPE', os.getenv('DATABASE_VECTOR_METRIC_TYPE', 'l2')),
-                'index_type': os.getenv('GRAPH_STORE_INDEX_TYPE', os.getenv('DATABASE_INDEX_TYPE', 'HNSW')),
-                'embedding_model_dims': int(os.getenv('GRAPH_STORE_EMBEDDING_MODEL_DIMS', os.getenv('DATABASE_EMBEDDING_MODEL_DIMS', '1536'))),
+                'vidx_metric_type': os.getenv('GRAPH_STORE_VECTOR_METRIC_TYPE', os.getenv('OCEANBASE_VECTOR_METRIC_TYPE', 'l2')),
+                'index_type': os.getenv('GRAPH_STORE_INDEX_TYPE', os.getenv('OCEANBASE_INDEX_TYPE', 'HNSW')),
+                'embedding_model_dims': int(os.getenv('GRAPH_STORE_EMBEDDING_MODEL_DIMS', os.getenv('OCEANBASE_EMBEDDING_MODEL_DIMS', '1536'))),
                 'max_hops': int(os.getenv('GRAPH_STORE_MAX_HOPS', '3'))
             }
         else:

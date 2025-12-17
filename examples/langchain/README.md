@@ -90,12 +90,12 @@ Edit `.env` and configure:
 ```env
 # Database Configuration
 DATABASE_PROVIDER=oceanbase
-DATABASE_HOST=localhost
-DATABASE_PORT=2881
-DATABASE_USER=root
-DATABASE_PASSWORD=your_password
-DATABASE_NAME=powermem
-DATABASE_COLLECTION_NAME=healthcare_memories
+OCEANBASE_HOST=127.0.0.1
+OCEANBASE_PORT=2881
+OCEANBASE_USER=root@sys
+OCEANBASE_PASSWORD=password
+OCEANBASE_DATABASE=powermem
+OCEANBASE_COLLECTION=healthcare_memories
 
 # LLM Configuration
 LLM_PROVIDER=qwen  # or openai
@@ -115,7 +115,7 @@ Ensure your OceanBase instance is running and accessible:
 
 ```bash
 # Test connection (adjust host/port as needed)
-mysql -h localhost -P 2881 -u root -p
+mysql -h 127.0.0.1 -P 2881 -u root -p
 ```
 
 ## Usage
@@ -255,10 +255,10 @@ summary = bot.get_patient_summary()
 ### Database Settings
 
 - `DATABASE_PROVIDER`: Set to `oceanbase`
-- `DATABASE_HOST`: OceanBase server hostname
-- `DATABASE_PORT`: OceanBase port (default: 2881)
-- `DATABASE_NAME`: Database name
-- `DATABASE_COLLECTION_NAME`: Collection/table name for memories
+- `OCEANBASE_HOST`: OceanBase server hostname
+- `OCEANBASE_PORT`: OceanBase port (default: 2881)
+- `OCEANBASE_DATABASE`: Database name
+- `OCEANBASE_COLLECTION`: Collection/table name for memories
 
 ### LLM Settings
 
@@ -279,7 +279,7 @@ summary = bot.get_patient_summary()
 **Problem**: Cannot connect to OceanBase
 
 **Solution**:
-1. Verify OceanBase is running: `mysql -h localhost -P 2881 -u root -p`
+1. Verify OceanBase is running: `mysql -h 127.0.0.1 -P 2881 -u root -p`
 2. Check configuration in `.env`
 3. Verify network connectivity and firewall settings
 
