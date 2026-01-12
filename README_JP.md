@@ -49,7 +49,7 @@ AI アプリケーション開発において、大規模言語モデルが履�
 ## 🚀 核心機能
 
 ### 👨‍💻 開発者フレンドリー
-- 🔌 **[軽量級アクセス方式](docs/examples/scenario_1_basic_usage.md)**：シンプルな Python SDK プロトコルサポートを提供し、`.env` ファイルから自動的に設定を読み込み、開発者が既存プロジェクトに迅速に統合できるようにします
+- 🔌 **[軽量級アクセス方式](docs/examples/scenario_1_basic_usage.md)**：シンプルな Python SDK プロトコルサポートを提供し、`.env` ファイルから自動的に設定を読み込み、開発者が既存プロジェクトに迅速に統合できるようにします。また、[MCP サーバー](docs/api/0004-mcp.md) と [HTTP API サーバー](docs/api/0005-api_server.md) の 2 つのアクセス方式もサポートしています
 
 ### 🧠 インテリジェントメモリ管理
 - 🔍 **[メモリのインテリジェント抽出](docs/examples/scenario_2_intelligent_memory.md)**：LLM を通じて会話から重要な事実を自動的に抽出し、重複をインテリジェントに検出し、競合する情報を更新し、関連するメモリをマージして、メモリデータベースの正確性と一貫性を確保します
@@ -57,7 +57,7 @@ AI アプリケーション開発において、大規模言語モデルが履�
 
 
 ### 👤 ユーザープロフィールサポート
-- 🎭 **[ユーザープロフィール](docs/examples/scenario_9_user_profile.md)**：ユーザーの履歴会話と行動データに基づいて、ユーザープロフィールを自動的に構築および更新し、パーソナライズされた推奨、AI コンパニオンシップなどのシナリオに適用され、AI システムが各ユーザーをよりよく理解し、サービスを提供できるようにします
+- 🎭 **[ユーザープロフィール](docs/examples/scenario_9_user_memory.md)**：ユーザーの履歴会話と行動データに基づいて、ユーザープロフィールを自動的に構築および更新し、パーソナライズされた推奨、AI コンパニオンシップなどのシナリオに適用され、AI システムが各ユーザーをよりよく理解し、サービスを提供できるようにします
 
 ### 🤖 マルチエージェントサポート
 - 🔐 **[エージェント共有/分離メモリ](docs/examples/scenario_3_multi_agent.md)**：各エージェントに独立したメモリ空間を提供し、エージェント間のメモリ共有とコラボレーションをサポートし、スコープ制御を通じて柔軟な権限管理を実現します
@@ -77,7 +77,7 @@ AI アプリケーション開発において、大規模言語モデルが履�
 pip install powermem
 ```
 
-### 💡 基本的な使用方法
+### 💡 基本的な使用方法（SDK）
 
 **✨ 最も簡単な方法**：`.env` ファイルから自動的にメモリを作成！[設定ファイル参照](.env.example)
 
@@ -99,6 +99,95 @@ for result in results.get('results', []):
 
 より詳細な例と使用パターンについては、[はじめにガイド](docs/guides/0001-getting_started.md) を参照してください。
 
+### 🌐 HTTP API Server
+
+PowerMem は、すべてのコアメモリ管理機能を RESTful API を通じて公開する本番環境対応の HTTP API サーバーも提供します。これにより、HTTP 呼び出しをサポートする任意のアプリケーションが、プログラミング言語に関係なく PowerMem のインテリジェントメモリシステムを統合できます。
+
+**SDK との関係**：API サーバーは、内部で同じ PowerMem SDK を使用し、同じ設定（`.env` ファイル）を共有します。Python SDK で利用可能な同じメモリ管理機能への HTTP インターフェースを提供し、PowerMem を非 Python アプリケーションでも利用可能にします。
+
+**API サーバーの起動**：
+
+```bash
+# 方法 1：CLI コマンドを使用（pip インストール後）
+powermem-server --host 0.0.0.0 --port 8000
+
+# 方法 2：Docker を使用
+# Docker で実行
+docker run -d \
+  --name powermem-server \
+  -p 8000:8000 \
+  -v $(pwd)/.env:/app/.env:ro \
+  --env-file .env \
+  oceanbase/powermem-server:latest
+
+# または Docker Compose を使用（推奨）
+docker-compose -f docker/docker-compose.yml up -d
+
+```
+
+起動後、API サーバーは以下を提供します：
+- すべてのメモリ操作の RESTful API エンドポイント
+- インタラクティブな API ドキュメント、`http://localhost:8000/docs` でアクセス可能
+- API Key 認証とレート制限サポート
+- SDK と同じ設定（`.env` ファイル経由）
+
+完全な API ドキュメントと使用例については、[API サーバードキュメント](docs/api/0005-api_server.md) を参照してください。
+
+### 🔌 MCP Server
+
+PowerMem は、Claude Desktop などの MCP 互換クライアントとの統合を可能にするモデルコンテキストプロトコル（MCP）サーバーも提供します。MCP サーバーは、MCP プロトコルを通じて PowerMem のメモリ管理機能を公開し、AI アシスタントがシームレスにメモリにアクセスして管理できるようにします。
+
+**SDK との関係**：MCP サーバーは、同じ PowerMem SDK を使用し、同じ設定（`.env` ファイル）を共有します。Python SDK で利用可能な同じメモリ管理機能への MCP インターフェースを提供し、PowerMem を MCP 互換の AI アシスタントでも利用可能にします。
+
+**インストール**：
+
+```bash
+# PowerMem をインストール（必須）
+pip install powermem
+
+# uvx をインストール（まだインストールされていない場合）
+# macOS/Linux の場合：
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows の場合：
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**MCP サーバーの起動**：
+
+```bash
+# SSE モード（推奨、デフォルトポート 8000）
+uvx powermem-mcp sse
+
+# SSE モード、カスタムポート
+uvx powermem-mcp sse 8001
+
+# Stdio モード
+uvx powermem-mcp stdio
+
+# Streamable HTTP モード（デフォルトポート 8000）
+uvx powermem-mcp streamable-http
+
+# Streamable HTTP モード、カスタムポート
+uvx powermem-mcp streamable-http 8001
+```
+
+**Claude Desktop との統合**：
+
+Claude Desktop 設定ファイルに次の設定を追加します：
+
+```json
+{
+  "mcpServers": {
+    "powermem": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+MCP サーバーは、メモリの追加、検索、更新、削除を含むメモリ管理ツールを提供します。完全な MCP ドキュメントと使用例については、[MCP サーバードキュメント](docs/api/0004-mcp.md) を参照してください。
+
 ## 🔗 統合とデモ
 
 - 🔗 **LangChain 統合**: LangChain + PowerMem + OceanBase を使用して医療サポートロボットを構築、[例を参照](examples/langchain/README.md)
@@ -118,10 +207,11 @@ for result in results.get('results', []):
 
 ## ⭐ ハイライト リリースノート
 
-| Version | Iteration Period | Release Date | Function |
-|---------|--------|-------|---------|
-| 0.2.0 | 2025.12 | 2025.12.16 | <ul><li>高度なユーザープロフィール管理、AI アプリケーションの「千人千面」をサポート</li><li>テキスト、画像、音声メモリを含む拡張マルチモーダルサポート</li></ul> |
-| 0.1.0 | 2025.11 | 2025.11.14 | <ul><li>コアメモリ管理機能、メモリの永続ストレージをサポート</li><li>ベクトル、全文、グラフ検索をサポートするハイブリッド検索</li><li>LLM ベースの事実抽出によるインテリジェントメモリ抽出</li><li>エビングハウス忘却曲線に基づく全ライフサイクルメモリ管理をサポート</li><li>Multi-Agent メモリ管理をサポート</li><li>複数のストレージバックエンドサポート（OceanBase、PostgreSQL、SQLite）</li><li>マルチホップグラフ検索による知識グラフの検索処理をサポート</li></ul> |
+| Version |  Release Date | Function |
+|---------|-------|---------|
+| 0.3.0 | 2026.01.09 | <ul><li>本番環境対応の HTTP API サーバー、すべてのメモリ操作の RESTful エンドポイントを提供</li><li>Docker サポート、簡単なデプロイとコンテナ化を実現</li></ul> |
+| 0.2.0 | 2025.12.16 | <ul><li>高度なユーザープロフィール管理、AI アプリケーションの「千人千面」をサポート</li><li>テキスト、画像、音声メモリを含む拡張マルチモーダルサポート</li></ul> |
+| 0.1.0 | 2025.11.14 | <ul><li>コアメモリ管理機能、メモリの永続ストレージをサポート</li><li>ベクトル、全文、グラフ検索をサポートするハイブリッド検索</li><li>LLM ベースの事実抽出によるインテリジェントメモリ抽出</li><li>エビングハウス忘却曲線に基づく全ライフサイクルメモリ管理をサポート</li><li>Multi-Agent メモリ管理をサポート</li><li>複数のストレージバックエンドサポート（OceanBase、PostgreSQL、SQLite）</li><li>マルチホップグラフ検索による知識グラフの検索処理をサポート</li></ul> |
 
 
 ## 💬 サポート

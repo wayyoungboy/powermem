@@ -50,14 +50,14 @@
 ## 🚀 核心特性
 
 ### 👨‍💻 开发者友好
-- 🔌 **[轻量级接入方式](docs/examples/scenario_1_basic_usage.md)**：提供简洁的 Python SDK 支持，自动从 `.env` 文件加载配置，让开发者快速集成到现有项目中
+- 🔌 **[轻量级接入方式](docs/examples/scenario_1_basic_usage.md)**：提供简洁的 Python SDK 支持，自动从 `.env` 文件加载配置，让开发者快速集成到现有项目中。还支持 [MCP Server](docs/api/0004-mcp.md) 和 [HTTP API Server](docs/api/0005-api_server.md) 两种接入方式
 
 ### 🧠 智能记忆管理
 - 🔍 **[记忆的智能提取](docs/examples/scenario_2_intelligent_memory.md)**：通过 LLM 自动从对话中提取关键事实，智能检测重复、更新冲突信息并合并相关记忆，确保记忆库的准确性和一致性
 - 📉 **[艾宾浩斯遗忘曲线](docs/examples/scenario_8_ebbinghaus_forgetting_curve.md)**：基于认知科学的记忆遗忘规律，自动计算记忆保留率并实现时间衰减加权，优先返回最近且相关的记忆，让 AI 系统像人类一样自然"遗忘"过时信息
 
 ### 👤 用户画像支持
-- 🎭 **[用户画像](docs/examples/scenario_9_user_profile.md)**：基于用户历史对话和行为数据，自动构建和更新用户画像，适用于个性化推荐、AI 陪伴等场景，让 AI 系统更好地理解和服务每个用户
+- 🎭 **[用户画像](docs/examples/scenario_9_user_memory.md)**：基于用户历史对话和行为数据，自动构建和更新用户画像，适用于个性化推荐、AI 陪伴等场景，让 AI 系统更好地理解和服务每个用户
 
 ### 🤖 多智能体支持
 - 🔐 **[智能体共享/隔离记忆](docs/examples/scenario_3_multi_agent.md)**：为每个智能体提供独立的记忆空间，支持跨智能体记忆共享和协作，通过作用域控制实现灵活的权限管理
@@ -78,7 +78,7 @@
 pip install powermem
 ```
 
-### 💡 基本使用
+### 💡 基本使用（SDK）
 
 **✨ 最简单的方式**：从 `.env` 文件读取配置自动创建记忆！[配置文件参考](.env.example)
 
@@ -100,6 +100,95 @@ for result in results.get('results', []):
 
 更多详细示例和使用模式，请参阅[入门指南](docs/guides/0001-getting_started.md)。
 
+### 🌐 HTTP API Server
+
+PowerMem 还提供了生产就绪的 HTTP API Server，通过 RESTful API 暴露所有核心记忆管理功能。这使得任何支持 HTTP 调用的应用程序都能集成 PowerMem 的智能记忆系统，无论使用何种编程语言。
+
+**与 SDK 的关系**：API Server底层使用相同的 PowerMem SDK，并共享相同的配置（`.env` 文件）。它提供了与 Python SDK 相同的记忆管理功能的 HTTP 接口，使 PowerMem 可供非 Python 应用程序使用。
+
+**启动 API Server**：
+
+```bash
+# 方法 1：使用 CLI 命令（pip 安装后）
+powermem-server --host 0.0.0.0 --port 8000
+
+# 方法 2：使用 Docker
+# 运行 Docker 容器
+docker run -d \
+  --name powermem-server \
+  -p 8000:8000 \
+  -v $(pwd)/.env:/app/.env:ro \
+  --env-file .env \
+  oceanbase/powermem-server:latest
+
+# 或使用 Docker Compose（推荐）
+docker-compose -f docker/docker-compose.yml up -d
+
+```
+
+启动后，API Server提供：
+- 所有记忆操作的 RESTful API 端点
+- 交互式 API 文档，访问 `http://localhost:8000/docs`
+- API Key 认证和限流支持
+- 与 SDK 相同的配置（通过 `.env` 文件）
+
+完整的 API 文档和使用示例，请参阅 [API Server文档](docs/api/0005-api_server.md)。
+
+### 🔌 MCP Server
+
+PowerMem 还提供了模型上下文协议（MCP Server），支持与 Claude Desktop 等 MCP 兼容客户端集成。MCP Server通过 MCP 协议暴露 PowerMem 的记忆管理功能，使 AI 助手能够无缝访问和管理记忆。
+
+**与 SDK 的关系**：MCP Server 使用相同的 PowerMem SDK 并共享相同的配置（`.env` 文件）。它提供了与 Python SDK 相同的记忆管理功能的 MCP 接口，使 PowerMem 可供 MCP 兼容的 AI 助手使用。
+
+**安装**：
+
+```bash
+# 安装 PowerMem（必需）
+pip install powermem
+
+# 安装 uvx（如果尚未安装）
+# 在 macOS/Linux 上：
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 在 Windows 上：
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**启动 MCP Server**：
+
+```bash
+# SSE 模式（推荐，默认端口 8000）
+uvx powermem-mcp sse
+
+# SSE 模式，自定义端口
+uvx powermem-mcp sse 8001
+
+# Stdio 模式
+uvx powermem-mcp stdio
+
+# Streamable HTTP 模式（默认端口 8000）
+uvx powermem-mcp streamable-http
+
+# Streamable HTTP 模式，自定义端口
+uvx powermem-mcp streamable-http 8001
+```
+
+**与 Claude Desktop 集成**：
+
+在 Claude Desktop 配置文件中添加以下配置：
+
+```json
+{
+  "mcpServers": {
+    "powermem": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+MCP Server提供记忆管理工具，包括添加、搜索、更新和删除记忆。完整的 MCP 文档和使用示例，请参阅 [MCP Server文档](docs/api/0004-mcp.md)。
+
 ## 🔗 集成与演示
 
 - 🔗 **LangChain 集成**：基于 LangChain + PowerMem + OceanBase 构建医疗支持机器人，[查看示例](examples/langchain/README.md)
@@ -119,10 +208,11 @@ for result in results.get('results', []):
 
 ## ⭐ 重点发布说明
 
-| Version | Iteration Period | Release Date | Function |
-|---------|--------|-------|---------|
-| 0.2.0 | 2025.12 | 2025.12.16 | <ul><li>高级用户画像管理，支持 AI 应用的“千人千面”</li><li>扩展多模态支持，包括文本、图像和音频记忆</li></ul> |
-| 0.1.0 | 2025.11 | 2025.11.14 | <ul><li>核心记忆管理功能，支持持久化存储记忆</li><li>支持向量、全文和图的混合检索</li><li>基于 LLM 的事实提取智能记忆</li><li>支持基于艾宾浩斯遗忘曲线的全生命周期记忆管理</li><li>支持 Multi-Agent 记忆管理</li><li>多存储后端支持（OceanBase、PostgreSQL、SQLite）</li><li>支持通过多跳图检索的方式处理知识图谱的检索</li></ul> |
+| Version | Release Date | Function |
+|---------|-------|---------|
+| 0.3.0 |  2026.01.09 | <ul><li>生产就绪的 HTTP API Server，提供所有记忆操作的 RESTful 端点</li><li>Docker 支持，便于部署和容器化</li>></ul> |
+| 0.2.0 | 2025.12.16 | <ul><li>高级用户画像管理，支持 AI 应用的"千人千面"</li><li>扩展多模态支持，包括文本、图像和音频记忆</li></ul> |
+| 0.1.0 | 2025.11.14 | <ul><li>核心记忆管理功能，支持持久化存储记忆</li><li>支持向量、全文和图的混合检索</li><li>基于 LLM 的事实提取智能记忆</li><li>支持基于艾宾浩斯遗忘曲线的全生命周期记忆管理</li><li>支持 Multi-Agent 记忆管理</li><li>多存储后端支持（OceanBase、PostgreSQL、SQLite）</li><li>支持通过多跳图检索的方式处理知识图谱的检索</li></ul> |
 
 ## 💬 支持
 
