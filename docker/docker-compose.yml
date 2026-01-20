@@ -1,5 +1,10 @@
 version: '3.8'
 
+networks:
+  powermem-network:
+    driver: bridge
+    name: powermem-network
+
 services:
   powermem-server:
     build:
@@ -47,6 +52,8 @@ services:
         max-file: "3"
     depends_on:
       - seekdb
+    networks:
+      - powermem-network
 
   seekdb:
     image: oceanbase/seekdb:latest
@@ -80,6 +87,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      - powermem-network
 
 volumes:
   seekdb_data:
