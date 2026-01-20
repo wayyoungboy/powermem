@@ -27,7 +27,7 @@ services:
       - POWERMEM_SERVER_CORS_ENABLED=true
       - POWERMEM_SERVER_CORS_ORIGINS=*
       - POWERMEM_DATABASE_URL=
-      # Database configuration for connecting to SeekDB
+      # Database configuration for connecting to seekdb
       # Use SEEKDB_ROOT_PASSWORD variable for unified password management
       - DATABASE_PROVIDER=oceanbase
       - OCEANBASE_HOST=seekdb
@@ -36,6 +36,8 @@ services:
       - OCEANBASE_PASSWORD=${SEEKDB_ROOT_PASSWORD:-}
       - OCEANBASE_DATABASE=powermem
       - OCEANBASE_COLLECTION=memories
+    env_file:
+      - .env
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
@@ -62,7 +64,7 @@ services:
       - "2881:2881"
       - "2886:2886"
     environment:
-      # Unified password variable for both SeekDB and PowerMem Server
+      # Unified password variable for both seekdb and PowerMem Server
       - ROOT_PASSWORD=${SEEKDB_ROOT_PASSWORD:-}
       - CPU_COUNT=4
       - MEMORY_LIMIT=4G
