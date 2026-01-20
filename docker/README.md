@@ -109,6 +109,7 @@ For detailed documentation, see [DOCKER.md](./DOCKER.md).
 
 - All Docker commands should be run from the **project root directory**, not from the `docker/` directory
 - The build context is the project root, so paths in Dockerfile are relative to the project root
+- The `.env` file should be in the project root directory and will be mounted into the container
 - seekdb data is persisted in a Docker volume named `seekdb_data`
 - On macOS with Docker version > 4.9.0, there are known issues with seekdb. Consider using an older Docker version if needed.
 - **Password Management**: 
