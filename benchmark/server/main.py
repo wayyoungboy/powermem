@@ -220,13 +220,25 @@ def load_config() -> Dict[str, Any]:
     }
     
     # Add provider-specific base URL if available
+    # Note: Each provider has its own specific field name for base URL
     if llm_base_url:
         if LLM_PROVIDER == "openai":
             llm_config["openai_base_url"] = llm_base_url
-        elif LLM_PROVIDER in ("qwen", "siliconflow", "ollama", "vllm", "deepseek"):
-            llm_config[f"{LLM_PROVIDER}_base_url"] = llm_base_url
+        elif LLM_PROVIDER == "qwen":
+            # Qwen uses dashscope_base_url, not qwen_base_url
+            llm_config["dashscope_base_url"] = llm_base_url
+        elif LLM_PROVIDER == "deepseek":
+            llm_config["deepseek_base_url"] = llm_base_url
+        elif LLM_PROVIDER == "vllm":
+            llm_config["vllm_base_url"] = llm_base_url
+        elif LLM_PROVIDER == "ollama":
+            llm_config["ollama_base_url"] = llm_base_url
         elif LLM_PROVIDER == "anthropic":
             llm_config["anthropic_base_url"] = llm_base_url
+        elif LLM_PROVIDER == "siliconflow":
+            # SiliconFlow may use a generic base_url or siliconflow_base_url
+            # Using siliconflow_base_url as fallback
+            llm_config["siliconflow_base_url"] = llm_base_url
     
     # Add optional parameters
     if LLM_MAX_TOKENS:
@@ -245,11 +257,21 @@ def load_config() -> Dict[str, Any]:
     }
     
     # Add provider-specific base URL if available
+    # Note: Each provider has its own specific field name for base URL
     if embedding_base_url:
         if EMBEDDING_PROVIDER == "openai":
             embedder_config["openai_base_url"] = embedding_base_url
-        elif EMBEDDING_PROVIDER in ("qwen", "siliconflow", "huggingface", "lmstudio", "ollama"):
-            embedder_config[f"{EMBEDDING_PROVIDER}_base_url"] = embedding_base_url
+        elif EMBEDDING_PROVIDER == "qwen":
+            # Qwen uses dashscope_base_url, not qwen_base_url
+            embedder_config["dashscope_base_url"] = embedding_base_url
+        elif EMBEDDING_PROVIDER == "siliconflow":
+            embedder_config["siliconflow_base_url"] = embedding_base_url
+        elif EMBEDDING_PROVIDER == "huggingface":
+            embedder_config["huggingface_base_url"] = embedding_base_url
+        elif EMBEDDING_PROVIDER == "lmstudio":
+            embedder_config["lmstudio_base_url"] = embedding_base_url
+        elif EMBEDDING_PROVIDER == "ollama":
+            embedder_config["ollama_base_url"] = embedding_base_url
 
     # Build configuration dictionary
     config = {
@@ -279,16 +301,19 @@ def load_config() -> Dict[str, Any]:
     
     # Add sparse embedder if enabled
     if SPARSE_VECTOR_ENABLE:
+        sparse_config = {
+            "api_key": SPARSE_EMBEDDER_API_KEY,
+            "model": SPARSE_EMBEDDER_MODEL,
+            "embedding_dims": SPARSE_EMBEDDER_DIMS,
+        }
+        # Sparse embedder uses generic base_url field, not provider-specific
+        if SPARSE_EMBEDDING_BASE_URL:
+            sparse_config["base_url"] = SPARSE_EMBEDDING_BASE_URL
+        
         config["sparse_embedder"] = {
             "provider": SPARSE_EMBEDDER_PROVIDER,
-            "config": {
-                "api_key": SPARSE_EMBEDDER_API_KEY,
-                "model": SPARSE_EMBEDDER_MODEL,
-                "embedding_dims": SPARSE_EMBEDDER_DIMS,
-            },
+            "config": sparse_config,
         }
-        if SPARSE_EMBEDDING_BASE_URL:
-            config["sparse_embedder"]["config"][f"{SPARSE_EMBEDDER_PROVIDER}_base_url"] = SPARSE_EMBEDDING_BASE_URL
 
     return config
 
