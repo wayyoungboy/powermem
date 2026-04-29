@@ -3,11 +3,11 @@ name: Build Package
 # Main PowerMem release (Python packages). Does not run on plugin-only tags (plugins-v*).
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, feat-optional-cli-server-0427]
     tags:
       - 'v*'
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, feat-optional-cli-server-0427]
   workflow_dispatch:
     inputs:
       python_version:
