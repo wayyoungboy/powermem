@@ -38,7 +38,20 @@ Requires the OpenClaw CLI to be installed.
 ### Install
 
 ```bash
+# Core only (SDK + storage backends)
 pip install powermem
+
+# With CLI (pmem / powermem-cli)
+pip install "powermem[cli]"
+
+# With HTTP API server (powermem-server)
+pip install "powermem[server]"
+
+# With MCP server (powermem-mcp)
+pip install "powermem[mcp]"
+
+# Everything at once
+pip install "powermem[cli,server,mcp]"
 ```
 
 ### SDK example
