@@ -50,6 +50,9 @@ pip install "powermem[server]"
 # MCP Server付き（powermem-mcp）
 pip install "powermem[mcp]"
 
+# SeekDB ストレージバックエンド付き
+pip install "powermem[seekdb]"
+
 # すべてまとめてインストール
 pip install "powermem[cli,server,mcp]"
 ```
