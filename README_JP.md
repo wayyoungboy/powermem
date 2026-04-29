@@ -38,7 +38,20 @@ OpenClaw CLI がインストール済みである必要があります。
 ### インストール
 
 ```bash
+# コアのみ（SDK + ストレージバックエンド）
 pip install powermem
+
+# CLI付き（pmem / powermem-cli）
+pip install "powermem[cli]"
+
+# HTTP API Server付き（powermem-server）
+pip install "powermem[server]"
+
+# MCP Server付き（powermem-mcp）
+pip install "powermem[mcp]"
+
+# すべてまとめてインストール
+pip install "powermem[cli,server,mcp]"
 ```
 
 ### SDK サンプル
