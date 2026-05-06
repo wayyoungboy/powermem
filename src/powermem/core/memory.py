@@ -231,10 +231,7 @@ class Memory(MemoryBase):
             graph_store_config = self.config.get("graph_store", {})
             if graph_store_config:
                 provider = graph_store_config.get("provider", "oceanbase")
-                if self.memory_config and self.memory_config.graph_store:
-                    config_to_pass = self.memory_config.graph_store
-                else:
-                    config_to_pass = graph_store_config.get("config", {})
+                config_to_pass = self.memory_config if self.memory_config else self.config
                 self.graph_store = GraphStoreFactory.create(provider, config_to_pass)
 
 
