@@ -6,7 +6,7 @@ of the memory system.
 """
 
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from powermem.integrations.embeddings.config.base import BaseEmbedderConfig
 from powermem.integrations.embeddings.config.providers import OpenAIEmbeddingConfig
@@ -265,6 +265,19 @@ class MemoryConfig(BaseModel):
         description="Configuration for query rewrite module",
         default=None,
     )
+
+    @field_validator('sparse_embedder', mode='before')
+    @classmethod
+    def resolve_sparse_embedder(cls, v):
+        if isinstance(v, dict) and 'provider' in v:
+            provider = v['provider'].lower()
+            config_dict = v.get('config', {})
+            config_cls = (
+                BaseSparseEmbedderConfig.get_provider_config_cls(provider)
+                or BaseSparseEmbedderConfig
+            )
+            return config_cls(**config_dict)
+        return v
 
     def __init__(self, **data):
         super().__init__(**data)
