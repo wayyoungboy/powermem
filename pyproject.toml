@@ -27,8 +27,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "httpx>=0.24.0",
     "sqlalchemy>=2.0.0",
-    "greenlet<3.0",             # greenlet 3.x requires GCC>=5 C++11, incompatible with CentOS 7
-    "numpy>=1.21.0,<2.0.0",     # numpy 2.x requires GCC>=9.3, incompatible with CentOS 7
+    "numpy>=1.21.0",
     "pytz>=2023.3",
     "python-dotenv>=1.0.0",
     "rank-bm25>=0.2.2",
