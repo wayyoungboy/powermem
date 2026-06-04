@@ -90,7 +90,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev,test]"
+          pip install -e ".[dev,test,seekdb]"
 
       - name: Deploy SeekDB (OceanBase)
         run: |
@@ -232,7 +232,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev,test]"
+          pip install -e ".[dev,test,seekdb]"
 
       - name: Deploy SeekDB (OceanBase)
         run: |
@@ -337,4 +337,3 @@ jobs:
           require_tests: false
           job_name: Regression Tests
           check_name: Test Report
-
