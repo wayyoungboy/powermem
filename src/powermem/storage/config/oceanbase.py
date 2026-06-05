@@ -80,6 +80,15 @@ class OceanBaseConfig(BaseVectorStoreConfig):
         ),
         description="OceanBase password"
     )
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def _strip_wrapping_quotes_from_password(cls, value: Any) -> Any:
+        if isinstance(value, str) and len(value) >= 2:
+            stripped = value.strip()
+            if stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
+                return stripped[1:-1]
+        return value
     
     db_name: str = Field(
         default="test",
