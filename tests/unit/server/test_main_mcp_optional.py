@@ -1,7 +1,11 @@
 import builtins
 
+import pytest
+
 
 def test_load_mcp_asgi_app_skips_mcp_import_when_fastmcp_missing(monkeypatch):
+    pytest.importorskip("fastapi", exc_type=ImportError)
+
     from server import main
 
     monkeypatch.setattr(
