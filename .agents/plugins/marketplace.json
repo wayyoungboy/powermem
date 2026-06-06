@@ -1,0 +1,20 @@
+{
+  "name": "powermem",
+  "interface": {
+    "displayName": "PowerMem"
+  },
+  "plugins": [
+    {
+      "name": "memory-powermem",
+      "source": {
+        "source": "local",
+        "path": "./apps/codex-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Memory"
+    }
+  ]
+}

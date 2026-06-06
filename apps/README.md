@@ -8,9 +8,12 @@ First-party setup flows that connect PowerMem to AI clients and IDEs. Every path
 |-------------|-------------------|------------------------|
 | **Cursor**, **VS Code**, **Windsurf**, **GitHub Copilot**, **Qoder** | [`vscode-extension/`](vscode-extension/) | `Read and follow apps/vscode-extension/SETUP.md to setup PowerMem` |
 | **Claude Desktop**, **Cline**, **Codex**, **OpenCode**, Roo Code, Goose, or any other MCP client | [`mcp-client/`](mcp-client/) | `Read and follow apps/mcp-client/SETUP.md to setup PowerMem` |
+| **Codex plugin** | [`codex-plugin/`](codex-plugin/) | Install `memory-powermem`, then ask Codex to initialize PowerMem |
 | **Claude Code** (hook-based plugin) | [`claude-code-plugin/`](claude-code-plugin/) | `Read and follow apps/claude-code-plugin/SETUP.md to set up PowerMem memory for Claude Code.` |
 
-> **Codex** and **OpenCode** belong under `mcp-client/`, not `vscode-extension/`. The VS Code extension flow is for VS Code–compatible IDEs only.
+> **Codex** can use either `codex-plugin/` or the generic `mcp-client/` flow.
+> **OpenCode** belongs under `mcp-client/`, not `vscode-extension/`. The VS Code
+> extension flow is for VS Code–compatible IDEs only.
 
 For **OpenClaw**, use the separate [`memory-powermem`](https://github.com/ob-labs/memory-powermem) plugin — see [OpenClaw integration](../docs/integrations/openclaw.md).
 
@@ -20,6 +23,7 @@ For **OpenClaw**, use the separate [`memory-powermem`](https://github.com/ob-lab
 |-----------|-------------|
 | **[vscode-extension](vscode-extension/)** | VS Code extension and agent-guided setup for Cursor, VS Code, Windsurf, GitHub Copilot, and Qoder. Commands: Query memories, Add selection, Quick note, Link to AI tools, Setup, Dashboard. |
 | **[mcp-client](mcp-client/)** | Agent-guided setup for generic MCP clients (Claude Desktop, Cline, Codex, OpenCode, and others). Uses `powermem-mcp` directly; prefers SSE on port `8848`. |
+| **[codex-plugin](codex-plugin/)** | Codex plugin with bundled MCP, lifecycle hooks, skills, and scripts that install a plugin-local backend. |
 | **[claude-code-plugin](claude-code-plugin/)** | Claude Code plugin with **HTTP mode by default** (REST hooks; empty `mcpServers`). Optional **MCP mode** via [`config/mcp-mode.mcp.json`](claude-code-plugin/config/mcp-mode.mcp.json). |
 
 ## Quick start

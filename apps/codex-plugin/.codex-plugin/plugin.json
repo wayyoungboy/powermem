@@ -1,0 +1,32 @@
+{
+  "name": "memory-powermem",
+  "version": "0.1.0",
+  "description": "PowerMem persistent memory integration for Codex with bundled MCP, lifecycle hooks, and user-invocable memory skills.",
+  "author": {
+    "name": "OceanBase / PowerMem",
+    "email": "open_oceanbase@oceanbase.com",
+    "url": "https://github.com/oceanbase"
+  },
+  "homepage": "https://github.com/oceanbase/powermem/tree/main/apps/codex-plugin",
+  "repository": "https://github.com/oceanbase/powermem",
+  "license": "Apache-2.0",
+  "keywords": ["memory", "powermem", "mcp", "codex"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.codex.json",
+  "interface": {
+    "displayName": "PowerMem",
+    "shortDescription": "Connect Codex to PowerMem persistent memory.",
+    "longDescription": "PowerMem adds persistent memory to Codex through a plugin-local backend install, bundled MCP configuration, memory skills, and lifecycle hooks.",
+    "developerName": "OceanBase / PowerMem",
+    "category": "Productivity",
+    "capabilities": ["MCP", "Memory", "Hooks"],
+    "websiteURL": "https://github.com/oceanbase/powermem",
+    "defaultPrompt": [
+      "Initialize PowerMem memory for Codex.",
+      "Recall relevant PowerMem memories.",
+      "Save this context to PowerMem."
+    ],
+    "brandColor": "#2563EB"
+  }
+}
