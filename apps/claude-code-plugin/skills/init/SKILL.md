@@ -17,6 +17,6 @@ Initialize PowerMem for Claude Code.
    - `POWERMEM_INIT_LLM_MODEL`
    - `POWERMEM_INIT_LLM_API_KEY`
    - `POWERMEM_INIT_LLM_BASE_URL`
-   - `POWERMEM_INIT_PACKAGE` when the user wants to test unpublished backend code instead of the PyPI `powermem[server,mcp,seekdb]` package.
+   - `POWERMEM_INIT_PACKAGE` when the user wants to test unpublished backend code instead of the PyPI `powermem` package.
 5. Never print API keys. Mask secrets in summaries.
 6. After init succeeds, run `scripts/status.sh` again and report the base URL.

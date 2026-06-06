@@ -9,11 +9,13 @@ echo "PowerMem Claude Code plugin init"
 echo "Data dir: $DATA_DIR"
 
 base_url=$(runtime_base_url)
-if is_healthy "$base_url"; then
-  write_runtime_base_url "$base_url"
-  echo "PowerMem backend is already healthy: $base_url"
-  exit 0
-fi
+
+BOOTSTRAP_PYTHON=$(choose_python) || {
+  echo "No Python >= 3.11 interpreter found. Set POWERMEM_INIT_PYTHON=/path/to/python3.11 and retry." >&2
+  exit 1
+}
+export POWERMEM_BOOTSTRAP_PYTHON=$BOOTSTRAP_PYTHON
+echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON"))"
 
 create_env_file() {
   python3 - "$ENV_FILE" <<'PY'
@@ -113,28 +115,52 @@ fi
 if [ ! -x "$(venv_powermem_server)" ]; then
   echo "Preparing plugin virtualenv."
   if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv "$VENV_DIR"
+    "$BOOTSTRAP_PYTHON" -m venv "$VENV_DIR"
   fi
   PYTHON=$(venv_python)
+  echo "Venv Python: $PYTHON ($(python_version "$PYTHON"))"
   "$PYTHON" -m pip install -U pip setuptools wheel
-  PACKAGE=${POWERMEM_INIT_PACKAGE:-powermem[server,mcp,seekdb]}
+  PACKAGE=${POWERMEM_INIT_PACKAGE:-powermem}
   echo "Installing $PACKAGE"
   "$PYTHON" -m pip install "$PACKAGE"
 else
   echo "Using existing plugin virtualenv: $VENV_DIR"
+  PYTHON=$(venv_python)
+  echo "Venv Python: $PYTHON ($(python_version "$PYTHON"))"
 fi
 
 if pid_alive; then
-  echo "Existing PowerMem server process is running: $(cat "$PID_FILE")"
+  echo "Managed PowerMem server process is running: $(cat "$PID_FILE")"
+  if is_healthy "$base_url"; then
+    write_runtime_base_url "$base_url"
+    echo "Managed PowerMem backend is healthy: $base_url"
+    exit 0
+  fi
+  echo "Managed server PID exists but health check failed; starting a fresh managed server."
+fi
+
+if is_healthy "$base_url"; then
+  write_runtime_base_url "$base_url"
+  echo "External PowerMem backend is healthy: $base_url"
+  echo "Plugin config and venv are ready. Not starting a managed server."
+  exit 0
 fi
 
 if [ -n "${POWERMEM_INIT_PORT:-}" ]; then
   port=$POWERMEM_INIT_PORT
+  if ! port_free "$port"; then
+    describe_port "$port" >&2
+    echo "Requested POWERMEM_INIT_PORT=$port is not available. Stop that process or choose another port." >&2
+    exit 1
+  fi
 elif port_free 8848; then
   port=8848
 else
+  describe_port 8848 >&2
+  echo "Port 8848 is occupied and not a healthy PowerMem backend; looking for a free port in 8849-8899." >&2
   port=$(find_free_port 8849 8899) || {
     echo "No free port found in 8849-8899." >&2
+    describe_port 8848 >&2
     exit 1
   }
 fi
@@ -162,5 +188,5 @@ done
 
 echo "PowerMem server did not become healthy within 120 seconds." >&2
 echo "Check log: $LOG_FILE" >&2
+describe_port "$port" >&2
 exit 1
-

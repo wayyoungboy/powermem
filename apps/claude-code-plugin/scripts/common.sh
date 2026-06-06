@@ -21,6 +21,34 @@ VENV_DIR="$DATA_DIR/venv"
 
 mkdir -p "$DATA_DIR"
 
+choose_python() {
+  if [ -n "${POWERMEM_INIT_PYTHON:-}" ]; then
+    candidates=$POWERMEM_INIT_PYTHON
+  else
+    candidates="python3.11 python3 python"
+  fi
+  for candidate in $candidates; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      if "$candidate" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+      then
+        command -v "$candidate"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+python_version() {
+  "$1" - <<'PY'
+import sys
+print(".".join(map(str, sys.version_info[:3])))
+PY
+}
+
 runtime_base_url() {
   if [ -n "${POWERMEM_BASE_URL:-}" ]; then
     printf '%s\n' "$POWERMEM_BASE_URL"
@@ -73,7 +101,8 @@ venv_powermem_server() {
 }
 
 port_free() {
-  python3 - "$1" <<'PY'
+  py=${POWERMEM_BOOTSTRAP_PYTHON:-python3}
+  "$py" - "$1" <<'PY'
 import socket
 import sys
 
@@ -86,6 +115,17 @@ except OSError:
 finally:
     sock.close()
 PY
+}
+
+describe_port() {
+  port=$1
+  echo "Port $port is occupied."
+  if command -v lsof >/dev/null 2>&1; then
+    echo "lsof -nP -iTCP:$port -sTCP:LISTEN:"
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+  else
+    echo "lsof is not installed; run: netstat -anp | grep ':$port'"
+  fi
 }
 
 find_free_port() {
@@ -101,4 +141,3 @@ find_free_port() {
   done
   return 1
 }
-
