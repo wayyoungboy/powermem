@@ -13,6 +13,29 @@ This directory still contains the plugin itself (`.claude-plugin/`, `hooks/`,
 claude --plugin-dir /path/to/powermem/apps/claude-code-plugin
 ```
 
+## Marketplace test flow
+
+For a GitHub marketplace test branch:
+
+```text
+/plugin marketplace add wayyoungboy/powermem@claude-marketplace-test-20260606224153
+/plugin install memory-powermem@powermem
+/reload-plugins
+/memory-powermem:init
+```
+
+`/reload-plugins` is required after install or update so Claude Code loads newly
+installed skills such as `/memory-powermem:init`, `/memory-powermem:status`,
+`/memory-powermem:stop`, and `/memory-powermem:reset`.
+
+Uninstall:
+
+```text
+/plugin uninstall memory-powermem@powermem
+/plugin marketplace remove powermem
+/reload-plugins
+```
+
 ## Troubleshooting — Error Handling Prompt
 
 When PowerMem encounters an issue (memory writes fail, search returns nothing,
