@@ -26,6 +26,14 @@ do not run `claude plugin install`, and do not build the dashboard. The plugin i
 already installed; this section only prepares the PowerMem backend that the plugin
 connects to.
 
+Installed-plugin init creates a plugin-local Python environment and installs the
+backend package with `pip install powermem` by default. Therefore the PyPI release
+used by this flow must already contain the backend capabilities required by the
+plugin, including the local embedding dependencies. If the user is validating a
+plugin change that depends on unpublished backend code, use
+`POWERMEM_INIT_PACKAGE` to install that exact Git branch or commit instead of the
+PyPI package.
+
 Installed-plugin init is idempotent and uses plugin-local state:
 
 ```text
@@ -65,7 +73,8 @@ Follow these steps:
    Optional variables:
    - `POWERMEM_INIT_LLM_BASE_URL` for a custom provider gateway.
    - `POWERMEM_INIT_PACKAGE` to test unpublished backend code instead of PyPI
-     `powermem`.
+     `powermem`, for example
+     `powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>`.
    - `POWERMEM_INIT_PYTHON` to force a specific Python >= 3.11.
    - `POWERMEM_INIT_PORT` to force the managed server port.
    - `POWERMEM_INIT_PRELOAD_MODEL=1` to pre-download the default local
@@ -81,6 +90,11 @@ ModelScope first, then bridge the files into the HuggingFace hub cache layout th
 the default embedder checks. Do **not** pre-warm with
 `sentence_transformers.SentenceTransformer(...)` or raw `huggingface_hub`; those
 can hang on networks where HuggingFace is slow or blocked. To test connectivity:
+
+If startup fails with `No module named 'sentence_transformers'`, the backend
+package installed in the plugin venv does not include the local embedding
+dependency. Publish or install a backend build that includes it, or set
+`POWERMEM_INIT_PACKAGE` to a Git branch/commit that does.
 
 ```bash
 curl -s -m 10 -o /dev/null -w "ModelScope: HTTP %{http_code}\n" \

@@ -5,8 +5,8 @@
     "email": "open_oceanbase@oceanbase.com"
   },
   "metadata": {
-    "description": "PowerMem marketplace for Claude Code plugin testing.",
-    "version": "0.1.0-test.20260606235520"
+    "description": "PowerMem marketplace: intelligent memory for Claude Code.",
+    "version": "0.1.0"
   },
   "plugins": [
     {

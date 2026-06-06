@@ -13,12 +13,13 @@ This directory still contains the plugin itself (`.claude-plugin/`, `hooks/`,
 claude --plugin-dir /path/to/powermem/apps/claude-code-plugin
 ```
 
-## Marketplace test flow
+## Marketplace install
 
-For a GitHub marketplace test branch:
+Once the PowerMem marketplace entry is available, install the Claude Code plugin
+with:
 
 ```text
-/plugin marketplace add wayyoungboy/powermem@claude-marketplace-test-20260606224153
+/plugin marketplace add oceanbase/powermem
 /plugin install memory-powermem@powermem
 /reload-plugins
 /memory-powermem:init
@@ -28,13 +29,28 @@ For a GitHub marketplace test branch:
 installed skills such as `/memory-powermem:init`, `/memory-powermem:status`,
 `/memory-powermem:stop`, and `/memory-powermem:reset`.
 
-By default `/memory-powermem:init` installs `powermem` from PyPI into the plugin
-data venv. To test unpublished backend code, run init with
-`POWERMEM_INIT_PACKAGE`, for example:
+The marketplace install only installs the Claude Code plugin connector. The
+`/memory-powermem:init` step prepares the backend by creating a plugin-local venv
+and installing `powermem` from PyPI.
+
+The PyPI package used by init must include the backend features and dependencies
+required by the plugin, including the default local embedding path
+(`sentence-transformers` / `all-MiniLM-L6-v2`). If you are testing plugin changes
+that depend on unpublished backend code, run init with `POWERMEM_INIT_PACKAGE`
+instead of the skill command:
 
 ```bash
-POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/wayyoungboy/powermem.git@claude-marketplace-test-20260606224153' \
+POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>' \
   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+```
+
+For marketplace branch testing before merge, add the marketplace from the same
+branch:
+
+```text
+/plugin marketplace add owner/powermem@<branch>
+/plugin install memory-powermem@powermem
+/reload-plugins
 ```
 
 To pre-download the default local embedding model through ModelScope before

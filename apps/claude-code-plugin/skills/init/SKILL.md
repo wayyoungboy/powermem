@@ -16,6 +16,11 @@ Use the plugin scripts as directed by that section:
 - `scripts/status.sh`
 - `scripts/init.sh`
 
+Remember that `scripts/init.sh` installs `powermem` from PyPI by default. If the
+user is testing unpublished backend changes, run the script with
+`POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>'`
+instead of using the default PyPI package.
+
 If values are missing, ask only for the missing values and pass them through
 `POWERMEM_INIT_*` environment variables. Never print API keys; mask secrets in
 summaries.
