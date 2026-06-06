@@ -37,6 +37,13 @@ POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/wayyoungboy/powermem.gi
   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
 ```
 
+To pre-download the default local embedding model through ModelScope before
+starting the server:
+
+```bash
+POWERMEM_INIT_PRELOAD_MODEL=1 sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+```
+
 Uninstall:
 
 ```text

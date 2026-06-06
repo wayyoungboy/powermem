@@ -129,6 +129,13 @@ else
   echo "Venv Python: $PYTHON ($(python_version "$PYTHON"))"
 fi
 
+if [ "${POWERMEM_INIT_PRELOAD_MODEL:-0}" = "1" ] || [ "${POWERMEM_INIT_PRELOAD_MODEL:-}" = "true" ]; then
+  echo "Preloading default local embedding model."
+  sh "$SCRIPT_DIR/preload-model.sh" "$PYTHON"
+else
+  echo "Skipping model preload. Set POWERMEM_INIT_PRELOAD_MODEL=1 to download via ModelScope and bridge to HuggingFace cache."
+fi
+
 if pid_alive; then
   echo "Managed PowerMem server process is running: $(cat "$PID_FILE")"
   if is_healthy "$base_url"; then
