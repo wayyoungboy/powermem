@@ -18,8 +18,8 @@ codex plugin add memory-powermem@powermem
 
 The repository includes both Codex marketplace manifest locations used in the
 ecosystem: `.agents/plugins/marketplace.json` per the current Codex docs and
-`.codex-plugin/marketplace.json` for compatibility with agentmemory-style
-repositories.
+`.codex-plugin/marketplace.json` for compatibility with existing repository
+layouts.
 
 Then ask Codex:
 

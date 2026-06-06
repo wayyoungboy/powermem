@@ -92,7 +92,7 @@ def json_option(f):
 # Static command tree for fast shell completion (no Python process on TAB).
 # Keep in sync with cli.add_command / group.add_command below.
 _COMPLETION_COMMANDS = [
-    "config", "manage", "memory", "shell", "stats",
+    "config", "connect", "manage", "memory", "shell", "stats",
 ]
 _COMPLETION_SUBCOMMANDS = {
     "config": ["init", "show", "test", "validate"],
@@ -333,12 +333,14 @@ from .commands.config import config_group
 from .commands.stats import stats_cmd
 from .commands.manage import manage_group
 from .commands.interactive import shell_cmd
+from .commands.connect import connect_group
 
 # Memory commands under "memory": pmem memory add/search/get/update/delete/list/delete-all
 cli.add_command(memory_group)
 
 # Register other command groups
 cli.add_command(config_group)
+cli.add_command(connect_group)
 cli.add_command(stats_cmd)
 cli.add_command(manage_group)
 cli.add_command(shell_cmd)

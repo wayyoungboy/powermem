@@ -9,6 +9,7 @@ from .config import config_group
 from .stats import stats_cmd
 from .manage import manage_group
 from .interactive import shell_cmd
+from .connect import connect_group
 
 __all__ = [
     "memory_group",
@@ -16,4 +17,5 @@ __all__ = [
     "stats_cmd",
     "manage_group",
     "shell_cmd",
+    "connect_group",
 ]

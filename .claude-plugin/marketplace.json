@@ -1,0 +1,20 @@
+{
+  "name": "powermem",
+  "owner": {
+    "name": "OceanBase / PowerMem",
+    "email": "open_oceanbase@oceanbase.com"
+  },
+  "metadata": {
+    "description": "PowerMem marketplace: persistent memory plugins for coding agents.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "memory-powermem",
+      "source": "./apps/claude-code-plugin",
+      "description": "PowerMem intelligent memory for Claude Code with lifecycle hooks, skills, and optional MCP tools.",
+      "category": "memory",
+      "tags": ["memory", "powermem", "rag", "hooks", "mcp", "oceanbase"]
+    }
+  ]
+}

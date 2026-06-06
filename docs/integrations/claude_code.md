@@ -110,9 +110,24 @@ End the session (or run `/compact`), then look for `POST /api/v1/memories` in th
 claude --plugin-dir /path/to/powermem/apps/claude-code-plugin
 ```
 
-#### Option B: Install from marketplace (not yet available)
+#### Option B: Install from repository marketplace
 
-This plugin is **not yet published** to a Claude Code plugin marketplace — use `--plugin-dir` (Option A) for now. (Note: the `memory-powermem` listing you may find in plugin directories is the [OpenClaw plugin](https://github.com/ob-labs/memory-powermem), a different ecosystem.) Once a marketplace release is available, you will be able to install it from there.
+When using a repository or fork that contains `.claude-plugin/marketplace.json`,
+install with:
+
+```text
+/plugin marketplace add oceanbase/powermem
+/plugin install memory-powermem@powermem
+```
+
+For branch testing, include the branch ref in the marketplace source:
+
+```text
+/plugin marketplace add wayyoungboy/powermem@<branch>
+/plugin install memory-powermem@powermem
+```
+
+After install, run `/reload-plugins` or start a new Claude Code session.
 
 #### Option C: Pack and copy to another machine (offline / internal)
 

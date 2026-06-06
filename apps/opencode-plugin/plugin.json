@@ -1,0 +1,12 @@
+{
+  "name": "powermem-capture",
+  "version": "0.1.0",
+  "description": "OpenCode plugin for PowerMem: captures session, prompt, tool, file, permission, task, and config events while providing memory commands through MCP.",
+  "author": {
+    "name": "OceanBase / PowerMem",
+    "url": "https://github.com/oceanbase"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/oceanbase/powermem",
+  "repository": "https://github.com/oceanbase/powermem"
+}
