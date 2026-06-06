@@ -28,6 +28,15 @@ For a GitHub marketplace test branch:
 installed skills such as `/memory-powermem:init`, `/memory-powermem:status`,
 `/memory-powermem:stop`, and `/memory-powermem:reset`.
 
+By default `/memory-powermem:init` installs `powermem[server,mcp,seekdb]` from
+PyPI into the plugin data venv. To test unpublished backend code, run init with
+`POWERMEM_INIT_PACKAGE`, for example:
+
+```bash
+POWERMEM_INIT_PACKAGE='powermem[server,mcp,seekdb] @ git+https://github.com/wayyoungboy/powermem.git@claude-marketplace-test-20260606224153' \
+  sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+```
+
 Uninstall:
 
 ```text
