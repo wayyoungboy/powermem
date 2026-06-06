@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "PowerMem marketplace: intelligent memory for Claude Code (Ebbinghaus decay, multi-agent, HTTP hooks).",
-    "version": "0.1.0"
+    "version": "0.1.0-test.20260606224153"
   },
   "plugins": [
     {
