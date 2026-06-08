@@ -1,4 +1,6 @@
-.PHONY: help install install-dev test test-unit test-integration test-e2e test-coverage test-fast test-slow lint format clean build build-package build-check build-dashboard build-claude-hook package-claude-plugin publish-pypi publish-testpypi install-build-tools upload docs bump-version server-start server-stop server-restart server-status server-logs server-dashboard-start docker-build docker-run docker-up docker-down docker-logs docker-stop docker-restart docker-clean docker-ps
+PYTHON ?= python3
+
+.PHONY: help install install-dev test test-unit test-integration test-e2e test-coverage test-fast test-slow check-python lint lint-pylint format-check format type-check clean build build-package build-check build-dashboard build-claude-hook package-claude-plugin publish-pypi publish-testpypi install-build-tools upload docs bump-version server-start server-stop server-restart server-status server-logs server-dashboard-start docker-build docker-run docker-up docker-down docker-logs docker-stop docker-restart docker-clean docker-ps
 
 help: ## Show help information
 	@echo "powermem Project Build Tools"
@@ -59,20 +61,25 @@ test-marker: ## Run tests with specific marker (usage: make test-marker MARKER=u
 	pytest -m $(MARKER) -v
 
 # Code quality
-lint: ## Run linting checks
-	flake8 src tests
-	pylint src/powermem || true
+check-python: ## Verify Python version
+	@$(PYTHON) -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 'Python >=3.11 required. Use PYTHON=python3.11 make lint or activate a Python 3.11+ environment.')"
 
-format-check: ## Check code formatting
-	black --check src tests
-	isort --check-only src tests
+lint: check-python ## Run linting checks
+	$(PYTHON) -m flake8 src tests
 
-format: ## Format code
-	black src tests
-	isort src tests
+lint-pylint: check-python ## Run optional pylint checks
+	$(PYTHON) -m pylint src/powermem
 
-type-check: ## Run type checking with mypy
-	mypy src/powermem
+format-check: check-python ## Check code formatting
+	$(PYTHON) -m black --check src tests
+	$(PYTHON) -m isort --check-only src tests
+
+format: check-python ## Format code
+	$(PYTHON) -m black src tests
+	$(PYTHON) -m isort src tests
+
+type-check: check-python ## Run type checking with mypy
+	$(PYTHON) -m mypy src/powermem
 
 # Cleanup
 clean: ## Clean build files
