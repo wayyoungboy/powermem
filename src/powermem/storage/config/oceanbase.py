@@ -4,6 +4,7 @@ from pydantic import AliasChoices, Field, field_validator, model_validator
 from powermem.settings import settings_config
 
 from powermem.storage.config.base import BaseVectorStoreConfig, BaseGraphStoreConfig
+from powermem.utils.strings import strip_wrapping_quotes
 
 
 class OceanBaseConfig(BaseVectorStoreConfig):
@@ -84,11 +85,7 @@ class OceanBaseConfig(BaseVectorStoreConfig):
     @field_validator("password", mode="before")
     @classmethod
     def _strip_wrapping_quotes_from_password(cls, value: Any) -> Any:
-        if isinstance(value, str) and len(value) >= 2:
-            stripped = value.strip()
-            if stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
-                return stripped[1:-1]
-        return value
+        return strip_wrapping_quotes(value)
     
     db_name: str = Field(
         default="test",

@@ -2,6 +2,7 @@ from typing import Any, ClassVar, Dict, Optional, Union
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings
 from powermem.settings import settings_config
+from powermem.utils.strings import strip_wrapping_quotes
 
 
 class BaseVectorStoreConfig(BaseSettings):
@@ -161,11 +162,7 @@ class BaseGraphStoreConfig(BaseVectorStoreConfig):
     @field_validator("password", mode="before")
     @classmethod
     def _strip_wrapping_quotes_from_password(cls, value: Any) -> Any:
-        if isinstance(value, str) and len(value) >= 2:
-            stripped = value.strip()
-            if stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
-                return stripped[1:-1]
-        return value
+        return strip_wrapping_quotes(value)
     
     db_name: str = Field(
         default="test",

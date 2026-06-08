@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from powermem.storage.base import VectorStoreBase, OutputData
 from powermem.utils.utils import serialize_datetime, generate_snowflake_id
 from powermem.utils.oceanbase_util import OceanBaseUtil
+from powermem.utils.strings import strip_wrapping_quotes
 
 try:
     from pyobvector import (
@@ -39,14 +40,6 @@ from powermem.storage.oceanbase import constants
 from .models import create_memory_model
 
 logger = logging.getLogger(__name__)
-
-
-def _strip_wrapping_quotes(value: Any) -> Any:
-    if isinstance(value, str) and len(value) >= 2:
-        stripped = value.strip()
-        if stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
-            return stripped[1:-1]
-    return value
 
 
 class OceanBaseVectorStore(VectorStoreBase):
@@ -148,7 +141,9 @@ class OceanBaseVectorStore(VectorStoreBase):
             "host": host or connection_args.get("host", constants.DEFAULT_OCEANBASE_CONNECTION["host"]),
             "port": port or connection_args.get("port", constants.DEFAULT_OCEANBASE_CONNECTION["port"]),
             "user": user or connection_args.get("user", constants.DEFAULT_OCEANBASE_CONNECTION["user"]),
-            "password": _strip_wrapping_quotes(password or connection_args.get("password", constants.DEFAULT_OCEANBASE_CONNECTION["password"])),
+            "password": strip_wrapping_quotes(
+                password or connection_args.get("password", constants.DEFAULT_OCEANBASE_CONNECTION["password"])
+            ),
             "db_name": db_name or connection_args.get("db_name", constants.DEFAULT_OCEANBASE_CONNECTION["db_name"]),
             "ob_path": ob_path or connection_args.get("ob_path", constants.DEFAULT_OCEANBASE_CONNECTION["ob_path"]),
             "pool_recycle": pool_recycle,

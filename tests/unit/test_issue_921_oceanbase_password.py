@@ -32,6 +32,7 @@ import powermem.config_loader as config_loader
 import powermem.settings as settings
 from powermem.config_loader import load_config_from_env
 from powermem.storage.oceanbase.oceanbase import OceanBaseVectorStore
+from powermem.utils.strings import strip_wrapping_quotes
 
 
 def _disable_env_file(monkeypatch):
@@ -65,3 +66,11 @@ def test_oceanbase_vector_store_strips_wrapping_quotes_from_connection_args(monk
     )
 
     assert store.connection_args["password"] == "powermem"
+
+
+def test_strip_wrapping_quotes_uses_trimmed_length_for_detection():
+    assert strip_wrapping_quotes(" ' ") == " ' "
+
+
+def test_strip_wrapping_quotes_documents_literal_quote_tradeoff():
+    assert strip_wrapping_quotes("'quoted-password'") == "quoted-password"
