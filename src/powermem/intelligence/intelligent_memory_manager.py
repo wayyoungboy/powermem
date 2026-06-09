@@ -49,6 +49,9 @@ class IntelligentMemoryManager:
             self.config.get("llm", {})
         )
         self.ebbinghaus_algorithm = EbbinghausAlgorithm(self.intelligent_config)
+        self.forgotten_score_multiplier = self._load_forgotten_score_multiplier(
+            self.intelligent_config.get("forgotten_score_multiplier", 0.1)
+        )
         
         # Initialize LLM for importance evaluation
         self._initialize_llm()
@@ -185,11 +188,27 @@ class IntelligentMemoryManager:
                     decay_rate=decay_rate,
                 )
                 
-                # Update result with processed information
+                # Update result with processed information. Keep the storage
+                # score for diagnostics, but expose the final score because
+                # it is the value used for user-visible ranking.
                 processed_result = result.copy()
+                original_score = processed_result.get("score")
+                forgotten_score_multiplier = (
+                    self.forgotten_score_multiplier
+                    if self._is_marked_forgetting(result)
+                    else 1.0
+                )
+                if original_score is not None:
+                    processed_result["original_score"] = original_score
                 processed_result["relevance_score"] = relevance_score
                 processed_result["decay_factor"] = decay_factor
-                processed_result["final_score"] = relevance_score * decay_factor
+                processed_result["forgotten_score_multiplier"] = (
+                    forgotten_score_multiplier
+                )
+                processed_result["final_score"] = (
+                    relevance_score * decay_factor * forgotten_score_multiplier
+                )
+                processed_result["score"] = processed_result["final_score"]
                 
                 processed_results.append(processed_result)
             
@@ -203,6 +222,34 @@ class IntelligentMemoryManager:
         except Exception as e:
             logger.error(f"Failed to process search results: {e}")
             return results
+
+    def _is_marked_forgetting(self, memory: Dict[str, Any]) -> bool:
+        value = memory.get("should_forget")
+        metadata = memory.get("metadata") or {}
+        if value is None:
+            value = metadata.get("should_forget")
+        if value is None:
+            management = metadata.get("memory_management") or {}
+            value = management.get("should_forget")
+        return self._coerce_bool(value)
+
+    @staticmethod
+    def _coerce_bool(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() == "true"
+        return False
+
+    @staticmethod
+    def _load_forgotten_score_multiplier(value: Any) -> float:
+        try:
+            multiplier = float(value)
+        except (TypeError, ValueError):
+            return 0.1
+        if multiplier < 0:
+            return 0.1
+        return min(multiplier, 1.0)
     
     async def process_search_results_async(
         self,
