@@ -456,8 +456,9 @@ class MemoryGraph(GraphStoreBase):
         search_output = self._search_graph_db(node_list=list(entity_type_map.keys()), filters=filters)
         to_be_deleted = self._get_delete_entities_from_search_output(search_output, data, filters)
 
-        deleted_entities = self._delete_entities(to_be_deleted, filters)
-        added_entities = self._add_entities(to_be_added, filters, entity_type_map)
+        with self.engine.begin() as conn:
+            deleted_entities = self._delete_entities(to_be_deleted, filters, conn=conn)
+            added_entities = self._add_entities(to_be_added, filters, entity_type_map, conn=conn)
         logger.debug("Deleted entities: %s, Added entities: %s", deleted_entities, added_entities)
         return {"deleted_entities": deleted_entities, "added_entities": added_entities}
 
@@ -1043,7 +1044,8 @@ class MemoryGraph(GraphStoreBase):
     def _delete_entities(
             self,
             to_be_deleted: List[Dict[str, str]],
-            filters: Dict[str, Any]
+            filters: Dict[str, Any],
+            conn=None
     ) -> List[Dict[str, int]]:
         """Delete the specified relationships from the graph.
 
@@ -1137,12 +1139,18 @@ class MemoryGraph(GraphStoreBase):
             where_str = " AND ".join(where_clauses)
             where_clause = text(where_str).bindparams(**params)
 
-            # Delete relationships using pyobvector delete method.
+            # Delete relationships.
             try:
-                delete_result = self.client.delete(
-                    table_name=constants.TABLE_RELATIONSHIPS,
-                    where_clause=[where_clause]
-                )
+                if conn is not None:
+                    delete_result = conn.execute(
+                        text(f"DELETE FROM {constants.TABLE_RELATIONSHIPS} WHERE {where_str}"),
+                        params,
+                    )
+                else:
+                    delete_result = self.client.delete(
+                        table_name=constants.TABLE_RELATIONSHIPS,
+                        where_clause=[where_clause]
+                    )
                 deleted_count = (
                     delete_result.rowcount
                     if hasattr(delete_result, "rowcount")
@@ -1151,6 +1159,8 @@ class MemoryGraph(GraphStoreBase):
                 results.append({"deleted_count": deleted_count})
             except Exception as e:
                 logger.warning("Error deleting relationship: %s", e)
+                if conn is not None:
+                    raise
                 results.append({"deleted_count": 0})
 
         return results
@@ -1159,7 +1169,8 @@ class MemoryGraph(GraphStoreBase):
             self,
             to_be_added: List[Dict[str, str]],
             filters: Dict[str, Any],
-            entity_type_map: Dict[str, str]
+            entity_type_map: Dict[str, str],
+            conn=None
     ) -> List[Dict[str, str]]:
         """Add new entities and relationships to the graph.
 
@@ -1202,7 +1213,13 @@ class MemoryGraph(GraphStoreBase):
                                               dest_embedding, filters)
 
             # Create or update relationship
-            rel_result = self._create_or_update_relationship(source_id, dest_id, relationship, filters)
+            rel_result = self._create_or_update_relationship(
+                source_id,
+                dest_id,
+                relationship,
+                filters,
+                conn=conn,
+            )
             results.append(rel_result)
 
         return results
@@ -1308,7 +1325,8 @@ class MemoryGraph(GraphStoreBase):
             source_id: int,
             dest_id: int,
             relationship_type: str,
-            filters: Dict[str, Any]
+            filters: Dict[str, Any],
+            conn=None
     ) -> Dict[str, str]:
         """Create or update a relationship between two entities.
 
@@ -1338,13 +1356,19 @@ class MemoryGraph(GraphStoreBase):
 
         where_clause_with_params = text(where_str).bindparams(**params)
 
-        # Check if relationship exists
-        existing_relationships = self.client.get(
-            table_name=constants.TABLE_RELATIONSHIPS,
-            ids=None,
-            output_column_name=["id"],
-            where_clause=[where_clause_with_params]
-        )
+        # Check if relationship exists.
+        if conn is not None:
+            existing_relationships = conn.execute(
+                text(f"SELECT id FROM {constants.TABLE_RELATIONSHIPS} WHERE {where_str}"),
+                params,
+            )
+        else:
+            existing_relationships = self.client.get(
+                table_name=constants.TABLE_RELATIONSHIPS,
+                ids=None,
+                output_column_name=["id"],
+                where_clause=[where_clause_with_params]
+            )
 
         existing_rows = OceanBaseUtil.safe_fetchall(existing_relationships)
         if not existing_rows:
@@ -1362,24 +1386,50 @@ class MemoryGraph(GraphStoreBase):
                 "updated_at": current_time,
             }
 
-            self.client.insert(
-                table_name=constants.TABLE_RELATIONSHIPS,
-                data=[new_record],
-            )
+            if conn is not None:
+                conn.execute(
+                    text(
+                        f"""
+                        INSERT INTO {constants.TABLE_RELATIONSHIPS}
+                        (id, source_entity_id, relationship_type, destination_entity_id,
+                         user_id, agent_id, run_id, created_at, updated_at)
+                        VALUES
+                        (:id, :source_entity_id, :relationship_type, :destination_entity_id,
+                         :user_id, :agent_id, :run_id, :created_at, :updated_at)
+                        """
+                    ),
+                    new_record,
+                )
+            else:
+                self.client.insert(
+                    table_name=constants.TABLE_RELATIONSHIPS,
+                    data=[new_record],
+                )
 
         # Get the names for return value using pyobvector get method
         # First get the entities
-        source_entity = OceanBaseUtil.safe_fetchone(self.client.get(
-            table_name=constants.TABLE_ENTITIES,
-            ids=[source_id],
-            output_column_name=["id", "name"]
-        ))
+        if conn is not None:
+            source_entity = OceanBaseUtil.safe_fetchone(conn.execute(
+                text(f"SELECT id, name FROM {constants.TABLE_ENTITIES} WHERE id = :entity_id"),
+                {"entity_id": source_id},
+            ))
 
-        dest_entity = OceanBaseUtil.safe_fetchone(self.client.get(
-            table_name=constants.TABLE_ENTITIES,
-            ids=[dest_id],
-            output_column_name=["id", "name"]
-        ))
+            dest_entity = OceanBaseUtil.safe_fetchone(conn.execute(
+                text(f"SELECT id, name FROM {constants.TABLE_ENTITIES} WHERE id = :entity_id"),
+                {"entity_id": dest_id},
+            ))
+        else:
+            source_entity = OceanBaseUtil.safe_fetchone(self.client.get(
+                table_name=constants.TABLE_ENTITIES,
+                ids=[source_id],
+                output_column_name=["id", "name"]
+            ))
+
+            dest_entity = OceanBaseUtil.safe_fetchone(self.client.get(
+                table_name=constants.TABLE_ENTITIES,
+                ids=[dest_id],
+                output_column_name=["id", "name"]
+            ))
 
         return {
             "source": source_entity[1] if source_entity else None,
