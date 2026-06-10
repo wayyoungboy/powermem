@@ -16,6 +16,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   release-build:
     if: startsWith(github.event.release.tag_name || github.event.inputs.release_tag, 'v') && !startsWith(github.event.release.tag_name || github.event.inputs.release_tag, 'plugins-')

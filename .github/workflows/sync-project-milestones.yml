@@ -19,6 +19,9 @@ permissions:
   # Note: This requires enabling "Read and write permissions" in repository settings or using a Personal Access Token
   # The GITHUB_TOKEN needs project write permissions for organization projects
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   get-project-id:
     if: github.repository == 'oceanbase/powermem'
@@ -399,4 +402,3 @@ jobs:
             console.log(`New PRs added to project: ${addedPRs}`);
             console.log(`Total items processed: ${totalIssues + totalPRs}`);
             console.log(`Total items added: ${addedIssues + addedPRs}`);
-
