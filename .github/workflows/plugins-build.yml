@@ -22,7 +22,6 @@ on:
         type: boolean
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: '24'
   GO_VERSION: '1.22.x'
 
@@ -36,10 +35,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -59,7 +58,7 @@ jobs:
         id: vsce
 
       - name: Upload VS Code extension (.vsix)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: powermem-vscode-vsix
           path: apps/vscode-extension/*.vsix
@@ -71,10 +70,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -82,7 +81,7 @@ jobs:
         run: bash apps/claude-code-plugin/scripts/package-plugin.sh
 
       - name: Upload Claude Code plugin (zip)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: powermem-claude-code-plugin-zip
           path: apps/claude-code-plugin/dist/powermem-claude-code-plugin-*.zip
@@ -98,13 +97,13 @@ jobs:
 
     steps:
       - name: Download VS Code extension
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: powermem-vscode-vsix
           path: vsix
 
       - name: Download Claude Code plugin
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: powermem-claude-code-plugin-zip
           path: zip
@@ -119,7 +118,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('plugins-{0}', steps.ver.outputs.version) }}
           name: Plugins ${{ steps.ver.outputs.version }}
