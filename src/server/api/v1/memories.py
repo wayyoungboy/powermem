@@ -360,6 +360,41 @@ async def get_unique_users(
 
 
 @router.get(
+    "/export",
+    summary="Export memories",
+    description="Export memories to JSON or CSV file",
+)
+@limiter.limit(get_rate_limit_string())
+async def export_memories(
+    request: Request,
+    format: str = Query("json", description="Export format (json/csv)"),
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
+    agent_id: Optional[str] = Query(None, description="Filter by agent ID"),
+    run_id: Optional[str] = Query(None, description="Filter by run ID"),
+    limit: int = Query(1000, ge=1, le=10000, description="Max memories to export"),
+    api_key: str = Depends(verify_api_key),
+    service: MemoryService = Depends(get_memory_service),
+):
+    """Export memories"""
+    content = service.memory.export_memories(
+        format=format,
+        user_id=user_id,
+        agent_id=agent_id,
+        run_id=run_id,
+        limit=limit,
+    )
+
+    media_type = "application/json" if format.lower() == "json" else "text/csv"
+    filename = f"memories_export.{format.lower()}"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get(
     "/{memory_id}",
     response_model=APIResponse,
     summary="Get a memory",
@@ -551,41 +586,6 @@ async def delete_memory(
         success=True,
         data={"memory_id": memory_id},
         message="Memory deleted successfully",
-    )
-
-
-@router.get(
-    "/export",
-    summary="Export memories",
-    description="Export memories to JSON or CSV file",
-)
-@limiter.limit(get_rate_limit_string())
-async def export_memories(
-    request: Request,
-    format: str = Query("json", description="Export format (json/csv)"),
-    user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    agent_id: Optional[str] = Query(None, description="Filter by agent ID"),
-    run_id: Optional[str] = Query(None, description="Filter by run ID"),
-    limit: int = Query(1000, ge=1, le=10000, description="Max memories to export"),
-    api_key: str = Depends(verify_api_key),
-    service: MemoryService = Depends(get_memory_service),
-):
-    """Export memories"""
-    content = service.memory.export_memories(
-        format=format,
-        user_id=user_id,
-        agent_id=agent_id,
-        run_id=run_id,
-        limit=limit,
-    )
-
-    media_type = "application/json" if format.lower() == "json" else "text/csv"
-    filename = f"memories_export.{format.lower()}"
-
-    return Response(
-        content=content,
-        media_type=media_type,
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
