@@ -108,6 +108,33 @@ def test_storage_adapter_count_uses_db_filters_without_fetching_all():
     adapter.get_all_memories.assert_not_called()
 
 
+def test_pgvector_count_supports_nested_metadata_filters():
+    from powermem.storage.pgvector.pgvector import PGVectorStore
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def execute(self, query, params):
+            self.query = query
+            self.params = params
+
+        def fetchone(self):
+            return (3,)
+
+    cursor = Cursor()
+    store = PGVectorStore.__new__(PGVectorStore)
+    store.collection_name = "memories"
+    store._get_cursor = MagicMock(return_value=cursor)
+
+    assert store.count({"metadata.scope": "personal"}) == 3
+    assert "payload #>> string_to_array(%s, '.')" in cursor.query
+    assert cursor.params == ("metadata.scope", "personal")
+
+
 def test_memory_count_all_passes_filters_to_storage():
     memory = Memory.__new__(Memory)
     memory.storage = MagicMock()
