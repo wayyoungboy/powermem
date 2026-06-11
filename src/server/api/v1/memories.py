@@ -188,6 +188,7 @@ async def list_memories(
     request: Request,
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
     agent_id: Optional[str] = Query(None, description="Filter by agent ID"),
+    scope: Optional[str] = Query(None, description="Filter by metadata scope"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     sort_by: Optional[str] = Query(None, description="Field to sort by: 'created_at', 'updated_at', 'id'"),
@@ -202,10 +203,15 @@ async def list_memories(
 ):
     """List memories with pagination and sorting"""
     cutoff_date = parse_time_range_cutoff(time_range)
+    filters = {"scope": scope} if scope is not None else None
 
     if cutoff_date is None:
         # Fast path: no time filter — storage handles pagination + sorting natively
-        total_count = service.count_memories(user_id=user_id, agent_id=agent_id)
+        total_count = service.count_memories(
+            user_id=user_id,
+            agent_id=agent_id,
+            filters=filters,
+        )
         memories = service.list_memories(
             user_id=user_id,
             agent_id=agent_id,
@@ -213,6 +219,7 @@ async def list_memories(
             offset=offset,
             sort_by=sort_by,
             order=order,
+            filters=filters,
         )
     else:
         # Storage doesn't natively filter by created_at range; pull a wide page,
@@ -225,6 +232,7 @@ async def list_memories(
             offset=0,
             sort_by=sort_by,
             order=order,
+            filters=filters,
         )
 
         def _created_at(m):

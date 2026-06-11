@@ -478,7 +478,10 @@ class StorageAdapter:
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Get all memories with optional filtering and sorting."""
-        # Build filters for database-level filtering (only scope keys; backends use payload top-level)
+        # Build database-level filters only for scope keys shared by all
+        # backends. Extra metadata filters are applied before pagination below;
+        # SQLite stores user metadata under payload.metadata while OceanBase
+        # stores it as the metadata JSON column.
         db_filters: Dict[str, Any] = {}
         if user_id:
             db_filters["user_id"] = user_id
@@ -486,11 +489,19 @@ class StorageAdapter:
             db_filters["agent_id"] = agent_id
         if run_id:
             db_filters["run_id"] = run_id
-        # Pass only scope to DB; extra filters (e.g. metadata.name) applied in-memory below
+        if filters:
+            for key in ("user_id", "agent_id", "run_id"):
+                if key in filters and key not in db_filters:
+                    db_filters[key] = filters[key]
+        has_extra_filters = any(
+            key not in ("user_id", "agent_id", "run_id")
+            for key in (filters or {})
+        )
+
         results = self.vector_store.list(
             filters=db_filters if db_filters else None,
-            limit=limit,
-            offset=offset,
+            limit=None if has_extra_filters else limit,
+            offset=0 if has_extra_filters else offset,
             order_by=sort_by,
             order=order
         )
@@ -566,7 +577,10 @@ class StorageAdapter:
                 continue  # one extra filter did not match, skip this memory
             
             memories.append(memory)
-        
+
+        if has_extra_filters:
+            memories = memories[offset:offset + limit]
+
         return memories
 
     def count_all_memories(
@@ -585,9 +599,28 @@ class StorageAdapter:
         if run_id:
             db_filters["run_id"] = run_id
         if filters:
-            db_filters.update(filters)
+            for key in ("user_id", "agent_id", "run_id"):
+                if key in filters and key not in db_filters:
+                    db_filters[key] = filters[key]
+        has_extra_filters = any(
+            key not in ("user_id", "agent_id", "run_id")
+            for key in (filters or {})
+        )
 
         try:
+            if has_extra_filters:
+                unbounded_limit = 1_000_000_000
+                return len(
+                    self.get_all_memories(
+                        user_id=user_id,
+                        agent_id=agent_id,
+                        run_id=run_id,
+                        limit=unbounded_limit,
+                        offset=0,
+                        filters=filters,
+                    )
+                )
+
             if hasattr(self.vector_store, "count"):
                 try:
                     return int(self.vector_store.count(filters=db_filters or None))

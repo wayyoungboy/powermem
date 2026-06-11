@@ -2209,7 +2209,7 @@ class Memory(MemoryBase):
         """
         try:
             count = self.storage.count_all_memories(
-                user_id, agent_id, run_id
+                user_id, agent_id, run_id, filters=filters
             )
             
             self.audit.log_event("memory.count_all", {
