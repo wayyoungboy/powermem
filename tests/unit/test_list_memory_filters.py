@@ -51,6 +51,63 @@ def test_storage_adapter_filters_metadata_before_pagination():
     assert all(memory["metadata"]["scope"] == "personal" for memory in page)
 
 
+def test_storage_adapter_pushes_sqlite_metadata_filter_to_db():
+    store = SQLiteVectorStore(database_path=":memory:")
+    adapter = StorageAdapter(store)
+
+    assert adapter._build_db_filters(
+        user_id="u01",
+        agent_id="a01",
+        filters={"scope": "personal"},
+    ) == {
+        "user_id": "u01",
+        "agent_id": "a01",
+        "metadata.scope": "personal",
+    }
+
+
+def test_storage_adapter_keeps_oceanbase_metadata_filter_key():
+    class OceanBaseLikeStore:
+        collection_name = "memories"
+
+    OceanBaseLikeStore.__module__ = "powermem.storage.oceanbase.oceanbase"
+    adapter = StorageAdapter(OceanBaseLikeStore())
+
+    assert adapter._build_db_filters(
+        user_id="u01",
+        agent_id="a01",
+        filters={"scope": "personal"},
+    ) == {
+        "user_id": "u01",
+        "agent_id": "a01",
+        "scope": "personal",
+    }
+
+
+def test_storage_adapter_count_uses_db_filters_without_fetching_all():
+    store = MagicMock()
+    store.collection_name = "memories"
+    store.count.return_value = 3
+    adapter = StorageAdapter(store)
+    adapter.get_all_memories = MagicMock()
+
+    total = adapter.count_all_memories(
+        user_id="u01",
+        agent_id="a01",
+        filters={"scope": "personal"},
+    )
+
+    assert total == 3
+    store.count.assert_called_once_with(
+        filters={
+            "user_id": "u01",
+            "agent_id": "a01",
+            "scope": "personal",
+        }
+    )
+    adapter.get_all_memories.assert_not_called()
+
+
 def test_memory_count_all_passes_filters_to_storage():
     memory = Memory.__new__(Memory)
     memory.storage = MagicMock()
