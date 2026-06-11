@@ -2,13 +2,12 @@
 
 Use PowerMem as a long-term memory tool provider for AgentScope agents through
 AgentScope's MCP client support. This keeps the integration lightweight:
-PowerMem owns memory storage and retrieval, while AgentScope registers the
-PowerMem MCP tools into its `Toolkit`.
+PowerMem owns memory storage and retrieval, while AgentScope discovers and calls
+PowerMem MCP tools through its MCP client.
 
 AgentScope supports HTTP and stdio MCP servers, stateful and stateless MCP
-clients, and registering MCP tools into `Toolkit`. PowerMem exposes the same
-memory tools through `powermem-mcp`, so no AgentScope-specific storage adapter is
-required.
+clients. PowerMem exposes the same memory tools through `powermem-mcp`, so no
+AgentScope-specific storage adapter is required.
 
 ## Prerequisites
 
@@ -42,32 +41,29 @@ available:
 powermem-mcp stdio
 ```
 
-## Register PowerMem tools in AgentScope
+## Connect PowerMem tools in AgentScope
 
 ```python
 import asyncio
 
-from agentscope.mcp import HttpStatelessClient
-from agentscope.tool import Toolkit
+from agentscope.mcp import HttpMCPConfig, MCPClient
 
 
-async def build_toolkit() -> Toolkit:
-    toolkit = Toolkit()
-    powermem = HttpStatelessClient(
+async def list_powermem_tools() -> None:
+    powermem = MCPClient(
         name="powermem",
-        transport="streamable_http",
-        url="http://localhost:8848/mcp",
+        is_stateful=False,
+        mcp_config=HttpMCPConfig(url="http://localhost:8848/mcp"),
     )
 
-    await toolkit.register_mcp_client(powermem, group_name="memory")
-    return toolkit
+    tools = await powermem.list_tools()
+    print([tool.name for tool in tools])
 
 
-toolkit = asyncio.run(build_toolkit())
-print([tool["function"]["name"] for tool in toolkit.get_json_schemas()])
+asyncio.run(list_powermem_tools())
 ```
 
-The registered tools include the standard PowerMem MCP memory operations:
+The discovered tools include the standard PowerMem MCP memory operations:
 
 - `add_memory`
 - `search_memories`
@@ -77,32 +73,29 @@ The registered tools include the standard PowerMem MCP memory operations:
 - `delete_all_memories`
 - `list_memories`
 
-Pass the resulting `toolkit` to the AgentScope agent or workflow that should be
-able to remember and recall information.
+AgentScope wraps MCP tools with a model-facing name such as
+`mcp__powermem__search_memories`; use the original PowerMem tool name when
+calling `get_tool()`.
 
 ## Function-level calls
 
-AgentScope can also obtain a single callable MCP tool by name. This is useful
-when a workflow wants explicit memory read/write steps instead of registering all
-tools.
+AgentScope can obtain a single callable MCP tool by name. This is useful when a
+workflow wants explicit memory read/write steps.
 
 ```python
 import asyncio
 
-from agentscope.mcp import HttpStatelessClient
+from agentscope.mcp import HttpMCPConfig, MCPClient
 
 
 async def search_powermem() -> None:
-    powermem = HttpStatelessClient(
+    powermem = MCPClient(
         name="powermem",
-        transport="streamable_http",
-        url="http://localhost:8848/mcp",
+        is_stateful=False,
+        mcp_config=HttpMCPConfig(url="http://localhost:8848/mcp"),
     )
 
-    search_memories = await powermem.get_callable_function(
-        func_name="search_memories",
-        wrap_tool_result=True,
-    )
+    search_memories = await powermem.get_tool("search_memories")
 
     result = await search_memories(
         query="dragonfruit-zx9",
@@ -120,7 +113,7 @@ asyncio.run(search_powermem())
 1. Start `powermem-mcp streamable-http 8848`.
 2. Run the AgentScope snippet above.
 3. Confirm `search_memories` and `add_memory` appear in
-   `toolkit.get_json_schemas()`.
+   the tool names printed by `list_tools()`.
 4. Add a probe memory with `add_memory` and search for the same token with
    `search_memories`.
 
