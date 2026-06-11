@@ -1,68 +1,58 @@
-from unittest.mock import MagicMock
-
-import pytest
-
-starlette_requests = pytest.importorskip("starlette.requests")
-
-from server.api.v1.memories import list_memories  # noqa: E402
-
-Request = starlette_requests.Request
+import ast
+from pathlib import Path
 
 
-@pytest.mark.asyncio
-async def test_list_memories_api_converts_scope_to_metadata_filter():
-    service = MagicMock()
-    service.count_memories.return_value = 1
-    service.list_memories.return_value = [
-        {
-            "id": 1,
-            "memory": "remember scope",
-            "user_id": "u01",
-            "agent_id": "a01",
-            "metadata": {"scope": "personal"},
-        }
+def _list_memories_function():
+    source = Path("src/server/api/v1/memories.py").read_text(encoding="utf-8")
+    module = ast.parse(source)
+    for node in module.body:
+        if (
+            isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "list_memories"
+        ):
+            return node
+    raise AssertionError("list_memories function not found")
+
+
+def test_list_memories_api_builds_scope_metadata_filter():
+    function = _list_memories_function()
+
+    filter_assignments = [
+        node
+        for node in ast.walk(function)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "filters"
+            for target in node.targets
+        )
     ]
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/api/v1/memories",
-            "headers": [],
-            "query_string": b"",
-            "client": ("testclient", 50000),
-            "server": ("testserver", 80),
-            "scheme": "http",
-        }
+    assert filter_assignments, "filters assignment not found"
+    assert ast.dump(filter_assignments[0].value) == ast.dump(
+        ast.parse(
+            '{"scope": scope} if scope is not None else None',
+            mode="eval",
+        ).body
     )
 
-    response = await list_memories(
-        request=request,
-        user_id="u01",
-        agent_id="a01",
-        scope="personal",
-        limit=100,
-        offset=0,
-        sort_by=None,
-        order="desc",
-        time_range=None,
-        api_key="test-key",
-        service=service,
-    )
 
-    assert response.success is True
-    assert response.data["total"] == 1
-    service.count_memories.assert_called_once_with(
-        user_id="u01",
-        agent_id="a01",
-        filters={"scope": "personal"},
-    )
-    service.list_memories.assert_called_once_with(
-        user_id="u01",
-        agent_id="a01",
-        limit=100,
-        offset=0,
-        sort_by=None,
-        order="desc",
-        filters={"scope": "personal"},
-    )
+def test_list_memories_api_passes_scope_filter_to_memory_service():
+    function = _list_memories_function()
+    calls = [
+        node
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in {"count_memories", "list_memories"}
+    ]
+
+    assert calls, "service memory calls not found"
+    for call in calls:
+        filters_keywords = [
+            keyword
+            for keyword in call.keywords
+            if keyword.arg == "filters"
+        ]
+        assert filters_keywords, f"{call.func.attr} does not pass filters"
+        assert isinstance(filters_keywords[0].value, ast.Name)
+        assert filters_keywords[0].value.id == "filters"

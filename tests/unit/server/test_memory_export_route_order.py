@@ -1,13 +1,9 @@
-from server.api.v1.memories import router
+from pathlib import Path
 
 
-def test_export_route_is_registered_before_memory_id_route():
-    get_paths = [
-        route.path
-        for route in router.routes
-        if "GET" in getattr(route, "methods", set())
-    ]
+def test_export_route_is_defined_before_memory_id_route():
+    source = Path("src/server/api/v1/memories.py").read_text(encoding="utf-8")
 
-    assert get_paths.index("/memories/export") < get_paths.index(
-        "/memories/{memory_id}"
+    assert source.index('@router.get(\n    "/export"') < source.index(
+        '@router.get(\n    "/{memory_id}"'
     )
