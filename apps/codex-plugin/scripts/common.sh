@@ -7,6 +7,8 @@ PLUGIN_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 powermem_data_dir() {
   if [ -n "${POWERMEM_PLUGIN_DATA:-}" ]; then
     printf '%s\n' "$POWERMEM_PLUGIN_DATA"
+  elif [ -n "${PLUGIN_DATA:-}" ]; then
+    printf '%s\n' "$PLUGIN_DATA"
   elif [ -n "${CODEX_PLUGIN_DATA:-}" ]; then
     printf '%s\n' "$CODEX_PLUGIN_DATA"
   elif [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
@@ -68,6 +70,7 @@ write_runtime_file() {
     printf 'POWERMEM_ENV_FILE=%s\n' "$ENV_FILE"
     printf 'POWERMEM_MCP_COMMAND=%s\n' "$(venv_powermem_mcp)"
     printf 'POWERMEM_PLUGIN_ROOT=%s\n' "$PLUGIN_ROOT"
+    printf 'PLUGIN_ROOT=%s\n' "$PLUGIN_ROOT"
     printf 'CODEX_HOOKS_FILE=%s\n' "$CODEX_HOOKS_FILE"
   } > "$tmp"
   mv "$tmp" "$RUNTIME_FILE"

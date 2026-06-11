@@ -16,10 +16,11 @@ codex plugin marketplace add oceanbase/powermem
 codex plugin add memory-powermem@powermem
 ```
 
-The repository includes both Codex marketplace manifest locations used in the
-ecosystem: `.agents/plugins/marketplace.json` per the current Codex docs and
-`.codex-plugin/marketplace.json` for compatibility with existing repository
-layouts.
+The Codex marketplace is exposed through `.agents/plugins/marketplace.json`,
+which points at the bundled plugin under `apps/codex-plugin/`. The repository
+also keeps `.codex-plugin/marketplace.json` for Codex builds that probe that
+compatible location. The explicit `.agents` catalog is intentional because this
+repository also has a separate Claude Code marketplace under `.claude-plugin/`.
 
 Then ask Codex:
 
@@ -34,6 +35,8 @@ The plugin init flow:
    `pip install powermem "fastmcp>=1.0"` by default.
 3. Creates a plugin-local `.env`.
 4. Lets Codex load the plugin's bundled `.mcp.json` and `hooks/hooks.codex.json`.
+5. Mirrors the same hook commands into `~/.codex/hooks.json` using absolute
+   paths as a user-scope fallback.
 
 The plugin bundles these lifecycle hooks:
 
@@ -44,22 +47,22 @@ The plugin bundles these lifecycle hooks:
 - `PreCompact`
 - `Stop`
 
-To also mirror those hooks into `~/.codex/hooks.json` as a user-scope fallback:
+Init installs the user-scope fallback by default for Codex hosts that do not
+dispatch plugin-local hooks. To skip it:
 
 ```bash
-POWERMEM_INIT_ENABLE_HOOKS=1 sh "$CODEX_PLUGIN_ROOT/scripts/init.sh"
+POWERMEM_INIT_ENABLE_HOOKS=0 sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
-Use the fallback for Codex builds that do not dispatch plugin-local hooks. The
-fallback preserves unrelated hooks and replaces only prior PowerMem-owned hook
-entries.
+The fallback preserves unrelated hooks and replaces only prior PowerMem-owned
+hook entries.
 
 If you are testing backend code that has not been published to PyPI, run init
 with:
 
 ```bash
 POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>' \
-  sh "$CODEX_PLUGIN_ROOT/scripts/init.sh"
+  sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
 Restart Codex after init so it reloads the installed plugin's MCP and hooks.
@@ -119,8 +122,8 @@ If the PowerMem MCP endpoint requires auth, add the matching header or pass
 
 ## Troubleshooting
 
-- If bundled hooks do not fire, run init with `POWERMEM_INIT_ENABLE_HOOKS=1`
-  and restart Codex.
+- If bundled hooks do not fire, confirm `~/.codex/hooks.json` contains the
+  PowerMem fallback entries, then restart Codex.
 - If MCP fails, confirm `http://localhost:8848/mcp` is reachable or switch to stdio MCP.
 
 ## Uninstall

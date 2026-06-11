@@ -21,16 +21,18 @@ supported by your Codex build, then ask Codex:
 Use memory-powermem to initialize PowerMem for Codex.
 ```
 
-The init skill runs:
+The init skill locates the installed plugin root and runs:
 
 ```bash
-sh "$CODEX_PLUGIN_ROOT/scripts/init.sh"
+sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
-To also mirror the bundled hooks into user-scope Codex hooks as a fallback:
+It also mirrors the bundled hooks into `~/.codex/hooks.json` by default. This is
+a user-scope fallback for Codex hosts that do not dispatch plugin-local hooks
+yet. To skip the fallback:
 
 ```bash
-POWERMEM_INIT_ENABLE_HOOKS=1 sh "$CODEX_PLUGIN_ROOT/scripts/init.sh"
+POWERMEM_INIT_ENABLE_HOOKS=0 sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
 ## Backend Package
@@ -45,7 +47,7 @@ To test unpublished backend code:
 
 ```bash
 POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>' \
-  sh "$CODEX_PLUGIN_ROOT/scripts/init.sh"
+  sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
 ## Commands
@@ -76,10 +78,13 @@ ${CODEX_PLUGIN_DATA:-$HOME/.codex/plugins/data/memory-powermem}/
 ```
 
 The plugin manifest points Codex at bundled MCP and hook config. The init script
-does not need to write `~/.codex/context.json`. When fallback hooks are enabled,
-it adds PowerMem-owned entries to `~/.codex/hooks.json` and preserves unrelated
+does not need to write `~/.codex/context.json`. It also adds PowerMem-owned
+fallback entries to `~/.codex/hooks.json` by default and preserves unrelated
 hooks.
 
-The repository marketplace manifests live at `.agents/plugins/marketplace.json`
-and `.codex-plugin/marketplace.json`. The plugin manifest lives at
-`apps/codex-plugin/.codex-plugin/plugin.json`.
+The Codex marketplace is exposed through `.agents/plugins/marketplace.json`,
+which points at this bundled plugin. The repository also keeps
+`.codex-plugin/marketplace.json` for Codex builds that probe that compatible
+location. The explicit `.agents` catalog is intentional because this repository
+also has a separate Claude Code marketplace under `.claude-plugin/`. The plugin
+manifest lives at `apps/codex-plugin/.codex-plugin/plugin.json`.

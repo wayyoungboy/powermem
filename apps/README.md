@@ -9,12 +9,11 @@ First-party setup flows that connect PowerMem to AI clients and IDEs. Every path
 | **Cursor**, **VS Code**, **Windsurf**, **GitHub Copilot**, **Qoder** | [`vscode-extension/`](vscode-extension/) | `Read and follow apps/vscode-extension/SETUP.md to setup PowerMem` |
 | **Claude Desktop**, **Cline**, **Codex**, **OpenCode**, Roo Code, Goose, or any other MCP client | [`mcp-client/`](mcp-client/) | `Read and follow apps/mcp-client/SETUP.md to setup PowerMem` |
 | **Codex plugin** | [`codex-plugin/`](codex-plugin/) | Install `memory-powermem`, then ask Codex to initialize PowerMem |
-| **OpenCode plugin** | [`opencode-plugin/`](opencode-plugin/) | Run `pmem connect opencode --with-hooks` |
 | **Claude Code** (hook-based plugin) | [`claude-code-plugin/`](claude-code-plugin/) | `Read and follow apps/claude-code-plugin/SETUP.md to set up PowerMem memory for Claude Code.` |
 
 > **Codex** can use either `codex-plugin/` or the generic `mcp-client/` flow.
-> **OpenCode** belongs under `mcp-client/`, not `vscode-extension/`. The VS Code
-> extension flow is for VS Code–compatible IDEs only.
+> Other MCP clients belong under `mcp-client/`, not `vscode-extension/`. The VS
+> Code extension flow is for VS Code-compatible IDEs only.
 
 For **OpenClaw**, use the separate [`memory-powermem`](https://github.com/ob-labs/memory-powermem) plugin — see [OpenClaw integration](../docs/integrations/openclaw.md).
 
@@ -26,33 +25,15 @@ For **OpenClaw**, use the separate [`memory-powermem`](https://github.com/ob-lab
 | **[mcp-client](mcp-client/)** | Agent-guided setup for generic MCP clients (Claude Desktop, Cline, Codex, OpenCode, and others). Uses `powermem-mcp` directly; prefers SSE on port `8848`. |
 | **[codex-plugin](codex-plugin/)** | Codex plugin with bundled MCP, lifecycle hooks, skills, and scripts that install a plugin-local backend. |
 | **[claude-code-plugin](claude-code-plugin/)** | Claude Code plugin with **HTTP mode by default** (REST hooks; empty `mcpServers`). Optional **MCP mode** via [`config/mcp-mode.mcp.json`](claude-code-plugin/config/mcp-mode.mcp.json). |
-| **[opencode-plugin](opencode-plugin/)** | OpenCode plugin with event capture and `/recall` / `/remember` commands. |
 
 ## CLI connector
 
-Use `pmem connect` to wire the same PowerMem MCP server into common coding
-agents without replacing existing MCP entries:
+Use `pmem connect` to wire the same PowerMem MCP server into Claude Code or
+Codex without replacing existing MCP entries:
 
 ```bash
-pmem connect cursor
 pmem connect claude-code --with-hooks
 pmem connect codex
-pmem connect opencode --with-hooks
-pmem connect copilot-cli
-pmem connect continue
-pmem connect gemini-cli
-pmem connect qwen
-pmem connect kiro
-pmem connect hermes
-pmem connect pi
-pmem connect openhuman
-pmem connect goose
-pmem connect qoder
-pmem connect openclaw
-pmem connect warp
-pmem connect zed
-pmem connect droid
-pmem connect antigravity
 pmem connect --all
 ```
 

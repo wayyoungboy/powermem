@@ -111,83 +111,18 @@ fi
 
 echo "Bundled MCP config is provided by $PLUGIN_ROOT/.mcp.json"
 
-if [ "${POWERMEM_INIT_ENABLE_HOOKS:-0}" = "1" ] || [ "${POWERMEM_INIT_ENABLE_HOOKS:-}" = "true" ]; then
-  "$BOOTSTRAP_PYTHON" - "$CODEX_HOOKS_FILE" "$PLUGIN_ROOT/hooks/hooks.codex.json" "$PLUGIN_ROOT" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-hooks_path = Path(sys.argv[1]).expanduser()
-manifest_path = Path(sys.argv[2])
-plugin_root = str(Path(sys.argv[3]))
-marker = "__powermem_codex_hook__"
-
-if hooks_path.is_file():
-    try:
-        payload = json.loads(hooks_path.read_text())
-        if not isinstance(payload, dict):
-            payload = {}
-    except Exception:
-        payload = {}
-else:
-    payload = {}
-
-hooks = payload.get("hooks")
-if not isinstance(hooks, dict):
-    hooks = {}
-payload["hooks"] = hooks
-
-manifest = json.loads(manifest_path.read_text())
-source_hooks = manifest.get("hooks")
-if not isinstance(source_hooks, dict):
-    raise SystemExit("Invalid hook manifest: missing hooks object")
-
-for event, entries in list(hooks.items()):
-    if isinstance(entries, list):
-        kept = [
-            entry
-            for entry in entries
-            if not (isinstance(entry, dict) and entry.get(marker) is True)
-        ]
-        if kept:
-            hooks[event] = kept
-        else:
-            hooks.pop(event, None)
-
-for event, entries in source_hooks.items():
-    if not isinstance(entries, list):
-        continue
-    resolved = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        next_entry = {
-            key: value
-            for key, value in entry.items()
-            if key != "hooks"
-        }
-        next_entry[marker] = True
-        next_hooks = []
-        for handler in entry.get("hooks", []):
-            if not isinstance(handler, dict):
-                continue
-            next_handler = dict(handler)
-            command = str(next_handler.get("command", ""))
-            next_handler["command"] = command.replace("${CLAUDE_PLUGIN_ROOT}", plugin_root)
-            next_hooks.append(next_handler)
-        if next_hooks:
-            next_entry["hooks"] = next_hooks
-            resolved.append(next_entry)
-    if resolved:
-        hooks[event] = [*(hooks.get(event) or []), *resolved]
-
-hooks_path.parent.mkdir(parents=True, exist_ok=True)
-hooks_path.write_text(json.dumps(payload, indent=2) + "\n")
-print(f"Wrote Codex fallback hook config: {hooks_path}")
-PY
-else
-  echo "Skipping user-scope Codex hooks. Plugin-local hooks are bundled; set POWERMEM_INIT_ENABLE_HOOKS=1 for the Desktop fallback."
-fi
+HOOKS_SETTING=$(printf '%s' "${POWERMEM_INIT_ENABLE_HOOKS:-1}" | tr '[:upper:]' '[:lower:]')
+case "$HOOKS_SETTING" in
+  0|false|no|off)
+    echo "Skipping user-scope Codex hooks. Plugin-local hooks are bundled."
+    ;;
+  *)
+    "$BOOTSTRAP_PYTHON" "$SCRIPT_DIR/install-hooks.py" \
+      "$CODEX_HOOKS_FILE" \
+      "$PLUGIN_ROOT/hooks/hooks.codex.json" \
+      "$PLUGIN_ROOT"
+    ;;
+esac
 
 write_runtime_file
 

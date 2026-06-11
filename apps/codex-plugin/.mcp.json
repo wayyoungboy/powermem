@@ -4,7 +4,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "for root in \"${CLAUDE_PLUGIN_ROOT:-}\" \"${CODEX_PLUGIN_ROOT:-}\" \"${CODEX_HOME:-$HOME/.codex}/plugins/cache/powermem/memory-powermem\"/* \"$HOME/.codex/plugins/cache/powermem/memory-powermem\"/*; do if [ -f \"$root/scripts/powermem-mcp.sh\" ]; then exec sh \"$root/scripts/powermem-mcp.sh\"; fi; done; echo 'PowerMem Codex plugin wrapper not found. Reinstall memory-powermem@powermem.' >&2; exit 1"
+        "for root in \"${PLUGIN_ROOT:-}\" \"${CLAUDE_PLUGIN_ROOT:-}\" \"${CODEX_PLUGIN_ROOT:-}\" \"${CODEX_HOME:-$HOME/.codex}/plugins/cache/powermem/memory-powermem\"/* \"$HOME/.codex/plugins/cache/powermem/memory-powermem\"/*; do if [ -f \"$root/scripts/powermem-mcp.sh\" ]; then exec sh \"$root/scripts/powermem-mcp.sh\"; fi; done; echo 'PowerMem Codex plugin wrapper not found. Reinstall memory-powermem@powermem.' >&2; exit 1"
       ]
     }
   }

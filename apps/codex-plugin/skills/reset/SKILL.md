@@ -9,7 +9,7 @@ and delete the plugin data directory containing `.env`, runtime state, logs, and
 venv. Only after explicit confirmation, run:
 
 ```bash
-POWERMEM_RESET_CONFIRM=delete sh "${CODEX_PLUGIN_ROOT}/scripts/reset.sh"
+POWERMEM_RESET_CONFIRM=delete sh "$PLUGIN_ROOT/scripts/reset.sh"
 ```
 
 Do not delete project files, Codex config, or unrelated PowerMem data.

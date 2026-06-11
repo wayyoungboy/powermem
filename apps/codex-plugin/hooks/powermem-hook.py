@@ -6,14 +6,17 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 SENSITIVE_KEYS = {"api_key", "authorization", "password", "secret", "token"}
 MAX_CAPTURE_CHARS = 8000
 MAX_RECALL_CHARS = 6000
 
 
 def data_dir() -> Path:
-    for key in ("POWERMEM_PLUGIN_DATA", "CODEX_PLUGIN_DATA", "CLAUDE_PLUGIN_DATA"):
+    for key in (
+        "POWERMEM_PLUGIN_DATA",
+        "CODEX_PLUGIN_DATA",
+        "CLAUDE_PLUGIN_DATA",
+    ):
         value = os.environ.get(key)
         if value:
             return Path(value).expanduser()
@@ -50,7 +53,9 @@ def enabled() -> bool:
     return PMEM.is_file() and os.access(PMEM, os.X_OK) and ENV_FILE.is_file()
 
 
-def run_pmem(args: list[str], *, input_text: str | None = None, timeout: int = 20) -> subprocess.CompletedProcess[str] | None:
+def run_pmem(
+    args: list[str], *, input_text: str | None = None, timeout: int = 20
+) -> subprocess.CompletedProcess[str] | None:
     if not enabled():
         return None
     env = os.environ.copy()
@@ -71,7 +76,11 @@ def run_pmem(args: list[str], *, input_text: str | None = None, timeout: int = 2
 
 
 def session_id(payload: dict[str, Any]) -> str:
-    return str(payload.get("session_id") or payload.get("sessionId") or "codex-session")
+    return str(
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or "codex-session"
+    )
 
 
 def cwd(payload: dict[str, Any]) -> str:
@@ -103,7 +112,9 @@ def collect_text(value: Any, out: list[str]) -> None:
             collect_text(item, out)
 
 
-def compact_payload(payload: dict[str, Any], limit: int = MAX_CAPTURE_CHARS) -> str:
+def compact_payload(
+    payload: dict[str, Any], limit: int = MAX_CAPTURE_CHARS
+) -> str:
     texts: list[str] = []
     collect_text(payload, texts)
     content = "\n".join(texts).strip()
@@ -112,7 +123,13 @@ def compact_payload(payload: dict[str, Any], limit: int = MAX_CAPTURE_CHARS) -> 
     return content
 
 
-def add_memory(event: str, content: str, payload: dict[str, Any], *, memory_type: str = "short_term") -> None:
+def add_memory(
+    event: str,
+    content: str,
+    payload: dict[str, Any],
+    *,
+    memory_type: str = "short_term",
+) -> None:
     content = content.strip()
     if not content:
         return
