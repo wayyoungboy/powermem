@@ -176,8 +176,11 @@ jobs:
       - name: Dump server log on failure
         if: failure()
         run: |
+          mkdir -p report
           make server-status || true
           if [ -f server.log ]; then
+            cp server.log report/server-test1.log
+            wc -l server.log
             tail -n 200 server.log
           else
             echo "server.log not found"
@@ -340,8 +343,11 @@ jobs:
       - name: Dump server log on failure
         if: failure()
         run: |
+          mkdir -p report
           make server-status || true
           if [ -f server.log ]; then
+            cp server.log report/server-test2.log
+            wc -l server.log
             tail -n 200 server.log
           else
             echo "server.log not found"

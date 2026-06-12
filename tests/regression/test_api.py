@@ -53,6 +53,115 @@ class APITester:
             "agent_id": "test-agent-456",
             "run_id": "test-run-789"
         }
+
+    def _read_env_values(self, makefile_dir: str) -> Dict[str, str]:
+        env_path = os.path.join(makefile_dir, ".env")
+        values: Dict[str, str] = {}
+        if not os.path.exists(env_path):
+            return values
+
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#") or "=" not in stripped:
+                        continue
+                    key, value = stripped.split("=", 1)
+                    values[key.strip()] = value.strip().strip("'\"")
+        except Exception as e:
+            print(f"[server-debug] Failed to read .env: {e}")
+
+        return values
+
+    def _print_env_debug(self, makefile_dir: str):
+        values = self._read_env_values(makefile_dir)
+        interesting_keys = [
+            "POWERMEM_SERVER_AUTH_ENABLED",
+            "POWERMEM_SERVER_API_KEYS",
+            "POWERMEM_SERVER_HOST",
+            "POWERMEM_SERVER_PORT",
+            "POWERMEM_SERVER_WORKERS",
+            "POWERMEM_SERVER_LOG_FILE",
+            "DATABASE_PROVIDER",
+            "OCEANBASE_HOST",
+            "OCEANBASE_PORT",
+            "OCEANBASE_DATABASE",
+            "OCEANBASE_COLLECTION",
+            "EMBEDDING_DIMS",
+        ]
+
+        print("[server-debug] .env summary:")
+        for key in interesting_keys:
+            if key not in values:
+                continue
+            value = "***" if key.endswith("API_KEYS") else values[key]
+            print(f"[server-debug]   {key}={value}")
+
+    def _run_debug_command(self, label: str, command: str, cwd: str, timeout: int = 10):
+        print(f"[server-debug] {label}: {command}")
+        try:
+            result = subprocess.run(
+                ["bash", "-lc", command],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            print(f"[server-debug] {label} exit={result.returncode}")
+            if result.stdout.strip():
+                print(f"[server-debug] {label} stdout:\n{result.stdout.strip()}")
+            if result.stderr.strip():
+                print(f"[server-debug] {label} stderr:\n{result.stderr.strip()}")
+        except subprocess.TimeoutExpired:
+            print(f"[server-debug] {label} timed out after {timeout}s")
+        except Exception as e:
+            print(f"[server-debug] {label} failed: {e}")
+
+    def _tail_server_log(self, makefile_dir: str, lines: int = 120):
+        values = self._read_env_values(makefile_dir)
+        log_file = values.get("POWERMEM_SERVER_LOG_FILE", "server.log")
+        log_path = log_file if os.path.isabs(log_file) else os.path.join(makefile_dir, log_file)
+        print(f"[server-debug] Tail server log: {log_path}")
+
+        if not os.path.exists(log_path):
+            print("[server-debug] server log not found")
+            return
+
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                tail = f.readlines()[-lines:]
+            print(f"[server-debug] Last {len(tail)} lines from server log:")
+            for line in tail:
+                print(line.rstrip())
+        except Exception as e:
+            print(f"[server-debug] Failed to read server log: {e}")
+
+    def dump_server_debug_state(self, makefile_dir: str, label: str, include_log_tail: bool = False):
+        print(f"\n[server-debug] ===== {label} =====")
+        self._print_env_debug(makefile_dir)
+        self._run_debug_command(
+            "pid file",
+            "if [ -f .server.pid ]; then printf 'pid='; cat .server.pid; "
+            "PID=$(cat .server.pid 2>/dev/null || true); "
+            "if [ -n \"$PID\" ]; then ps -fp \"$PID\" || true; fi; "
+            "else echo 'no .server.pid'; fi",
+            makefile_dir,
+        )
+        self._run_debug_command(
+            "port listeners",
+            "PORT=$(grep -E '^POWERMEM_SERVER_PORT=' .env 2>/dev/null | cut -d '=' -f2- | "
+            "sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed \"s/^['\\\"]//;s/['\\\"]$//\"); "
+            "PORT=${PORT:-8848}; lsof -nP -iTCP:$PORT -sTCP:LISTEN || true",
+            makefile_dir,
+        )
+        self._run_debug_command(
+            "server processes",
+            "ps -ef | grep -E '[p]owermem-server|[u]vicorn' || true",
+            makefile_dir,
+        )
+        if include_log_tail:
+            self._tail_server_log(makefile_dir)
+        print(f"[server-debug] ===== end {label} =====\n")
     
     def print_response(self, response: requests.Response, test_name: str = ""):
         """
@@ -1905,7 +2014,9 @@ class APITester:
             print("Warning: Makefile not found, skipping server restart")
             print("Please manually execute: make server-stop && make server-start")
             return False
-        
+
+        self.dump_server_debug_state(makefile_dir, "before server-stop")
+
         try:
             # Execute make server-stop
             print(f"Executing: make server-stop (in directory: {makefile_dir})")
@@ -1916,7 +2027,7 @@ class APITester:
                 text=True,
                 timeout=30
             )
-            
+
             if result_stop.returncode != 0:
                 print(f"Warning: make server-stop returned non-zero exit code: {result_stop.returncode}")
                 if result_stop.stderr:
@@ -1925,11 +2036,13 @@ class APITester:
                 print("✓ make server-stop executed successfully")
                 if result_stop.stdout:
                     print(f"Output: {result_stop.stdout.strip()}")
-            
+
+            self.dump_server_debug_state(makefile_dir, "after server-stop")
+
             # Wait for server to stop
             print("Waiting for server to stop...")
             time.sleep(2)
-            
+
             # Execute make server-start
             print(f"Executing: make server-start (in directory: {makefile_dir})")
             result_start = subprocess.run(
@@ -1939,22 +2052,25 @@ class APITester:
                 text=True,
                 timeout=30
             )
-            
+
             if result_start.returncode != 0:
                 print(f"Warning: make server-start returned non-zero exit code: {result_start.returncode}")
                 if result_start.stderr:
                     print(f"Error message: {result_start.stderr}")
+                self.dump_server_debug_state(makefile_dir, "after failed server-start", include_log_tail=True)
                 return False
             else:
                 print("✓ make server-start executed successfully")
                 if result_start.stdout:
                     print(f"Output: {result_start.stdout.strip()}")
-            
+
+            self.dump_server_debug_state(makefile_dir, "after server-start")
+
             # Wait for server to start, using retry mechanism
             print("Waiting for server to start...")
             max_retries = 10  # Maximum 10 retries
             retry_interval = 3  # 3 seconds between retries
-            
+
             for attempt in range(max_retries):
                 time.sleep(retry_interval)
                 try:
@@ -1968,16 +2084,19 @@ class APITester:
                     print(f"Waiting for server to start... (attempt {attempt + 1}/{max_retries}, connection refused)")
                 except requests.exceptions.RequestException as e:
                     print(f"Waiting for server to start... (attempt {attempt + 1}/{max_retries}, error: {e})")
-            
+
             print(f"Error: Server failed to start within {max_retries * retry_interval} seconds")
             print("Please manually check server status")
+            self.dump_server_debug_state(makefile_dir, "server start timeout", include_log_tail=True)
             return False
-            
+
         except subprocess.TimeoutExpired:
             print("Error: make command execution timeout")
+            self.dump_server_debug_state(makefile_dir, "make command timeout", include_log_tail=True)
             return False
         except Exception as e:
             print(f"Error: Error executing make command: {e}")
+            self.dump_server_debug_state(makefile_dir, "unexpected restart error", include_log_tail=True)
             return False
     
     def load_env_config(self):
