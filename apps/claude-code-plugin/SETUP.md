@@ -40,7 +40,7 @@ Installed-plugin init is idempotent and uses plugin-local state:
 $HOME/.powermem/
   .env
   runtime.env
-  server.pid
+  powermem.pid
   powermem-server.log
   venv/
 ```
@@ -69,15 +69,17 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
    ```
 
-   The script reads `~/.claude/settings.json` and attempts to derive:
-   `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, and provider base URL. It writes only
-   the plugin-local `.env`.
+   The script reads `~/.claude/settings.json` and attempts to derive the supported
+   Claude Code API-key path: `env.ANTHROPIC_API_KEY`, `env.ANTHROPIC_MODEL`, and
+   `env.ANTHROPIC_BASE_URL`. It writes the plugin-local `.env` with the full
+   PowerMem backend defaults: embedded OceanBase/seekdb storage, local default
+   embedding, server settings, and logging settings.
 4. If init reports missing values, ask the user only for those missing values. Do
    not invent credentials. Re-run init with the matching environment variables:
 
    ```bash
    POWERMEM_INIT_LLM_PROVIDER=anthropic \
-   POWERMEM_INIT_LLM_MODEL=claude-sonnet-4-6 \
+   POWERMEM_INIT_LLM_MODEL=anthropic/claude-sonnet-4.6 \
    POWERMEM_INIT_LLM_API_KEY=... \
    sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
    ```
@@ -223,44 +225,44 @@ writing. Never silently patch `.env`.**
 
    If the user selects "Yes, auto-detect" (or "Other" and types "yes"/"auto"):
 
-   **Auto-detection priority chain** — same order Claude Code uses internally:
+   **Auto-detection priority chain**:
    1. **OS environment variables** (highest priority) — check these first:
-      - `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`
-      - `ANTHROPIC_MODEL` / `OPENAI_MODEL` / `DEEPSEEK_MODEL`
-      - `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` / `DEEPSEEK_BASE_URL`
+      - `ANTHROPIC_API_KEY`
+      - `ANTHROPIC_MODEL`
+      - `ANTHROPIC_BASE_URL`
    2. **`~/.claude/settings.json`** — fall back if env vars are missing
    3. **Manual input** — ask only for fields that are still missing
+
+   Do not migrate Claude Code bearer-token or OAuth routes into PowerMem. In
+   particular, do not treat `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`,
+   `/login` credentials, `apiKeyHelper`, Bedrock, Vertex, or Foundry as
+   `LLM_API_KEY`; PowerMem's Anthropic provider currently uses the API-key path.
 
    **Step 1 — Check OS environment variables.** Run these checks silently (do not
    print the values, only note whether each field was found):
 
    | Field | Check |
    |-------|-------|
-   | LLM_PROVIDER | If `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set → `anthropic`; elif `OPENAI_API_KEY` → `openai`; elif `DEEPSEEK_API_KEY` → `deepseek` |
-   | LLM_MODEL | `$ANTHROPIC_MODEL` or `$OPENAI_MODEL` or `$DEEPSEEK_MODEL` (provider-specific) |
-   | LLM_API_KEY | `$ANTHROPIC_API_KEY` or `$ANTHROPIC_AUTH_TOKEN` or `$OPENAI_API_KEY` or `$DEEPSEEK_API_KEY` |
-   | LLM_BASE_URL | `$ANTHROPIC_BASE_URL` or `$OPENAI_BASE_URL` or `$DEEPSEEK_BASE_URL` |
+   | LLM_PROVIDER | If `ANTHROPIC_API_KEY` is set → `anthropic`; otherwise infer from `ANTHROPIC_MODEL` prefix if present |
+   | LLM_MODEL | `$ANTHROPIC_MODEL` |
+   | LLM_API_KEY | `$ANTHROPIC_API_KEY` |
+   | LLM_BASE_URL | `$ANTHROPIC_BASE_URL` |
 
    **Step 2 — If any field is still missing, read `~/.claude/settings.json`.**
 
    **Model and provider** — read `env.ANTHROPIC_MODEL` (Claude Code's standard model
-   key); fall back to the top-level `model` field if absent. Both use the format
-   `<provider>/<model>` — split on the first `/`:
-     - `"deepseek/deepseek-v4-pro"` → `LLM_PROVIDER=deepseek`, `LLM_MODEL=deepseek-v4-pro`
-     - `"anthropic/claude-sonnet-4-6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-4-6`
-     - If neither field is present or has no `/`, leave the field unset — it will
-       be collected manually in Step 3.
-
-   ⚠️ **Anthropic model name normalization**: Claude Code's `settings.json` uses
-   **dots** for version numbers (e.g. `claude-sonnet-4.6`), but the Anthropic API
-   requires **dashes** (e.g. `claude-sonnet-4-6`). After splitting on `/`, if
-   `LLM_PROVIDER=anthropic`, replace every `.` with `-` in the version suffix of
-   `LLM_MODEL`. Rule: `claude-<name>-<major>.<minor>` → `claude-<name>-<major>-<minor>`.
-   Example: `claude-sonnet-4.6` → `claude-sonnet-4-6`, `claude-haiku-4.5` → `claude-haiku-4-5`.
+   key); fall back to the top-level `model` field if absent. Keep the value exactly
+   as configured by Claude Code. Do not strip a `<provider>/` prefix and do not
+   rewrite dotted versions:
+     - `"anthropic/claude-opus-4.6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=anthropic/claude-opus-4.6`
+     - `"anthropic/claude-sonnet-4.6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=anthropic/claude-sonnet-4.6`
 
    **API key** — Claude Code always stores its credentials under `ANTHROPIC_*` keys
-   regardless of the actual model or provider. Read directly:
-     - `env.ANTHROPIC_AUTH_TOKEN` (preferred) or `env.ANTHROPIC_API_KEY`
+   for this supported path. Read only:
+     - `env.ANTHROPIC_API_KEY`
+
+   If only `env.ANTHROPIC_AUTH_TOKEN` is present, ask for an Anthropic API key or
+   a manual `POWERMEM_INIT_LLM_API_KEY` value instead of copying the bearer token.
 
    **Base URL** — read directly:
      - `env.ANTHROPIC_BASE_URL` (if absent, leave blank — PowerMem will use the
@@ -613,9 +615,12 @@ make build-claude-hook
 
 #### [E005] Storage Backend Initialization
 **Problem**: 503 errors on API calls despite server health
-**Fix**: Use SQLite alternative
+**Fix**: the Claude Code plugin defaults to embedded OceanBase/seekdb. Stop the
+managed server, remove stale seekdb data, and restart init:
 ```bash
-STORAGE_TYPE=sqlite SQLITE_DB_PATH=sqlite_data/powermem.db powermem-server --host 0.0.0.0 --port 8848 &
+sh "$CLAUDE_PLUGIN_ROOT/scripts/stop.sh"
+rm -rf "$HOME/.powermem/seekdb_data"
+sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
 ```
 
 #### [E006] Model Download Timeout
