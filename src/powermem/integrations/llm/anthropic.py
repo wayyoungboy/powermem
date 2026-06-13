@@ -42,6 +42,11 @@ class AnthropicLLM(LLMBase):
         if not api_key:
             auth_token = getattr(self.config, "auth_token", None) or os.getenv("ANTHROPIC_AUTH_TOKEN")
         base_url = getattr(self.config, "anthropic_base_url", None) or os.getenv("ANTHROPIC_BASE_URL")
+        if auth_token and not base_url:
+            raise ValueError(
+                "ANTHROPIC_AUTH_TOKEN/LLM_AUTH_TOKEN requires "
+                "ANTHROPIC_BASE_URL or ANTHROPIC_LLM_BASE_URL."
+            )
         client_kwargs = {"base_url": base_url}
         if auth_token:
             client_kwargs["auth_token"] = auth_token

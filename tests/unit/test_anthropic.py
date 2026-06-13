@@ -55,6 +55,18 @@ def test_anthropic_llm_auth_token_headers(monkeypatch):
     assert str(llm.client.base_url) == "https://gateway.example.com"
 
 
+def test_anthropic_llm_auth_token_requires_base_url(monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    monkeypatch.delenv("ANTHROPIC_LLM_BASE_URL", raising=False)
+
+    with pytest.raises(ValueError, match="ANTHROPIC_AUTH_TOKEN"):
+        AnthropicLLM(AnthropicConfig(auth_token="gateway-token"))
+
+
 def test_anthropic_llm_api_key_from_env_takes_precedence(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "env-token")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "env-api-key")

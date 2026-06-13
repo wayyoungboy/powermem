@@ -255,7 +255,9 @@ writing. Never silently patch `.env`.**
 
    PowerMem supports Claude Code's Anthropic API-key path and bearer-token gateway
    path. Do not treat `ANTHROPIC_AUTH_TOKEN` as `LLM_API_KEY`; copy it to
-   `LLM_AUTH_TOKEN` and require `ANTHROPIC_BASE_URL`. Do not migrate
+   `LLM_AUTH_TOKEN` and require `ANTHROPIC_BASE_URL`. A token without a base URL
+   is incomplete; fall back to API-key mode or ask for the base URL instead of
+   sending the token to Anthropic's default endpoint. Do not migrate
    `CLAUDE_CODE_OAUTH_TOKEN`, `/login` credentials, `apiKeyHelper`, Bedrock,
    Vertex, or Foundry as either `LLM_API_KEY` or `LLM_AUTH_TOKEN`.
 

@@ -84,18 +84,42 @@ raw_model = (
     or ""
 ).strip()
 
-api_key = (
+explicit_base_url = env_first("POWERMEM_INIT_LLM_BASE_URL", "LLM_BASE_URL")
+env_api_key = (
     env_first("POWERMEM_INIT_LLM_API_KEY", "LLM_API_KEY")
     or env_first("ANTHROPIC_API_KEY")
 )
+env_auth_token = (
+    env_first("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN")
+    or env_first("ANTHROPIC_AUTH_TOKEN")
+)
+env_auth_base_url = explicit_base_url or env_first("ANTHROPIC_BASE_URL")
+settings_api_key = settings_first(settings_env, "ANTHROPIC_API_KEY")
+settings_auth_token = settings_first(settings_env, "ANTHROPIC_AUTH_TOKEN")
+settings_auth_base_url = explicit_base_url or settings_first(
+    settings_env,
+    "ANTHROPIC_BASE_URL",
+    "LLM_BASE_URL",
+)
+
+api_key = ""
 auth_token = ""
-if not api_key:
-    auth_token = (
-        env_first("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN")
-        or env_first("ANTHROPIC_AUTH_TOKEN")
-        or settings_first(settings_env, "ANTHROPIC_AUTH_TOKEN")
-    )
-    api_key = settings_first(settings_env, "ANTHROPIC_API_KEY")
+base_url = ""
+if env_api_key:
+    api_key = env_api_key
+elif env_auth_token and env_auth_base_url:
+    auth_token = env_auth_token
+    base_url = env_auth_base_url
+elif settings_api_key:
+    api_key = settings_api_key
+elif settings_auth_token and settings_auth_base_url:
+    auth_token = settings_auth_token
+    base_url = settings_auth_base_url
+elif env_auth_token:
+    auth_token = env_auth_token
+elif settings_auth_token:
+    auth_token = settings_auth_token
+
 key_provider = "anthropic" if auth_token or api_key else ""
 
 model_prefix = raw_model.split("/", 1)[0].strip().lower() if "/" in raw_model else ""
@@ -108,18 +132,13 @@ provider = (
 
 model = raw_model
 
-base_url = env_first("POWERMEM_INIT_LLM_BASE_URL", "LLM_BASE_URL")
-if not base_url:
+if not base_url and not auth_token:
+    base_url = explicit_base_url
+if not base_url and not auth_token:
     base_url = provider_base_url_from_env(provider)
-if not base_url:
+if not base_url and not auth_token:
     base_url = provider_base_url_from_settings(settings_env, provider)
 base_url = base_url.strip()
-
-if auth_token:
-    if base_url:
-        api_key = ""
-    elif api_key:
-        auth_token = ""
 
 missing = []
 if not provider:
@@ -318,7 +337,16 @@ api_key  = env.get('LLM_API_KEY', '')
 auth_token = env.get('LLM_AUTH_TOKEN', '') or env.get('ANTHROPIC_AUTH_TOKEN', '')
 base_url = env.get(f'{provider.upper()}_LLM_BASE_URL', '') if provider else ''
 if provider == 'anthropic':
-    base_url = base_url or env.get('ANTHROPIC_BASE_URL', '')
+    base_url = base_url or env.get('ANTHROPIC_BASE_URL', '') or env.get('LLM_BASE_URL', '')
+    if api_key:
+        auth_token = ''
+    elif auth_token and not base_url:
+        print(
+            'LLM validation failed: ANTHROPIC_AUTH_TOKEN/LLM_AUTH_TOKEN requires '
+            'ANTHROPIC_LLM_BASE_URL, ANTHROPIC_BASE_URL, or LLM_BASE_URL.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 if provider in {'ollama', 'vllm'} or not (api_key or auth_token):
     sys.exit(0)
