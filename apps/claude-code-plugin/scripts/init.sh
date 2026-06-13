@@ -34,8 +34,12 @@ def read_claude_settings():
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        print(f"Failed to read Claude settings {path}: {exc}", file=sys.stderr)
-        sys.exit(1)
+        print(
+            f"Warning: failed to read Claude settings {path}: {exc}; "
+            "ignoring settings fallback.",
+            file=sys.stderr,
+        )
+        return {}
     return loaded if isinstance(loaded, dict) else {}
 
 def env_first(*names):
@@ -139,38 +143,53 @@ auth_token = ""
 auth_token_source = ""
 base_url = ""
 base_url_source = ""
+credential_source_group = ""
 if env_api_key:
     api_key = env_api_key
     api_key_source = env_api_key_source
+    credential_source_group = "env"
 elif env_auth_token and env_auth_base_url:
     auth_token = env_auth_token
     auth_token_source = env_auth_token_source
     base_url = env_auth_base_url
     base_url_source = env_auth_base_url_source
+    credential_source_group = "env"
 elif settings_api_key:
     api_key = settings_api_key
     api_key_source = settings_api_key_source
+    credential_source_group = "settings"
 elif settings_auth_token and settings_auth_base_url:
     auth_token = settings_auth_token
     auth_token_source = settings_auth_token_source
     base_url = settings_auth_base_url
     base_url_source = settings_auth_base_url_source
+    credential_source_group = "settings"
 elif env_auth_token:
     auth_token = env_auth_token
     auth_token_source = env_auth_token_source
+    credential_source_group = "env"
 elif settings_auth_token:
     auth_token = settings_auth_token
     auth_token_source = settings_auth_token_source
+    credential_source_group = "settings"
 
 key_provider = "anthropic" if auth_token or api_key else ""
 
 model_prefix = raw_model.split("/", 1)[0].strip().lower() if "/" in raw_model else ""
-provider, provider_source = first_value(
-    env_first_with_source("POWERMEM_INIT_LLM_PROVIDER", "LLM_PROVIDER"),
-    settings_first_with_source(settings_env, "LLM_PROVIDER"),
-    (key_provider, "inferred:anthropic credential" if key_provider else ""),
-    (model_prefix, "inferred:LLM model prefix" if model_prefix else ""),
+explicit_provider, explicit_provider_source = env_first_with_source("POWERMEM_INIT_LLM_PROVIDER", "LLM_PROVIDER")
+settings_provider, settings_provider_source = settings_first_with_source(settings_env, "LLM_PROVIDER")
+provider_candidates = [
+    (explicit_provider, explicit_provider_source),
+]
+if credential_source_group != "env":
+    provider_candidates.append((settings_provider, settings_provider_source))
+provider_candidates.extend(
+    [
+        (key_provider, "inferred:anthropic credential" if key_provider else ""),
+        (model_prefix, "inferred:LLM model prefix" if model_prefix else ""),
+    ]
 )
+provider, provider_source = first_value(*provider_candidates)
 provider = provider.lower()
 
 model = raw_model
@@ -179,9 +198,14 @@ if not base_url and not auth_token:
     base_url = explicit_base_url
     base_url_source = explicit_base_url_source
 if not base_url and not auth_token:
-    base_url, base_url_source = provider_base_url_from_env_source(provider)
-if not base_url and not auth_token:
-    base_url, base_url_source = provider_base_url_from_settings_source(settings_env, provider)
+    if credential_source_group == "env":
+        base_url, base_url_source = provider_base_url_from_env_source(provider)
+    elif credential_source_group == "settings":
+        base_url, base_url_source = provider_base_url_from_settings_source(settings_env, provider)
+    else:
+        base_url, base_url_source = provider_base_url_from_env_source(provider)
+        if not base_url:
+            base_url, base_url_source = provider_base_url_from_settings_source(settings_env, provider)
 base_url = base_url.strip()
 
 missing = []
