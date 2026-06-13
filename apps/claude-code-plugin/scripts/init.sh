@@ -64,14 +64,17 @@ raw_model = (
     or ""
 ).strip()
 
-# PowerMem currently supports Anthropic's API-key path, not Claude Code's
-# bearer-token path. Do not map ANTHROPIC_AUTH_TOKEN to LLM_API_KEY.
-api_key = env_first("POWERMEM_INIT_LLM_API_KEY", "LLM_API_KEY")
-key_provider = ""
-if not api_key:
-    api_key = env_first("ANTHROPIC_API_KEY") or settings_first(settings_env, "ANTHROPIC_API_KEY")
-    if api_key:
-        key_provider = "anthropic"
+auth_token = (
+    env_first("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN")
+    or env_first("ANTHROPIC_AUTH_TOKEN")
+    or settings_first(settings_env, "ANTHROPIC_AUTH_TOKEN")
+)
+api_key = (
+    env_first("POWERMEM_INIT_LLM_API_KEY", "LLM_API_KEY")
+    or env_first("ANTHROPIC_API_KEY")
+    or settings_first(settings_env, "ANTHROPIC_API_KEY")
+)
+key_provider = "anthropic" if auth_token or api_key else ""
 
 model_prefix = raw_model.split("/", 1)[0].strip().lower() if "/" in raw_model else ""
 provider = (
@@ -97,13 +100,25 @@ base_url = (
     or ""
 ).strip()
 
+if auth_token and not base_url and api_key:
+    auth_token = ""
+
 missing = []
 if not provider:
     missing.append("POWERMEM_INIT_LLM_PROVIDER")
 if not model:
     missing.append("POWERMEM_INIT_LLM_MODEL")
-if provider not in {"ollama", "vllm"} and not api_key:
-    missing.append("ANTHROPIC_API_KEY or POWERMEM_INIT_LLM_API_KEY")
+if provider not in {"ollama", "vllm"}:
+    if provider == "anthropic":
+        if not auth_token and not api_key:
+            missing.append(
+                "ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL, "
+                "ANTHROPIC_API_KEY, or POWERMEM_INIT_LLM_API_KEY"
+            )
+        if auth_token and not base_url:
+            missing.append("ANTHROPIC_BASE_URL or POWERMEM_INIT_LLM_BASE_URL")
+    elif not api_key:
+        missing.append("POWERMEM_INIT_LLM_API_KEY or LLM_API_KEY")
 
 if missing:
     print("Missing configuration: " + ", ".join(missing), file=sys.stderr)
@@ -192,6 +207,8 @@ lines = [
 ]
 if api_key:
     lines.append(f"LLM_API_KEY={api_key}")
+if auth_token:
+    lines.append(f"LLM_AUTH_TOKEN={auth_token}")
 if base_url:
     key = f"{provider.upper()}_LLM_BASE_URL"
     if provider == "qwen":
@@ -280,37 +297,50 @@ for line in Path(sys.argv[1]).read_text().splitlines():
 provider = env.get('LLM_PROVIDER', '')
 model    = env.get('LLM_MODEL', '')
 api_key  = env.get('LLM_API_KEY', '')
+auth_token = env.get('LLM_AUTH_TOKEN', '') or env.get('ANTHROPIC_AUTH_TOKEN', '')
 base_url = env.get(f'{provider.upper()}_LLM_BASE_URL', '') if provider else ''
+if provider == 'anthropic':
+    base_url = base_url or env.get('ANTHROPIC_BASE_URL', '')
 
-if provider in {'ollama', 'vllm'} or not api_key:
+if provider in {'ollama', 'vllm'} or not (api_key or auth_token):
     sys.exit(0)
+
+def anthropic_headers(api_key, auth_token):
+    headers = {
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+    }
+    if auth_token:
+        headers['authorization'] = f'Bearer {auth_token}'
+    else:
+        headers['x-api-key'] = api_key
+    return headers
 
 CONFIGS = {
     'anthropic': {
         'url':     lambda b: f"{b or 'https://api.anthropic.com'}/v1/messages",
-        'headers': lambda k: {'x-api-key': k, 'anthropic-version': '2023-06-01',
-                              'content-type': 'application/json'},
+        'headers': lambda k, t: anthropic_headers(k, t),
         'body':    lambda m: {'model': m, 'max_tokens': 1,
                               'messages': [{'role': 'user', 'content': 'hi'}]},
     },
     'openai': {
         'url':     lambda b: f"{b or 'https://api.openai.com'}/v1/chat/completions",
-        'headers': lambda k: {'authorization': f'Bearer {k}',
-                              'content-type': 'application/json'},
+        'headers': lambda k, t: {'authorization': f'Bearer {k}',
+                                 'content-type': 'application/json'},
         'body':    lambda m: {'model': m, 'max_tokens': 1,
                               'messages': [{'role': 'user', 'content': 'hi'}]},
     },
     'deepseek': {
         'url':     lambda b: f"{b or 'https://api.deepseek.com'}/v1/chat/completions",
-        'headers': lambda k: {'authorization': f'Bearer {k}',
-                              'content-type': 'application/json'},
+        'headers': lambda k, t: {'authorization': f'Bearer {k}',
+                                 'content-type': 'application/json'},
         'body':    lambda m: {'model': m, 'max_tokens': 1,
                               'messages': [{'role': 'user', 'content': 'hi'}]},
     },
     'qwen': {
         'url':     lambda b: f"{b or 'https://dashscope.aliyuncs.com/compatible-mode'}/v1/chat/completions",
-        'headers': lambda k: {'authorization': f'Bearer {k}',
-                              'content-type': 'application/json'},
+        'headers': lambda k, t: {'authorization': f'Bearer {k}',
+                                 'content-type': 'application/json'},
         'body':    lambda m: {'model': m, 'max_tokens': 1,
                               'messages': [{'role': 'user', 'content': 'hi'}]},
     },
@@ -322,7 +352,7 @@ if not cfg:
     sys.exit(0)
 
 url     = cfg['url'](base_url)
-headers = cfg['headers'](api_key)
+headers = cfg['headers'](api_key, auth_token)
 body    = json.dumps(cfg['body'](model)).encode()
 
 try:

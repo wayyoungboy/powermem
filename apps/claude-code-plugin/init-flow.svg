@@ -66,7 +66,7 @@
   <rect x="1245" y="700" width="600" height="126" class="config"/>
   <text x="1545" y="740" text-anchor="middle" class="text">不存在：生成</text>
   <text x="1545" y="770" text-anchor="middle" class="small">读取 ~/.claude/settings.json</text>
-  <text x="1545" y="798" text-anchor="middle" class="small">合并 POWERMEM_INIT_*，写完整后端默认配置</text>
+  <text x="1545" y="798" text-anchor="middle" class="small">合并 POWERMEM_INIT_*，支持 API key 或 auth token</text>
 
   <!-- subflow B -->
   <rect x="250" y="940" width="1720" height="570" class="subflow"/>
@@ -102,12 +102,13 @@
   <text x="295" y="1642" class="sub-title">子流程 C：校验 LLM 配置</text>
 
   <rect x="445" y="1710" width="500" height="96" class="config"/>
-  <text x="695" y="1748" text-anchor="middle" class="text">1. 读取 ~/.powermem/.env</text>
-  <text x="695" y="1778" text-anchor="middle" class="small">LLM_PROVIDER / LLM_MODEL / LLM_API_KEY</text>
+  <text x="695" y="1742" text-anchor="middle" class="text">1. 读取 ~/.powermem/.env</text>
+  <text x="695" y="1772" text-anchor="middle" class="small">LLM_PROVIDER / LLM_MODEL</text>
+  <text x="695" y="1800" text-anchor="middle" class="small">LLM_API_KEY 或 LLM_AUTH_TOKEN</text>
 
   <rect x="1025" y="1710" width="500" height="96" class="config"/>
   <text x="1275" y="1748" text-anchor="middle" class="text">2. 决定是否远程试探</text>
-  <text x="1275" y="1778" text-anchor="middle" class="small">ollama、vllm 或无 API key 时跳过请求</text>
+  <text x="1275" y="1778" text-anchor="middle" class="small">ollama、vllm 或无凭证时跳过请求</text>
 
   <rect x="700" y="1860" width="650" height="98" class="config"/>
   <text x="1025" y="1898" text-anchor="middle" class="text">3. 对支持的 provider 发起最小请求</text>
@@ -116,7 +117,7 @@
   <rect x="1525" y="1848" width="320" height="122" class="warn"/>
   <text x="1685" y="1890" text-anchor="middle" class="text">校验失败</text>
   <text x="1685" y="1920" text-anchor="middle" class="small">提示 provider / model</text>
-  <text x="1685" y="1948" text-anchor="middle" class="small">API key / base URL 后退出</text>
+  <text x="1685" y="1948" text-anchor="middle" class="small">API key、auth token 或 base URL 后退出</text>
 
   <!-- subflow D -->
   <rect x="250" y="2100" width="1720" height="590" class="subflow"/>
