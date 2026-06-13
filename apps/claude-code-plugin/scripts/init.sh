@@ -39,23 +39,41 @@ def read_claude_settings():
     return loaded if isinstance(loaded, dict) else {}
 
 def env_first(*names):
+    value, _ = env_first_with_source(*names)
+    return value
+
+def env_first_with_source(*names):
     for name in names:
         value = os.environ.get(name)
         if value is not None and value.strip():
-            return value.strip()
-    return ""
+            return value.strip(), f"env:{name}"
+    return "", ""
 
 def settings_first(settings_env, *names):
+    value, _ = settings_first_with_source(settings_env, *names)
+    return value
+
+def settings_first_with_source(settings_env, *names):
     for name in names:
         value = settings_env.get(name)
         if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
+            return value.strip(), f"settings.env:{name}"
+    return "", ""
+
+def first_value(*items):
+    for value, source in items:
+        if value:
+            return value, source
+    return "", ""
 
 def path_value(*parts):
     return str(data_dir.joinpath(*parts))
 
 def provider_base_url_from_env(provider):
+    value, _ = provider_base_url_from_env_source(provider)
+    return value
+
+def provider_base_url_from_env_source(provider):
     provider_base_envs = {
         "anthropic": ("ANTHROPIC_BASE_URL",),
         "openai": ("OPENAI_BASE_URL",),
@@ -63,9 +81,13 @@ def provider_base_url_from_env(provider):
         "siliconflow": ("SILICONFLOW_BASE_URL",),
         "deepseek": ("DEEPSEEK_BASE_URL",),
     }
-    return env_first(*provider_base_envs.get(provider, ()))
+    return env_first_with_source(*provider_base_envs.get(provider, ()))
 
 def provider_base_url_from_settings(settings_env, provider):
+    value, _ = provider_base_url_from_settings_source(settings_env, provider)
+    return value
+
+def provider_base_url_from_settings_source(settings_env, provider):
     provider_base_keys = {
         "anthropic": ("ANTHROPIC_BASE_URL",),
         "openai": ("OPENAI_BASE_URL",),
@@ -73,71 +95,93 @@ def provider_base_url_from_settings(settings_env, provider):
         "siliconflow": ("SILICONFLOW_BASE_URL",),
         "deepseek": ("DEEPSEEK_BASE_URL",),
     }
-    return settings_first(settings_env, *(provider_base_keys.get(provider, ()) + ("LLM_BASE_URL",)))
+    return settings_first_with_source(settings_env, *(provider_base_keys.get(provider, ()) + ("LLM_BASE_URL",)))
 
 settings = read_claude_settings()
 settings_env = settings.get("env") if isinstance(settings.get("env"), dict) else {}
-raw_model = (
-    env_first("POWERMEM_INIT_LLM_MODEL", "LLM_MODEL", "ANTHROPIC_MODEL")
-    or settings_first(settings_env, "ANTHROPIC_MODEL", "LLM_MODEL")
-    or (settings.get("model") if isinstance(settings.get("model"), str) else "")
-    or ""
-).strip()
+settings_model = settings.get("model") if isinstance(settings.get("model"), str) else ""
+raw_model, model_source = first_value(
+    env_first_with_source("POWERMEM_INIT_LLM_MODEL", "LLM_MODEL", "ANTHROPIC_MODEL"),
+    settings_first_with_source(settings_env, "ANTHROPIC_MODEL", "LLM_MODEL"),
+    (settings_model.strip(), "settings.model" if settings_model.strip() else ""),
+)
+raw_model = raw_model.strip()
 
-explicit_base_url = env_first("POWERMEM_INIT_LLM_BASE_URL", "LLM_BASE_URL")
-env_api_key = (
-    env_first("POWERMEM_INIT_LLM_API_KEY", "LLM_API_KEY")
-    or env_first("ANTHROPIC_API_KEY")
+explicit_base_url, explicit_base_url_source = env_first_with_source("POWERMEM_INIT_LLM_BASE_URL", "LLM_BASE_URL")
+env_api_key, env_api_key_source = first_value(
+    env_first_with_source("POWERMEM_INIT_LLM_API_KEY", "LLM_API_KEY"),
+    env_first_with_source("ANTHROPIC_API_KEY"),
 )
-env_auth_token = (
-    env_first("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN")
-    or env_first("ANTHROPIC_AUTH_TOKEN")
+env_auth_token, env_auth_token_source = first_value(
+    env_first_with_source("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN"),
+    env_first_with_source("ANTHROPIC_AUTH_TOKEN"),
 )
-env_auth_base_url = explicit_base_url or env_first("ANTHROPIC_BASE_URL")
-settings_api_key = settings_first(settings_env, "ANTHROPIC_API_KEY")
-settings_auth_token = settings_first(settings_env, "ANTHROPIC_AUTH_TOKEN")
-settings_auth_base_url = explicit_base_url or settings_first(
+env_anthropic_base_url, env_anthropic_base_url_source = env_first_with_source("ANTHROPIC_BASE_URL")
+env_auth_base_url, env_auth_base_url_source = first_value(
+    (explicit_base_url, explicit_base_url_source),
+    (env_anthropic_base_url, env_anthropic_base_url_source),
+)
+settings_api_key, settings_api_key_source = settings_first_with_source(settings_env, "ANTHROPIC_API_KEY")
+settings_auth_token, settings_auth_token_source = settings_first_with_source(settings_env, "ANTHROPIC_AUTH_TOKEN")
+settings_auth_base_value, settings_auth_base_source = settings_first_with_source(
     settings_env,
     "ANTHROPIC_BASE_URL",
     "LLM_BASE_URL",
 )
+settings_auth_base_url, settings_auth_base_url_source = first_value(
+    (explicit_base_url, explicit_base_url_source),
+    (settings_auth_base_value, settings_auth_base_source),
+)
 
 api_key = ""
+api_key_source = ""
 auth_token = ""
+auth_token_source = ""
 base_url = ""
+base_url_source = ""
 if env_api_key:
     api_key = env_api_key
+    api_key_source = env_api_key_source
 elif env_auth_token and env_auth_base_url:
     auth_token = env_auth_token
+    auth_token_source = env_auth_token_source
     base_url = env_auth_base_url
+    base_url_source = env_auth_base_url_source
 elif settings_api_key:
     api_key = settings_api_key
+    api_key_source = settings_api_key_source
 elif settings_auth_token and settings_auth_base_url:
     auth_token = settings_auth_token
+    auth_token_source = settings_auth_token_source
     base_url = settings_auth_base_url
+    base_url_source = settings_auth_base_url_source
 elif env_auth_token:
     auth_token = env_auth_token
+    auth_token_source = env_auth_token_source
 elif settings_auth_token:
     auth_token = settings_auth_token
+    auth_token_source = settings_auth_token_source
 
 key_provider = "anthropic" if auth_token or api_key else ""
 
 model_prefix = raw_model.split("/", 1)[0].strip().lower() if "/" in raw_model else ""
-provider = (
-    env_first("POWERMEM_INIT_LLM_PROVIDER", "LLM_PROVIDER")
-    or settings_first(settings_env, "LLM_PROVIDER")
-    or key_provider
-    or model_prefix
-).lower()
+provider, provider_source = first_value(
+    env_first_with_source("POWERMEM_INIT_LLM_PROVIDER", "LLM_PROVIDER"),
+    settings_first_with_source(settings_env, "LLM_PROVIDER"),
+    (key_provider, "inferred:anthropic credential" if key_provider else ""),
+    (model_prefix, "inferred:LLM model prefix" if model_prefix else ""),
+)
+provider = provider.lower()
 
 model = raw_model
 
 if not base_url and not auth_token:
     base_url = explicit_base_url
+    base_url_source = explicit_base_url_source
 if not base_url and not auth_token:
-    base_url = provider_base_url_from_env(provider)
+    base_url, base_url_source = provider_base_url_from_env_source(provider)
 if not base_url and not auth_token:
-    base_url = provider_base_url_from_settings(settings_env, provider)
+    base_url, base_url_source = provider_base_url_from_settings_source(settings_env, provider)
 base_url = base_url.strip()
 
 missing = []
@@ -251,6 +295,8 @@ if base_url:
     if provider == "qwen":
         key = "QWEN_LLM_BASE_URL"
     lines.append(f"{key}={base_url}")
+else:
+    key = ""
 
 lines.extend(
     [
@@ -316,6 +362,19 @@ print(
     f"embedding_provider={embedding_provider}, embedding_model={embedding_model}, "
     f"embedding_dims={embedding_dims}, server_port={server_port}"
 )
+print("LLM config sources:")
+print(f"  LLM_PROVIDER: {provider_source or 'not set'}")
+print(f"  LLM_MODEL: {model_source or 'not set'}")
+if api_key:
+    print(f"  LLM_API_KEY: {api_key_source or 'unknown'} (value hidden)")
+elif auth_token:
+    print(f"  LLM_AUTH_TOKEN: {auth_token_source or 'unknown'} (value hidden)")
+else:
+    print("  LLM_API_KEY/LLM_AUTH_TOKEN: not required")
+if key and base_url:
+    print(f"  {key}: {base_url_source or 'unknown'} (value hidden)")
+else:
+    print("  *_LLM_BASE_URL: not set")
 PY
 }
 
@@ -331,15 +390,25 @@ for line in Path(sys.argv[1]).read_text().splitlines():
         k, v = line.split('=', 1)
         env[k.strip()] = v.strip()
 
+def env_value_with_source(*names):
+    for name in names:
+        value = env.get(name, '')
+        if value:
+            return value, f".env:{name}"
+    return '', ''
+
 provider = env.get('LLM_PROVIDER', '')
 model    = env.get('LLM_MODEL', '')
-api_key  = env.get('LLM_API_KEY', '')
-auth_token = env.get('LLM_AUTH_TOKEN', '') or env.get('ANTHROPIC_AUTH_TOKEN', '')
-base_url = env.get(f'{provider.upper()}_LLM_BASE_URL', '') if provider else ''
+api_key, api_key_source = env_value_with_source('LLM_API_KEY')
+auth_token, auth_token_source = env_value_with_source('LLM_AUTH_TOKEN', 'ANTHROPIC_AUTH_TOKEN')
+base_url_name = f'{provider.upper()}_LLM_BASE_URL' if provider else ''
+base_url, base_url_source = env_value_with_source(base_url_name) if base_url_name else ('', '')
 if provider == 'anthropic':
-    base_url = base_url or env.get('ANTHROPIC_BASE_URL', '')
+    if not base_url:
+        base_url, base_url_source = env_value_with_source('ANTHROPIC_BASE_URL')
     if api_key:
         auth_token = ''
+        auth_token_source = ''
     elif auth_token and not base_url:
         print(
             'LLM validation failed: ANTHROPIC_AUTH_TOKEN/LLM_AUTH_TOKEN requires '
@@ -350,6 +419,18 @@ if provider == 'anthropic':
 
 if provider in {'ollama', 'vllm'} or not (api_key or auth_token):
     sys.exit(0)
+
+print("LLM validation sources:")
+print("  LLM_PROVIDER: .env:LLM_PROVIDER")
+print("  LLM_MODEL: .env:LLM_MODEL")
+if api_key:
+    print(f"  LLM_API_KEY: {api_key_source} (value hidden)")
+elif auth_token:
+    print(f"  {auth_token_source.rsplit(':', 1)[-1]}: {auth_token_source} (value hidden)")
+if base_url:
+    print(f"  {base_url_source.rsplit(':', 1)[-1]}: {base_url_source} (value hidden)")
+else:
+    print("  *_LLM_BASE_URL: not set")
 
 def anthropic_headers(api_key, auth_token):
     headers = {
