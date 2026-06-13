@@ -591,6 +591,14 @@ stop_unhealthy_managed_server() {
   remove_managed_pid_files
 }
 
+announce_dashboard_url() {
+  case "$1" in
+    */) dashboard_url="${1}dashboard/" ;;
+    *) dashboard_url="${1}/dashboard/" ;;
+  esac
+  echo "Memory dashboard: $dashboard_url"
+}
+
 if [ ! -f "$ENV_FILE" ]; then
   echo "Creating plugin .env from environment variables or Claude settings fallback."
   create_env_file
@@ -607,6 +615,7 @@ else
     if is_healthy "$base_url"; then
       write_runtime_base_url "$base_url"
       echo "Managed PowerMem backend is healthy: $base_url"
+      announce_dashboard_url "$base_url"
       echo "Hook will use this backend through $RUNTIME_FILE."
       exit 0
     fi
@@ -660,6 +669,7 @@ if pid_alive; then
   if is_healthy "$base_url"; then
     write_runtime_base_url "$base_url"
     echo "Managed PowerMem backend is healthy: $base_url"
+    announce_dashboard_url "$base_url"
     exit 0
   fi
   echo "Managed server PID exists but health check failed; stopping it before continuing."
@@ -669,6 +679,7 @@ fi
 if is_healthy "$base_url"; then
   write_runtime_base_url "$base_url"
   echo "External PowerMem backend is healthy: $base_url"
+  announce_dashboard_url "$base_url"
   echo "Plugin config and venv are ready. Not starting a managed server."
   exit 0
 fi
@@ -707,6 +718,7 @@ while [ "$i" -lt 60 ]; do
   if is_healthy "$base_url"; then
     write_runtime_base_url "$base_url"
     echo "PowerMem backend is healthy: $base_url"
+    announce_dashboard_url "$base_url"
     echo "Hook will use this backend through $RUNTIME_FILE."
     echo "Log: $LOG_FILE"
     exit 0
