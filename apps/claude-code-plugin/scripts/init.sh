@@ -337,13 +337,13 @@ api_key  = env.get('LLM_API_KEY', '')
 auth_token = env.get('LLM_AUTH_TOKEN', '') or env.get('ANTHROPIC_AUTH_TOKEN', '')
 base_url = env.get(f'{provider.upper()}_LLM_BASE_URL', '') if provider else ''
 if provider == 'anthropic':
-    base_url = base_url or env.get('ANTHROPIC_BASE_URL', '') or env.get('LLM_BASE_URL', '')
+    base_url = base_url or env.get('ANTHROPIC_BASE_URL', '')
     if api_key:
         auth_token = ''
     elif auth_token and not base_url:
         print(
             'LLM validation failed: ANTHROPIC_AUTH_TOKEN/LLM_AUTH_TOKEN requires '
-            'ANTHROPIC_LLM_BASE_URL, ANTHROPIC_BASE_URL, or LLM_BASE_URL.',
+            'ANTHROPIC_LLM_BASE_URL or ANTHROPIC_BASE_URL.',
             file=sys.stderr,
         )
         sys.exit(1)
