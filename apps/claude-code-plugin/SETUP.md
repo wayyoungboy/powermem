@@ -69,11 +69,12 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
    ```
 
-   The script reads `~/.claude/settings.json` and attempts to derive either
-   supported Claude Code Anthropic path:
-   `env.ANTHROPIC_AUTH_TOKEN` + `env.ANTHROPIC_BASE_URL`, or
-   `env.ANTHROPIC_API_KEY`. It also reads `env.ANTHROPIC_MODEL`. It writes the
-   plugin-local `.env` with the full PowerMem backend defaults: embedded
+   The script reads the current process environment and attempts to derive the
+   supported Anthropic configuration. It uses `ANTHROPIC_API_KEY` first; only
+   when that is absent does it use `ANTHROPIC_AUTH_TOKEN` together with
+   `ANTHROPIC_BASE_URL`. It also reads `ANTHROPIC_MODEL` from the environment.
+   It does not read `~/.claude/settings.json` for credentials or model values.
+   It writes the plugin-local `.env` with the full PowerMem backend defaults: embedded
    OceanBase/seekdb storage, local default embedding, server settings, and logging
    settings.
 4. If init reports missing values, ask the user only for those missing values. Do
@@ -237,18 +238,17 @@ writing. Never silently patch `.env`.**
 
    | Option | Description |
    |--------|-------------|
-   | Yes, auto-detect | Auto-detect LLM config (priority: OS env → `~/.claude/settings.json` → manual) |
+   | Yes, auto-detect | Auto-detect LLM config from the current process environment, then ask only for missing fields |
 
    If the user selects "Yes, auto-detect" (or "Other" and types "yes"/"auto"):
 
    **Auto-detection priority chain**:
-   1. **OS environment variables** (highest priority) — check these first:
-      - `ANTHROPIC_AUTH_TOKEN`
+   1. **Current process environment variables** — check these first:
       - `ANTHROPIC_API_KEY`
-      - `ANTHROPIC_MODEL`
+      - `ANTHROPIC_AUTH_TOKEN`
       - `ANTHROPIC_BASE_URL`
-   2. **`~/.claude/settings.json`** — fall back if env vars are missing
-   3. **Manual input** — ask only for fields that are still missing
+      - `ANTHROPIC_MODEL`
+   2. **Manual input** — ask only for fields that are still missing
 
    PowerMem supports Claude Code's Anthropic API-key path and bearer-token gateway
    path. Do not treat `ANTHROPIC_AUTH_TOKEN` as `LLM_API_KEY`; copy it to
@@ -261,38 +261,33 @@ writing. Never silently patch `.env`.**
 
    | Field | Check |
    |-------|-------|
-   | LLM_PROVIDER | If `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY` is set → `anthropic`; otherwise infer from `ANTHROPIC_MODEL` prefix if present |
+   | LLM_PROVIDER | If `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set → `anthropic`; otherwise infer from `ANTHROPIC_MODEL` prefix if present |
    | LLM_MODEL | `$ANTHROPIC_MODEL` |
-   | LLM_AUTH_TOKEN | `$ANTHROPIC_AUTH_TOKEN` |
-   | LLM_API_KEY | `$ANTHROPIC_API_KEY`, only when no auth token is present |
+   | LLM_API_KEY | `$ANTHROPIC_API_KEY` |
+   | LLM_AUTH_TOKEN | `$ANTHROPIC_AUTH_TOKEN`, only when `ANTHROPIC_API_KEY` is absent |
    | LLM_BASE_URL | `$ANTHROPIC_BASE_URL` |
 
-   **Step 2 — If any field is still missing, read `~/.claude/settings.json`.**
-
-   **Model and provider** — read `env.ANTHROPIC_MODEL` (Claude Code's standard model
-   key); fall back to the top-level `model` field if absent. Keep the value exactly
-   as configured by Claude Code. Do not strip a `<provider>/` prefix and do not
-   rewrite dotted versions:
+   Keep `ANTHROPIC_MODEL` exactly as configured. Do not strip a `<provider>/`
+   prefix and do not rewrite dotted versions:
      - `"anthropic/claude-opus-4.6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=anthropic/claude-opus-4.6`
      - `"anthropic/claude-sonnet-4.6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=anthropic/claude-sonnet-4.6`
 
-   **Credentials** — Claude Code stores these values under `ANTHROPIC_*` keys.
-   Preserve Claude Code's precedence: bearer token first, API key second.
-   Read:
-     - `env.ANTHROPIC_AUTH_TOKEN`
-     - `env.ANTHROPIC_API_KEY`
+   **Credentials** — preserve PowerMem's precedence: API key first, bearer-token
+   gateway second. Read:
+     - `ANTHROPIC_API_KEY`
+     - `ANTHROPIC_AUTH_TOKEN`, only if `ANTHROPIC_API_KEY` is absent
 
    **Base URL** — read directly:
-     - `env.ANTHROPIC_BASE_URL`
+     - `ANTHROPIC_BASE_URL`
      - If `ANTHROPIC_AUTH_TOKEN` is used, `ANTHROPIC_BASE_URL` is required.
      - If `ANTHROPIC_API_KEY` is used and the base URL is absent, leave it blank —
        PowerMem will use the provider's default endpoint.
 
-   **Step 3 — For any fields still missing after Steps 1-2,** ask as a plain chat
+   **Step 2 — For any fields still missing after environment detection,** ask as a plain chat
    question (one at a time, per 2b–2e below). Only ask for what is actually missing.
 
-   After all three steps, show a **masked** summary of the merged result (per
-   🔒 DATA SAFETY rules), noting the source of each field (env / settings.json / manual).
+   After detection/manual input, show a **masked** summary of the merged result
+   (per 🔒 DATA SAFETY rules), noting the source of each field (env / manual).
    Then jump to **2f**.
 
    If the user does NOT select auto-detect, fall back to the manual flow:

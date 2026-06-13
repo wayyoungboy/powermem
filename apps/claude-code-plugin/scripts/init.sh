@@ -19,24 +19,12 @@ echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON")
 
 create_env_file() {
   "$BOOTSTRAP_PYTHON" - "$ENV_FILE" "$DATA_DIR" <<'PY'
-import json
 import os
 import sys
 from pathlib import Path
 
 env_path = Path(sys.argv[1])
 data_dir = Path(sys.argv[2]).expanduser()
-
-def read_claude_settings():
-    path = Path.home() / ".claude" / "settings.json"
-    if not path.is_file():
-        return {}
-    try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        print(f"Failed to read Claude settings {path}: {exc}", file=sys.stderr)
-        sys.exit(1)
-    return loaded if isinstance(loaded, dict) else {}
 
 def env_first(*names):
     for name in names:
@@ -45,63 +33,46 @@ def env_first(*names):
             return value.strip()
     return ""
 
-def settings_first(settings_env, *names):
-    for name in names:
-        value = settings_env.get(name)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
-
 def path_value(*parts):
     return str(data_dir.joinpath(*parts))
 
-settings = read_claude_settings()
-settings_env = settings.get("env") if isinstance(settings.get("env"), dict) else {}
 raw_model = (
-    env_first("POWERMEM_INIT_LLM_MODEL", "LLM_MODEL")
-    or settings_first(settings_env, "ANTHROPIC_MODEL", "LLM_MODEL")
-    or (settings.get("model") if isinstance(settings.get("model"), str) else "")
+    env_first("POWERMEM_INIT_LLM_MODEL", "LLM_MODEL", "ANTHROPIC_MODEL")
     or ""
 ).strip()
 
-auth_token = (
-    env_first("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN")
-    or env_first("ANTHROPIC_AUTH_TOKEN")
-    or settings_first(settings_env, "ANTHROPIC_AUTH_TOKEN")
-)
 api_key = (
     env_first("POWERMEM_INIT_LLM_API_KEY", "LLM_API_KEY")
     or env_first("ANTHROPIC_API_KEY")
-    or settings_first(settings_env, "ANTHROPIC_API_KEY")
 )
+auth_token = ""
+if not api_key:
+    auth_token = (
+        env_first("POWERMEM_INIT_LLM_AUTH_TOKEN", "LLM_AUTH_TOKEN")
+        or env_first("ANTHROPIC_AUTH_TOKEN")
+    )
 key_provider = "anthropic" if auth_token or api_key else ""
 
 model_prefix = raw_model.split("/", 1)[0].strip().lower() if "/" in raw_model else ""
 provider = (
     env_first("POWERMEM_INIT_LLM_PROVIDER", "LLM_PROVIDER")
-    or settings_first(settings_env, "LLM_PROVIDER")
     or key_provider
     or model_prefix
 ).lower()
 
-model = env_first("POWERMEM_INIT_LLM_MODEL", "LLM_MODEL") or raw_model
+model = raw_model
 
-base_url = (
-    env_first("POWERMEM_INIT_LLM_BASE_URL", "LLM_BASE_URL")
-    or settings_first(
-        settings_env,
-        "ANTHROPIC_BASE_URL",
-        "OPENAI_BASE_URL",
-        "QWEN_BASE_URL",
-        "SILICONFLOW_BASE_URL",
-        "DEEPSEEK_BASE_URL",
-        "LLM_BASE_URL",
-    )
-    or ""
-).strip()
-
-if auth_token and not base_url and api_key:
-    auth_token = ""
+base_url = env_first("POWERMEM_INIT_LLM_BASE_URL", "LLM_BASE_URL")
+if not base_url:
+    provider_base_envs = {
+        "anthropic": ("ANTHROPIC_BASE_URL",),
+        "openai": ("OPENAI_BASE_URL",),
+        "qwen": ("QWEN_BASE_URL",),
+        "siliconflow": ("SILICONFLOW_BASE_URL",),
+        "deepseek": ("DEEPSEEK_BASE_URL",),
+    }
+    base_url = env_first(*provider_base_envs.get(provider, ()))
+base_url = base_url.strip()
 
 missing = []
 if not provider:
@@ -155,11 +126,11 @@ embedding_dims = (
 embedding_api_key = env_first("POWERMEM_INIT_EMBEDDING_API_KEY", "EMBEDDING_API_KEY")
 if not embedding_api_key:
     if embedding_provider == "qwen":
-        embedding_api_key = env_first("QWEN_API_KEY", "DASHSCOPE_API_KEY") or settings_first(settings_env, "QWEN_API_KEY", "DASHSCOPE_API_KEY")
+        embedding_api_key = env_first("QWEN_API_KEY", "DASHSCOPE_API_KEY")
     elif embedding_provider == "openai":
-        embedding_api_key = env_first("OPENAI_API_KEY") or settings_first(settings_env, "OPENAI_API_KEY")
+        embedding_api_key = env_first("OPENAI_API_KEY")
     elif embedding_provider == "siliconflow":
-        embedding_api_key = env_first("SILICONFLOW_API_KEY") or settings_first(settings_env, "SILICONFLOW_API_KEY")
+        embedding_api_key = env_first("SILICONFLOW_API_KEY")
 
 if embedding_provider not in {"default", "ollama", "lmstudio"} and not embedding_api_key:
     print(
@@ -441,7 +412,7 @@ stop_unhealthy_managed_server() {
 }
 
 if [ ! -f "$ENV_FILE" ]; then
-  echo "Creating plugin .env from Claude settings or POWERMEM_INIT_* variables."
+  echo "Creating plugin .env from environment variables."
   create_env_file
 else
   echo "Using existing plugin .env: $ENV_FILE"
