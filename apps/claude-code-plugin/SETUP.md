@@ -69,12 +69,13 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
    ```
 
-   The script reads the current process environment and attempts to derive the
-   supported Anthropic configuration. It uses `ANTHROPIC_API_KEY` first; only
+   The script reads the current process environment first and attempts to derive
+   the supported Anthropic configuration. It uses `ANTHROPIC_API_KEY` first; only
    when that is absent does it use `ANTHROPIC_AUTH_TOKEN` together with
    `ANTHROPIC_BASE_URL`. It also reads `ANTHROPIC_MODEL` from the environment.
-   It does not read `~/.claude/settings.json` for credentials or model values.
-   It writes the plugin-local `.env` with the full PowerMem backend defaults: embedded
+   If the environment does not provide a complete config, it falls back to
+   `~/.claude/settings.json` using the same Anthropic keys. It writes the
+   plugin-local `.env` with the full PowerMem backend defaults: embedded
    OceanBase/seekdb storage, local default embedding, server settings, and logging
    settings.
 4. If init reports missing values, ask the user only for those missing values. Do
@@ -238,7 +239,7 @@ writing. Never silently patch `.env`.**
 
    | Option | Description |
    |--------|-------------|
-   | Yes, auto-detect | Auto-detect LLM config from the current process environment, then ask only for missing fields |
+   | Yes, auto-detect | Auto-detect LLM config from the current process environment, then `~/.claude/settings.json`, then ask only for missing fields |
 
    If the user selects "Yes, auto-detect" (or "Other" and types "yes"/"auto"):
 
@@ -248,7 +249,9 @@ writing. Never silently patch `.env`.**
       - `ANTHROPIC_AUTH_TOKEN`
       - `ANTHROPIC_BASE_URL`
       - `ANTHROPIC_MODEL`
-   2. **Manual input** — ask only for fields that are still missing
+   2. **`~/.claude/settings.json`** — use `env.ANTHROPIC_*`, `env.LLM_*`, and
+      top-level `model` as fallback sources
+   3. **Manual input** — ask only for fields that are still missing
 
    PowerMem supports Claude Code's Anthropic API-key path and bearer-token gateway
    path. Do not treat `ANTHROPIC_AUTH_TOKEN` as `LLM_API_KEY`; copy it to
@@ -267,27 +270,36 @@ writing. Never silently patch `.env`.**
    | LLM_AUTH_TOKEN | `$ANTHROPIC_AUTH_TOKEN`, only when `ANTHROPIC_API_KEY` is absent |
    | LLM_BASE_URL | `$ANTHROPIC_BASE_URL` |
 
-   Keep `ANTHROPIC_MODEL` exactly as configured. Do not strip a `<provider>/`
-   prefix and do not rewrite dotted versions:
+   If environment model detection fails, read `env.ANTHROPIC_MODEL`,
+   `env.LLM_MODEL`, or top-level `model` from `~/.claude/settings.json`. Keep
+   the model exactly as configured. Do not strip a `<provider>/` prefix and do
+   not rewrite dotted versions:
      - `"anthropic/claude-opus-4.6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=anthropic/claude-opus-4.6`
      - `"anthropic/claude-sonnet-4.6"` → `LLM_PROVIDER=anthropic`, `LLM_MODEL=anthropic/claude-sonnet-4.6`
 
-   **Credentials** — preserve PowerMem's precedence: API key first, bearer-token
-   gateway second. Read:
+   **Credentials** — preserve PowerMem's environment precedence: API key first,
+   bearer-token gateway second. If environment credentials are incomplete, fall
+   back to the old `~/.claude/settings.json` credential flow. Read:
      - `ANTHROPIC_API_KEY`
      - `ANTHROPIC_AUTH_TOKEN`, only if `ANTHROPIC_API_KEY` is absent
+     - fallback `env.ANTHROPIC_AUTH_TOKEN` / `env.ANTHROPIC_API_KEY` from
+       `~/.claude/settings.json`
 
    **Base URL** — read directly:
      - `ANTHROPIC_BASE_URL`
+     - fallback `env.ANTHROPIC_BASE_URL` or `env.LLM_BASE_URL` from
+       `~/.claude/settings.json`
      - If `ANTHROPIC_AUTH_TOKEN` is used, `ANTHROPIC_BASE_URL` is required.
      - If `ANTHROPIC_API_KEY` is used and the base URL is absent, leave it blank —
        PowerMem will use the provider's default endpoint.
 
-   **Step 2 — For any fields still missing after environment detection,** ask as a plain chat
-   question (one at a time, per 2b–2e below). Only ask for what is actually missing.
+   **Step 3 — For any fields still missing after environment and settings
+   detection,** ask as a plain chat question (one at a time, per 2b–2e below).
+   Only ask for what is actually missing.
 
    After detection/manual input, show a **masked** summary of the merged result
-   (per 🔒 DATA SAFETY rules), noting the source of each field (env / manual).
+   (per 🔒 DATA SAFETY rules), noting the source of each field
+   (env / settings.json / manual).
    Then jump to **2f**.
 
    If the user does NOT select auto-detect, fall back to the manual flow:

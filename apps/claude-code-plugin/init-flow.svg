@@ -65,8 +65,8 @@
 
   <rect x="1245" y="700" width="600" height="126" class="config"/>
   <text x="1545" y="740" text-anchor="middle" class="text">不存在：生成</text>
-  <text x="1545" y="770" text-anchor="middle" class="small">读取当前进程环境变量</text>
-  <text x="1545" y="798" text-anchor="middle" class="small">先用 ANTHROPIC_API_KEY，再用 token + base URL</text>
+  <text x="1545" y="770" text-anchor="middle" class="small">先读当前进程环境变量</text>
+  <text x="1545" y="798" text-anchor="middle" class="small">失败后用 ~/.claude/settings.json 兜底</text>
 
   <!-- subflow B -->
   <rect x="250" y="940" width="1720" height="570" class="subflow"/>
