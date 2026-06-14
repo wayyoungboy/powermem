@@ -2,7 +2,7 @@
 
 This file is a **prompt for Claude Code**. Open Claude Code in your terminal and say:
 
-> Read and follow `apps/claude-code-plugin/SETUP.md` to set up PowerMem memory for Claude Code.
+> Read and follow `apps/agent-plugin/SETUP.md` to set up PowerMem memory for Claude Code.
 
 Claude Code will then run the steps below: detect whether you are in the PowerMem
 source tree or not, ask you for the few required secrets, and wire PowerMem up as a
@@ -194,7 +194,7 @@ state and either skip, reuse, or refresh it instead of failing or duplicating wo
 
 1. DETECT CONTEXT. The current directory is the PowerMem source tree if a
    pyproject.toml here has name = "powermem" (or src/powermem/ and
-   apps/claude-code-plugin/ both exist). Tell me which path you will take:
+   apps/agent-plugin/ both exist). Tell me which path you will take:
      - SOURCE  -> build & deploy from this checkout and install the Claude Code
                   plugin GLOBALLY in HTTP mode (hooks -> REST; needs Go 1.22+).
      - PYPI/MCP -> install PowerMem from PyPI with uv and connect via the
@@ -450,8 +450,8 @@ writing. Never silently patch `.env`.**
       ~/.claude/marketplaces/powermem:
         DEST="$HOME/.claude/marketplaces/powermem"
         mkdir -p "$DEST"
-        rsync -a --delete "<ABS_PATH>/apps/claude-code-plugin/" "$DEST/"
-          # no rsync? rm -rf "$DEST" && cp -a "<ABS_PATH>/apps/claude-code-plugin/." "$DEST/"
+        rsync -a --delete "<ABS_PATH>/apps/agent-plugin/" "$DEST/"
+          # no rsync? rm -rf "$DEST" && cp -a "<ABS_PATH>/apps/agent-plugin/." "$DEST/"
       The binaries from `make build-claude-hook` must already be on disk before this
       copy. Re-copy on every re-run so the staged dir tracks your latest build.
     - Register the marketplace from the STAGED dir (it ships
@@ -635,7 +635,7 @@ writing. Never silently patch `.env`.**
 This file is safe to re-run end to end. The only manual-feeling case is refreshing
 the cached plugin after you change the plugin or rebuild the Go hooks at the SAME
 version: rebuild (`make build-claude-hook`), re-copy the result into the staged
-marketplace (`rsync -a --delete <ABS_PATH>/apps/claude-code-plugin/ ~/.claude/marketplaces/powermem/`),
+marketplace (`rsync -a --delete <ABS_PATH>/apps/agent-plugin/ ~/.claude/marketplaces/powermem/`),
 then force-refresh the cache with `claude plugin uninstall memory-powermem@powermem`
 followed by `claude plugin install memory-powermem@powermem --scope user` (or bump the
 version in .claude-plugin/plugin.json so `claude plugin update memory-powermem` picks it up).
@@ -694,14 +694,9 @@ make build-claude-hook
 
 #### [E005] Storage Backend Initialization
 **Problem**: 503 errors on API calls despite server health
-<<<<<<< HEAD
-**Fix**: the Claude Code plugin defaults to embedded OceanBase/seekdb. Stop the
-managed server, remove stale seekdb data only if you accept deleting local memories, and
-restart init:
-=======
 **Fix**: the PowerMem plugin defaults to embedded OceanBase/seekdb. Stop the
-managed server, remove stale seekdb data, and restart init:
->>>>>>> Add Codex CLI plugin support
+managed server, remove stale seekdb data only if you accept deleting local memories,
+and restart init:
 ```bash
 sh "$PLUGIN_ROOT/scripts/stop.sh"
 rm -rf "$HOME/.powermem/seekdb_data"
@@ -900,7 +895,7 @@ make build-claude-hook
 # Register marketplace
 DEST="$HOME/.claude/marketplaces/powermem"
 mkdir -p "$DEST"
-rsync -a --delete "$(pwd)/apps/claude-code-plugin/" "$DEST/"
+rsync -a --delete "$(pwd)/apps/agent-plugin/" "$DEST/"
 claude plugin marketplace add "$DEST"
 claude plugin install memory-powermem@powermem --scope user
 

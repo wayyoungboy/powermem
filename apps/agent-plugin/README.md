@@ -15,7 +15,7 @@ This directory contains the plugin descriptors and shared runtime files
 To load it directly in Claude Code:
 
 ```bash
-claude --plugin-dir /path/to/powermem/apps/claude-code-plugin
+claude --plugin-dir /path/to/powermem/apps/agent-plugin
 ```
 
 ## Claude Code Marketplace Install

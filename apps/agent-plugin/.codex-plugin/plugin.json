@@ -7,7 +7,7 @@
     "email": "open_oceanbase@oceanbase.com",
     "url": "https://github.com/oceanbase"
   },
-  "homepage": "https://github.com/oceanbase/powermem/tree/main/apps/claude-code-plugin",
+  "homepage": "https://github.com/oceanbase/powermem/tree/main/apps/agent-plugin",
   "repository": "https://github.com/oceanbase/powermem",
   "license": "Apache-2.0",
   "keywords": ["memory", "powermem", "codex", "mcp", "oceanbase"],

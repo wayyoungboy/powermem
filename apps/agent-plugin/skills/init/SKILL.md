@@ -5,7 +5,7 @@ description: Initialize PowerMem for Claude Code or Codex CLI after the plugin i
 
 Initialize PowerMem for Claude Code or Codex CLI.
 
-Read `apps/claude-code-plugin/SETUP.md`, section "Installed plugin initialization",
+Read `apps/agent-plugin/SETUP.md`, section "Installed plugin initialization",
 and follow only that section.
 
 Do not run the source/developer setup flow from `SETUP.md`: do not build hook

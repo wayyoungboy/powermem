@@ -7,7 +7,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 
 base_url=$(runtime_base_url)
 
-echo "PowerMem Claude Code plugin status"
+echo "PowerMem agent plugin status"
 echo "Data dir: $DATA_DIR"
 echo "Runtime file: $RUNTIME_FILE"
 echo "Env file: $ENV_FILE"

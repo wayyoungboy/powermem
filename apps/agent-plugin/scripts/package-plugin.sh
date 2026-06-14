@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build a portable zip of the Claude Code plugin for sharing or offline install.
-# Output: apps/claude-code-plugin/dist/powermem-claude-code-plugin-<version>.zip
+# Build a portable zip of the PowerMem agent plugin for sharing or offline install.
+# Output: apps/agent-plugin/dist/powermem-agent-plugin-<version>.zip
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +8,7 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DIST="${PLUGIN_ROOT}/dist"
 
 VERSION="$(python3 -c "import json; print(json.load(open('${PLUGIN_ROOT}/.claude-plugin/plugin.json'))['version'])")"
-ZIP_NAME="powermem-claude-code-plugin-${VERSION}.zip"
+ZIP_NAME="powermem-agent-plugin-${VERSION}.zip"
 ZIP_PATH="${DIST}/${ZIP_NAME}"
 
 if ! command -v zip >/dev/null 2>&1; then
@@ -23,7 +23,7 @@ TMP="$(mktemp -d)"
 cleanup() { rm -rf "${TMP}"; }
 trap cleanup EXIT
 
-STAGE="${TMP}/powermem-claude-code-plugin"
+STAGE="${TMP}/powermem-agent-plugin"
 mkdir -p "${STAGE}"
 
 cp -R "${PLUGIN_ROOT}/.claude-plugin" "${STAGE}/"
@@ -40,7 +40,7 @@ cp -R "${PLUGIN_ROOT}/skills" "${STAGE}/"
 [[ -d "${PLUGIN_ROOT}/cmd" ]] && cp -R "${PLUGIN_ROOT}/cmd" "${STAGE}/"
 [[ -d "${PLUGIN_ROOT}/scripts" ]] && cp -R "${PLUGIN_ROOT}/scripts" "${STAGE}/"
 
-( cd "${TMP}" && zip -r "${ZIP_PATH}" "powermem-claude-code-plugin" -x "*.DS_Store" -x "*__pycache__*" -x "*.pyc" )
+( cd "${TMP}" && zip -r "${ZIP_PATH}" "powermem-agent-plugin" -x "*.DS_Store" -x "*__pycache__*" -x "*.pyc" )
 
 echo "Packaged: ${ZIP_PATH}"
 ls -lh "${ZIP_PATH}"

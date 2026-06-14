@@ -27,4 +27,4 @@ Initial release of the PowerMem plugin for Claude Code.
 
 - Optional workspace file poller: `sh hooks/run-hook.sh poll` (see `watcher/README.md`).
 - Windows: `hooks/hooks.windows.example.json` + PowerShell `run-hook.ps1` when `sh` is unavailable.
-- Packaging: `scripts/package-plugin.sh` / `make package-claude-plugin`; hook binaries via `scripts/build-hook-binaries.sh` (Go 1.22+).
+- Packaging: `scripts/package-plugin.sh` / `make package-agent-plugin`; hook binaries via `scripts/build-hook-binaries.sh` (Go 1.22+).

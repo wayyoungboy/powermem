@@ -2,7 +2,7 @@
 
 This file is a **prompt for Claude Code**. Open Claude Code in your terminal and say:
 
-> Read and follow `apps/claude-code-plugin/UNINSTALL.md` to remove PowerMem from Claude Code.
+> Read and follow `apps/agent-plugin/UNINSTALL.md` to remove PowerMem from Claude Code.
 
 It reverses everything `SETUP.md` did: it unregisters the plugin/MCP server, removes the
 staged marketplace copy (~/.claude/marketplaces/powermem), stops the PowerMem API server,
@@ -25,7 +25,7 @@ confirmation — those steps are gated below.
 
 1. DETECT CONTEXT. The current directory is the PowerMem source tree if a
    pyproject.toml here has name = "powermem" (or src/powermem/ and
-   apps/claude-code-plugin/ both exist). Tell me which path applies:
+   apps/agent-plugin/ both exist). Tell me which path applies:
      - SOURCE  -> global plugin install (HTTP hooks) was used.
      - PYPI/MCP -> the powermem-mcp server (MCP) was used.
    If unsure, check both: `claude plugin list` (look for memory-powermem@powermem)
@@ -76,13 +76,12 @@ confirmation — those steps are gated below.
    the integration, and some destroy data:
     - Build artifacts (SOURCE): delete the compiled hook binaries (rm -rf never errors
       when the dir is already gone):
-        rm -rf apps/claude-code-plugin/hooks/bin
+        rm -rf apps/agent-plugin/hooks/bin
       (You may also restore the committed default if it drifted:
-        git checkout -- apps/claude-code-plugin/.mcp.json 2>/dev/null || true)
-    - Stored memories (DESTRUCTIVE — this erases all my saved memories): the default
-      embedded seekdb/OceanBase storage mode uses `./seekdb_data/` (or the path in
-      my .env). SQLite storage mode uses `./sqlite_data/` only if explicitly
-      configured.
+        git checkout -- apps/agent-plugin/.mcp.json 2>/dev/null || true)
+    - Stored memories (DESTRUCTIVE — this erases all my saved memories): the embedded
+      seekdb/OceanBase data lives in `./seekdb_data/` (or the path in my .env).
+      For SQLite storage mode, data lives in `./sqlite_data/` when configured.
       Only delete it if I explicitly say so.
     - Secrets: do NOT touch my .env unless I explicitly ask. If I do, redact the key
       in any output.
