@@ -27,6 +27,7 @@ STAGE="${TMP}/powermem-claude-code-plugin"
 mkdir -p "${STAGE}"
 
 cp -R "${PLUGIN_ROOT}/.claude-plugin" "${STAGE}/"
+[[ -d "${PLUGIN_ROOT}/.codex-plugin" ]] && cp -R "${PLUGIN_ROOT}/.codex-plugin" "${STAGE}/"
 cp "${PLUGIN_ROOT}/.mcp.json" "${STAGE}/"
 [[ -d "${PLUGIN_ROOT}/config" ]] && cp -R "${PLUGIN_ROOT}/config" "${STAGE}/"
 cp -R "${PLUGIN_ROOT}/hooks" "${STAGE}/"

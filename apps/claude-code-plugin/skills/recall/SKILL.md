@@ -1,4 +1,5 @@
 ---
+name: recall
 description: Search PowerMem for relevant memories. Use before answering questions about the user, project, or past decisions.
 ---
 

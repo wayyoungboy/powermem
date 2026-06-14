@@ -1,15 +1,17 @@
 ---
-description: Initialize PowerMem for Claude Code after the plugin is installed. Use when the user asks to set up, initialize, or repair PowerMem.
+name: init
+description: Initialize PowerMem for Claude Code or Codex CLI after the plugin is installed. Use when the user asks to set up, initialize, or repair PowerMem.
 ---
 
-Initialize PowerMem for Claude Code.
+Initialize PowerMem for Claude Code or Codex CLI.
 
 Read `apps/claude-code-plugin/SETUP.md`, section "Installed plugin initialization",
 and follow only that section.
 
 Do not run the source/developer setup flow from `SETUP.md`: do not build hook
 binaries, do not stage the plugin, do not run `claude plugin marketplace add`, do
-not run `claude plugin install`, and do not build the dashboard.
+not run `claude plugin install`, do not run `codex plugin marketplace add`, do
+not run `codex plugin add`, and do not build the dashboard.
 
 Use the plugin scripts as directed by that section:
 

@@ -1,4 +1,5 @@
 ---
+name: remember
 description: Add or update a memory in PowerMem. Use when the user or conversation reveals a fact, preference, or decision that should be remembered across sessions.
 ---
 

@@ -1,4 +1,4 @@
-# PowerMem — automated Claude Code setup
+# PowerMem — automated Claude Code and Codex CLI setup
 
 This file is a **prompt for Claude Code**. Open Claude Code in your terminal and say:
 
@@ -9,12 +9,15 @@ source tree or not, ask you for the few required secrets, and wire PowerMem up a
 **globally enabled** plugin so every `claude` session (interactive AND non-interactive
 `claude -p`) uses it automatically — no per-session `--plugin-dir` flag.
 
+The **Installed plugin initialization** section is shared by Claude Code and
+Codex CLI. The later source/developer setup flow is Claude Code specific.
+
 ---
 
 ## Installed plugin initialization
 
 Use this section when the `memory-powermem` plugin is already installed from a
-Claude Code marketplace and the user runs:
+Claude Code or Codex marketplace and the user runs the PowerMem init skill:
 
 ```text
 /memory-powermem:init
@@ -22,9 +25,10 @@ Claude Code marketplace and the user runs:
 
 In this mode, **do not** run the source/developer install flow below: do not build
 hook binaries, do not stage the plugin, do not run `claude plugin marketplace add`,
-do not run `claude plugin install`, and do not build the dashboard. The plugin is
-already installed; this section only prepares the PowerMem backend that the plugin
-connects to.
+do not run `claude plugin install`, do not run `codex plugin marketplace add`, do
+not run `codex plugin add`, and do not build the dashboard. The plugin is already
+installed; this section only prepares the PowerMem backend that the plugin connects
+to.
 
 Installed-plugin init ensures `uv` is available, then starts the backend with the
 uvx-style launcher `uvx --from 'powermem[server,seekdb]' powermem-server`. It does
@@ -47,26 +51,47 @@ $HOME/.powermem/
 
 Follow these steps:
 
-**Always use a two-step invocation: discover or reuse `CLAUDE_PLUGIN_ROOT`
-first, then run the script.** Never write `VAR=val sh "$VAR/..."` on one line —
+**Always use a two-step invocation: discover or reuse `PLUGIN_ROOT` first, then
+run the script.** Never write `VAR=val sh "$VAR/..."` on one line —
 the shell expands `$VAR` before the assignment, producing an empty path.
 
 ```bash
-# If CLAUDE_PLUGIN_ROOT is not already set, find the plugin root:
-if [ -z "${CLAUDE_PLUGIN_ROOT:-}" ]; then
-  export CLAUDE_PLUGIN_ROOT=$(find ~/.claude/plugins/cache/powermem/memory-powermem -maxdepth 2 -name scripts -type d 2>/dev/null | head -1 | xargs dirname)
+# If PLUGIN_ROOT is not already set, reuse the host-provided root if available.
+if [ -z "${PLUGIN_ROOT:-}" ]; then
+  PLUGIN_ROOT="${POWERMEM_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-}}}"
 fi
-sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
+
+# If no root variable is available, find the installed plugin copy.
+if [ -z "${PLUGIN_ROOT:-}" ]; then
+  PLUGIN_ROOT=$(
+    find "$HOME/.claude/plugins" "$HOME/.codex/plugins" \
+      -maxdepth 8 -type d -name scripts 2>/dev/null |
+    while IFS= read -r scripts_dir; do
+      case "$scripts_dir" in
+        *memory-powermem*) dirname "$scripts_dir"; break ;;
+      esac
+    done
+  )
+fi
+
+[ -n "${PLUGIN_ROOT:-}" ] || {
+  echo "PowerMem plugin root not found. Reinstall memory-powermem and retry."
+  exit 1
+}
+
+sh "$PLUGIN_ROOT/scripts/..."
 ```
 
 1. If the skill was just installed or updated, ask the user to run `/reload-plugins`
-   first, then retry `/memory-powermem:init`.
-2. Run `sh "$CLAUDE_PLUGIN_ROOT/scripts/status.sh"` and inspect whether config,
-   uv, managed PID, Python versions, and health are present.
+   first in Claude Code, then retry `/memory-powermem:init`. In Codex CLI, start
+   a new thread after installing or updating the plugin so Codex loads the updated
+   skills.
+2. Run `sh "$PLUGIN_ROOT/scripts/status.sh"` and inspect whether config, uv,
+   managed PID, Python versions, and health are present.
 3. If `.env` is missing, run init with auto-detection first:
 
    ```bash
-   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+   sh "$PLUGIN_ROOT/scripts/init.sh"
    ```
 
    The script reads the current process environment first and attempts to derive
@@ -85,7 +110,7 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    POWERMEM_INIT_LLM_PROVIDER=anthropic \
    POWERMEM_INIT_LLM_MODEL=anthropic/claude-sonnet-4.6 \
    POWERMEM_INIT_LLM_API_KEY=... \
-   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+   sh "$PLUGIN_ROOT/scripts/init.sh"
    ```
 
    For a bearer-token gateway, use:
@@ -95,7 +120,7 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    POWERMEM_INIT_LLM_MODEL=anthropic/claude-sonnet-4.6 \
    POWERMEM_INIT_LLM_AUTH_TOKEN=... \
    POWERMEM_INIT_LLM_BASE_URL=https://your-gateway.example.com \
-   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+   sh "$PLUGIN_ROOT/scripts/init.sh"
    ```
 
    Optional variables:
@@ -109,10 +134,11 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
      `all-MiniLM-L6-v2` embedding model before starting the server.
 5. Never print API keys, auth tokens, or other credentials. Mask any secret in
    summaries.
-6. After init succeeds, run `sh "$CLAUDE_PLUGIN_ROOT/scripts/status.sh"` again and
+6. After init succeeds, run `sh "$PLUGIN_ROOT/scripts/status.sh"` again and
    report the base URL.
-7. The hook launcher reads `runtime.env`, so once init writes a base URL, prompt
-   recall and session-save hooks use that backend automatically.
+7. Claude Code hooks read `runtime.env`, so once init writes a base URL, prompt
+   recall and session-save hooks use that backend automatically. Codex CLI should
+   use the same base URL when adding the MCP server with `codex mcp add`.
 
 Installed-plugin model preload uses `uvx --from modelscope python` to download
 from **ModelScope**, then bridges the files into the HuggingFace hub cache layout.
@@ -668,13 +694,18 @@ make build-claude-hook
 
 #### [E005] Storage Backend Initialization
 **Problem**: 503 errors on API calls despite server health
+<<<<<<< HEAD
 **Fix**: the Claude Code plugin defaults to embedded OceanBase/seekdb. Stop the
 managed server, remove stale seekdb data only if you accept deleting local memories, and
 restart init:
+=======
+**Fix**: the PowerMem plugin defaults to embedded OceanBase/seekdb. Stop the
+managed server, remove stale seekdb data, and restart init:
+>>>>>>> Add Codex CLI plugin support
 ```bash
-sh "$CLAUDE_PLUGIN_ROOT/scripts/stop.sh"
+sh "$PLUGIN_ROOT/scripts/stop.sh"
 rm -rf "$HOME/.powermem/seekdb_data"
-sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
 #### [E006] Model Download Timeout

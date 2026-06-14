@@ -1,19 +1,24 @@
-# PowerMem Plugin for Claude Code
+# PowerMem Plugin for Claude Code and Codex CLI
 
 The full Claude Code integration guide — the auto-setup prompt, manual steps, the
 two connection modes (HTTP / MCP), hooks, configuration, troubleshooting, and
-uninstall — now lives in the docs and is the single source of truth:
+uninstall — lives in the docs:
 
 **➡ [docs/integrations/claude_code.md](../../docs/integrations/claude_code.md)**
 
-This directory still contains the plugin itself (`.claude-plugin/`, `hooks/`,
-`skills/`, `config/`, `.mcp.json`). To load it:
+The Codex CLI guide lives here:
+
+**➡ [docs/integrations/codex.md](../../docs/integrations/codex.md)**
+
+This directory contains the plugin descriptors and shared runtime files
+(`.claude-plugin/`, `.codex-plugin/`, `hooks/`, `skills/`, `config/`, `.mcp.json`).
+To load it directly in Claude Code:
 
 ```bash
 claude --plugin-dir /path/to/powermem/apps/claude-code-plugin
 ```
 
-## Marketplace install
+## Claude Code Marketplace Install
 
 Once the PowerMem marketplace entry is available, install the Claude Code plugin
 with:
@@ -56,6 +61,38 @@ from the same branch:
 /plugin marketplace add https://github.com/owner/powermem.git#<branch>
 /plugin install memory-powermem@powermem
 /reload-plugins
+```
+
+## Codex CLI Install
+
+Install the Codex marketplace and plugin:
+
+```bash
+codex plugin marketplace add oceanbase/powermem
+codex plugin add memory-powermem@powermem
+```
+
+For branch testing:
+
+```bash
+codex plugin remove memory-powermem 2>/dev/null || true
+codex plugin marketplace remove powermem 2>/dev/null || true
+codex plugin marketplace add https://github.com/<owner>/powermem.git --ref <branch>
+codex plugin add memory-powermem@powermem
+```
+
+Start a new Codex thread, then ask Codex:
+
+```text
+Use the memory-powermem init skill to initialize PowerMem.
+```
+
+After init succeeds, wire MCP to the managed server:
+
+```bash
+. "$HOME/.powermem/runtime.env"
+codex mcp remove powermem 2>/dev/null || true
+codex mcp add powermem --url "${POWERMEM_BASE_URL%/}/mcp"
 ```
 
 To pre-download the default local embedding model through ModelScope before
