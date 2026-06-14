@@ -10,12 +10,8 @@ echo "Data dir: $DATA_DIR"
 
 base_url=$(runtime_base_url)
 
-BOOTSTRAP_PYTHON=$(choose_python) || {
-  echo "No Python >= 3.11 interpreter found. Set POWERMEM_INIT_PYTHON=/path/to/python3.11 and retry." >&2
-  exit 1
-}
-export POWERMEM_BOOTSTRAP_PYTHON=$BOOTSTRAP_PYTHON
-echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON"))"
+BOOTSTRAP_PYTHON=
+UV_BIN=
 
 create_env_file() {
   "$BOOTSTRAP_PYTHON" - "$ENV_FILE" "$DATA_DIR" <<'PY'
@@ -546,7 +542,7 @@ raise SystemExit(1)
 PY
 }
 
-configure_pip_index() {
+configure_package_index() {
   if [ "${POWERMEM_PIP_INDEX_CONFIGURED:-0}" = "1" ]; then
     return
   fi
@@ -556,17 +552,31 @@ configure_pip_index() {
   country=$(detect_public_ip_country || true)
   case "$country" in
     CN)
-      POWERMEM_PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+      POWERMEM_PIP_INDEX_URL=${POWERMEM_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
       export POWERMEM_PIP_INDEX_URL
-      echo "Detected public IP country: CN; pip install will append -i $POWERMEM_PIP_INDEX_URL"
+      if [ -z "${UV_DEFAULT_INDEX:-}" ]; then
+        UV_DEFAULT_INDEX=$POWERMEM_PIP_INDEX_URL
+        export UV_DEFAULT_INDEX
+      fi
+      echo "Detected public IP country: CN; package installs will use $POWERMEM_PIP_INDEX_URL"
       ;;
     "")
-      echo "Public IP country detection failed; pip install will use the default PyPI index."
+      echo "Public IP country detection failed; package installs will use the default PyPI index."
       ;;
     *)
-      echo "Detected public IP country: $country; pip install will use the default PyPI index."
+      echo "Detected public IP country: $country; package installs will use the default PyPI index."
       ;;
   esac
+
+  if [ -n "${POWERMEM_UV_PYTHON_INSTALL_MIRROR:-}" ] && [ -z "${UV_PYTHON_INSTALL_MIRROR:-}" ]; then
+    UV_PYTHON_INSTALL_MIRROR=$POWERMEM_UV_PYTHON_INSTALL_MIRROR
+    export UV_PYTHON_INSTALL_MIRROR
+    echo "uv Python downloads will use UV_PYTHON_INSTALL_MIRROR=$UV_PYTHON_INSTALL_MIRROR"
+  fi
+}
+
+configure_pip_index() {
+  configure_package_index
 }
 
 pip_install() {
@@ -575,6 +585,205 @@ pip_install() {
   else
     "$PYTHON" -m pip install "$@"
   fi
+}
+
+find_uv() {
+  if [ -n "${POWERMEM_INIT_UV:-}" ] && [ -x "$POWERMEM_INIT_UV" ]; then
+    printf '%s\n' "$POWERMEM_INIT_UV"
+    return 0
+  fi
+  if [ -n "${POWERMEM_UV_INSTALL_DIR:-}" ] && [ -x "$POWERMEM_UV_INSTALL_DIR/uv" ]; then
+    printf '%s\n' "$POWERMEM_UV_INSTALL_DIR/uv"
+    return 0
+  fi
+  if [ -x "$DATA_DIR/uv/bin/uv" ]; then
+    printf '%s\n' "$DATA_DIR/uv/bin/uv"
+    return 0
+  fi
+  if [ -x "$DATA_DIR/uv-venv/bin/uv" ]; then
+    printf '%s\n' "$DATA_DIR/uv-venv/bin/uv"
+    return 0
+  fi
+  if command -v uv >/dev/null 2>&1; then
+    command -v uv
+    return 0
+  fi
+  return 1
+}
+
+download_to_file() {
+  url=$1
+  output=$2
+  if command -v curl >/dev/null 2>&1; then
+    curl -LsSf --connect-timeout 10 --max-time 300 "$url" -o "$output"
+    return
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -q --timeout=10 --tries=2 -O "$output" "$url"
+    return
+  fi
+  return 1
+}
+
+install_uv_standalone() {
+  install_dir=${POWERMEM_UV_INSTALL_DIR:-$DATA_DIR/uv/bin}
+  install_url=${POWERMEM_UV_INSTALL_URL:-https://astral.sh/uv/install.sh}
+  tmp="$DATA_DIR/uv-install.sh"
+  mkdir -p "$install_dir"
+  echo "Installing uv with standalone installer: $install_url" >&2
+  download_to_file "$install_url" "$tmp" || return 1
+  UV_INSTALL_DIR=$install_dir \
+    UV_NO_MODIFY_PATH=1 \
+    INSTALLER_NO_MODIFY_PATH=1 \
+    sh "$tmp" >&2 || {
+      rm -f "$tmp" 2>/dev/null || true
+      return 1
+    }
+  rm -f "$tmp" 2>/dev/null || true
+  [ -x "$install_dir/uv" ] || return 1
+  printf '%s\n' "$install_dir/uv"
+}
+
+install_uv_with_pip() {
+  [ -n "$BOOTSTRAP_PYTHON" ] || return 1
+  uv_venv=${POWERMEM_UV_VENV_DIR:-$DATA_DIR/uv-venv}
+  if [ ! -x "$uv_venv/bin/python" ]; then
+    echo "Creating uv bootstrap venv: $uv_venv" >&2
+    "$BOOTSTRAP_PYTHON" -m venv "$uv_venv" || return 1
+  fi
+  uv_python="$uv_venv/bin/python"
+  "$uv_python" -m ensurepip --upgrade >&2 || true
+  if [ -n "${POWERMEM_PIP_INDEX_URL:-}" ]; then
+    "$uv_python" -m pip install -U uv -i "$POWERMEM_PIP_INDEX_URL" >&2 || return 1
+  else
+    "$uv_python" -m pip install -U uv >&2 || return 1
+  fi
+  [ -x "$uv_venv/bin/uv" ] || return 1
+  printf '%s\n' "$uv_venv/bin/uv"
+}
+
+ensure_uv() {
+  if UV_BIN=$(find_uv 2>/dev/null); then
+    echo "Using uv: $UV_BIN"
+    return 0
+  fi
+
+  case "${POWERMEM_INIT_AUTO_INSTALL_UV:-1}" in
+    0|false|FALSE|no|NO)
+      return 1
+      ;;
+  esac
+
+  echo "uv is not installed; init will install uv automatically."
+  if [ -n "$BOOTSTRAP_PYTHON" ]; then
+    configure_package_index
+    if UV_BIN=$(install_uv_with_pip); then
+      echo "Installed uv: $UV_BIN"
+      return 0
+    fi
+    echo "Installing uv with pip failed; trying the standalone installer."
+  fi
+
+  if UV_BIN=$(install_uv_standalone); then
+    echo "Installed uv: $UV_BIN"
+    return 0
+  fi
+
+  UV_BIN=
+  return 1
+}
+
+prepare_bootstrap_python_with_uv() {
+  [ -n "$UV_BIN" ] || return 1
+  bootstrap_venv=${POWERMEM_BOOTSTRAP_VENV_DIR:-$DATA_DIR/bootstrap-python}
+  if [ ! -x "$bootstrap_venv/bin/python" ]; then
+    echo "Preparing uv-managed bootstrap Python: $bootstrap_venv"
+    "$UV_BIN" venv "$bootstrap_venv" --python "${POWERMEM_INIT_UV_PYTHON:-3.11}" --managed-python --no-project || return 1
+  fi
+  [ -x "$bootstrap_venv/bin/python" ] || return 1
+  BOOTSTRAP_PYTHON=$bootstrap_venv/bin/python
+}
+
+ensure_bootstrap_python() {
+  if [ -n "$BOOTSTRAP_PYTHON" ]; then
+    return 0
+  fi
+
+  BOOTSTRAP_PYTHON=$(choose_bootstrap_python 2>/dev/null || true)
+  if [ -z "$BOOTSTRAP_PYTHON" ]; then
+    echo "No Python >= 3.8 bootstrap interpreter found; trying uv-managed Python."
+    if ensure_uv && prepare_bootstrap_python_with_uv; then
+      :
+    else
+      echo "No Python >= 3.8 bootstrap interpreter found, and uv automatic setup failed." >&2
+      echo "Install uv or set POWERMEM_INIT_BOOTSTRAP_PYTHON=/path/to/python3." >&2
+      exit 1
+    fi
+  fi
+
+  export POWERMEM_BOOTSTRAP_PYTHON=$BOOTSTRAP_PYTHON
+  echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON"))"
+}
+
+runtime_python_compatible() {
+  candidate=$1
+  [ -x "$candidate" ] || return 1
+  "$candidate" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+}
+
+reset_plugin_venv() {
+  if [ ! -e "$VENV_DIR" ]; then
+    return 0
+  fi
+  if [ -z "$VENV_DIR" ] || [ "$VENV_DIR" = "/" ] || [ "$VENV_DIR" = "$HOME" ] || [ "$VENV_DIR" = "$DATA_DIR" ]; then
+    echo "Refusing to recreate unsafe virtualenv path: $VENV_DIR" >&2
+    return 1
+  fi
+  rm -rf "$VENV_DIR"
+}
+
+prepare_plugin_venv_with_uv() {
+  ensure_uv || return 1
+  configure_package_index
+  if ! runtime_python_compatible "$(venv_python)"; then
+    if [ -e "$VENV_DIR" ]; then
+      echo "Existing plugin virtualenv is not Python >= 3.11; recreating it with uv."
+      reset_plugin_venv || return 1
+    fi
+    echo "Creating plugin virtualenv with uv: $VENV_DIR"
+    "$UV_BIN" venv "$VENV_DIR" --python "${POWERMEM_INIT_UV_PYTHON:-3.11}" --managed-python --no-project || return 1
+  fi
+  PYTHON=$(venv_python)
+  echo "Venv Python: $PYTHON ($(python_version "$PYTHON"))"
+  PACKAGE=${POWERMEM_INIT_PACKAGE:-powermem[server,seekdb]}
+  echo "Installing $PACKAGE with uv"
+  "$UV_BIN" pip install --python "$PYTHON" "$PACKAGE" || return 1
+}
+
+prepare_plugin_venv_with_pip() {
+  RUNTIME_PYTHON=$(choose_python 2>/dev/null || true)
+  if [ -z "$RUNTIME_PYTHON" ]; then
+    echo "No Python >= 3.11 interpreter found and uv setup is unavailable." >&2
+    echo "Install uv, or set POWERMEM_INIT_PYTHON=/path/to/python3.11." >&2
+    exit 1
+  fi
+  if ! runtime_python_compatible "$(venv_python)"; then
+    if [ -e "$VENV_DIR" ]; then
+      echo "Existing plugin virtualenv is not Python >= 3.11; recreating it with $RUNTIME_PYTHON."
+      reset_plugin_venv || exit 1
+    fi
+    "$RUNTIME_PYTHON" -m venv "$VENV_DIR"
+  fi
+  PYTHON=$(venv_python)
+  echo "Venv Python: $PYTHON ($(python_version "$PYTHON"))"
+  configure_package_index
+  pip_install -U pip setuptools wheel
+  PACKAGE=${POWERMEM_INIT_PACKAGE:-powermem[server,seekdb]}
+  echo "Installing $PACKAGE with pip"
+  pip_install "$PACKAGE"
 }
 
 stop_unhealthy_managed_server() {
@@ -598,6 +807,8 @@ announce_dashboard_url() {
   esac
   echo "Memory dashboard: $dashboard_url"
 }
+
+ensure_bootstrap_python
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Creating plugin .env from environment variables or Claude settings fallback."
@@ -636,16 +847,10 @@ fi
 
 if [ ! -x "$(venv_powermem_server)" ]; then
   echo "Preparing plugin virtualenv."
-  if [ ! -d "$VENV_DIR" ]; then
-    "$BOOTSTRAP_PYTHON" -m venv "$VENV_DIR"
+  if ! prepare_plugin_venv_with_uv; then
+    echo "uv setup failed or is unavailable; falling back to Python >= 3.11 + pip."
+    prepare_plugin_venv_with_pip
   fi
-  PYTHON=$(venv_python)
-  echo "Venv Python: $PYTHON ($(python_version "$PYTHON"))"
-  configure_pip_index
-  pip_install -U pip setuptools wheel
-  PACKAGE=${POWERMEM_INIT_PACKAGE:-powermem[server,seekdb]}
-  echo "Installing $PACKAGE"
-  pip_install "$PACKAGE"
 else
   echo "Using existing plugin virtualenv: $VENV_DIR"
   PYTHON=$(venv_python)
@@ -654,7 +859,7 @@ fi
 
 if [ "${POWERMEM_INIT_PRELOAD_MODEL:-0}" = "1" ] || [ "${POWERMEM_INIT_PRELOAD_MODEL:-}" = "true" ]; then
   echo "Preloading default local embedding model."
-  configure_pip_index
+  configure_package_index
   sh "$SCRIPT_DIR/preload-model.sh" "$PYTHON"
 else
   echo "Skipping model preload. Set POWERMEM_INIT_PRELOAD_MODEL=1 to download via ModelScope and bridge to HuggingFace cache."

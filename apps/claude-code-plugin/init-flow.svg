@@ -6,13 +6,13 @@
       <path d="M0,0 L9,4 L0,8 Z" fill="#26323f"/>
     </marker>
     <style>
-      .title { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 40px; font-weight: 700; fill: #17202a; }
-      .subtitle { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 22px; fill: #4c5b6a; }
-      .section-title { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 26px; font-weight: 700; fill: #314155; }
-      .sub-title { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 23px; font-weight: 700; fill: #314155; }
-      .text { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 20px; fill: #17202a; }
-      .small { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 17px; fill: #4c5b6a; }
-      .label { font-family: "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 17px; fill: #26323f; }
+      .title { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 40px; font-weight: 700; fill: #17202a; }
+      .subtitle { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 22px; fill: #4c5b6a; }
+      .section-title { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 26px; font-weight: 700; fill: #314155; }
+      .sub-title { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 23px; font-weight: 700; fill: #314155; }
+      .text { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 20px; fill: #17202a; }
+      .small { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 17px; fill: #4c5b6a; }
+      .label { font-family: "Droid Sans", "Droid Sans Fallback", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 17px; fill: #26323f; }
       .section { fill: #f7f9fc; stroke: #d8dee8; stroke-width: 1.2; rx: 18; }
       .subflow { fill: #ffffff; stroke: #b5c0cf; stroke-width: 1.5; rx: 18; }
       .box { fill: #ffffff; stroke: #617184; stroke-width: 1.8; rx: 14; }
@@ -123,27 +123,31 @@
   <rect x="250" y="2100" width="1720" height="590" class="subflow"/>
   <text x="295" y="2152" class="sub-title">子流程 D：准备本机运行环境</text>
 
-  <rect x="430" y="2220" width="560" height="92" class="service"/>
-  <text x="710" y="2258" text-anchor="middle" class="text">1. 检查 ~/.powermem/venv</text>
-  <text x="710" y="2288" text-anchor="middle" class="small">缺少 venv 时用 bootstrap Python 创建</text>
+  <rect x="430" y="2220" width="560" height="118" class="service"/>
+  <text x="710" y="2258" text-anchor="middle" class="text">1. 准备 bootstrap Python</text>
+  <text x="710" y="2288" text-anchor="middle" class="small">优先用本机 Python &gt;= 3.8</text>
+  <text x="710" y="2316" text-anchor="middle" class="small">没有时尝试用 uv 创建 managed Python</text>
 
-  <rect x="430" y="2380" width="560" height="126" class="service"/>
-  <text x="710" y="2420" text-anchor="middle" class="text">2. 确保 venv 里有 powermem-server</text>
-  <text x="710" y="2450" text-anchor="middle" class="small">已有可执行文件则复用，不重装</text>
-  <text x="710" y="2478" text-anchor="middle" class="small">缺少时安装 powermem[server,seekdb]</text>
+  <rect x="430" y="2405" width="560" height="136" class="service"/>
+  <text x="710" y="2445" text-anchor="middle" class="text">2. 确保 uv 可用</text>
+  <text x="710" y="2475" text-anchor="middle" class="small">POWERMEM_INIT_UV / ~/.powermem / PATH</text>
+  <text x="710" y="2503" text-anchor="middle" class="small">缺失时自动安装 uv</text>
+  <text x="710" y="2531" text-anchor="middle" class="small">可用 POWERMEM_INIT_AUTO_INSTALL_UV=0 关闭</text>
 
-  <rect x="1075" y="2220" width="620" height="122" class="service"/>
-  <text x="1385" y="2260" text-anchor="middle" class="text">3. pip install 镜像选择</text>
-  <text x="1385" y="2290" text-anchor="middle" class="small">公网 IP 检测为 CN 时追加</text>
-  <text x="1385" y="2318" text-anchor="middle" class="small">-i https://pypi.tuna.tsinghua.edu.cn/simple</text>
+  <rect x="1075" y="2220" width="620" height="146" class="service"/>
+  <text x="1385" y="2260" text-anchor="middle" class="text">3. 准备 ~/.powermem/venv</text>
+  <text x="1385" y="2290" text-anchor="middle" class="small">优先 uv venv --python 3.11 --managed-python</text>
+  <text x="1385" y="2318" text-anchor="middle" class="small">uv 不可用时才退回本机 Python &gt;= 3.11 + pip</text>
+  <text x="1385" y="2346" text-anchor="middle" class="small">已有 powermem-server 可执行文件则复用</text>
 
-  <rect x="1075" y="2410" width="620" height="118" class="service"/>
-  <text x="1385" y="2450" text-anchor="middle" class="text">4. 可选预下载 embedding 模型</text>
-  <text x="1385" y="2480" text-anchor="middle" class="small">POWERMEM_INIT_PRELOAD_MODEL=1</text>
-  <text x="1385" y="2508" text-anchor="middle" class="small">preload-model.sh 安装 modelscope 时沿用镜像</text>
+  <rect x="1075" y="2435" width="620" height="136" class="service"/>
+  <text x="1385" y="2475" text-anchor="middle" class="text">4. 安装后端包并选择镜像</text>
+  <text x="1385" y="2505" text-anchor="middle" class="small">安装 powermem[server,seekdb]</text>
+  <text x="1385" y="2533" text-anchor="middle" class="small">公网 IP 为 CN 时 pip/uv 使用清华 PyPI 镜像</text>
+  <text x="1385" y="2561" text-anchor="middle" class="small">可选预下载 embedding 模型时沿用镜像</text>
 
-  <rect x="680" y="2580" width="760" height="55" class="service"/>
-  <text x="1060" y="2616" text-anchor="middle" class="small">输出：本机已有可执行的 powermem-server，可用于启动 managed 服务</text>
+  <rect x="680" y="2610" width="760" height="55" class="service"/>
+  <text x="1060" y="2646" text-anchor="middle" class="small">输出：本机已有可执行的 powermem-server，可用于启动 managed 服务</text>
 
   <!-- subflow E -->
   <rect x="250" y="2770" width="1720" height="640" class="subflow"/>
@@ -261,11 +265,11 @@
   <text x="1405" y="1885" class="label">失败</text>
 
   <!-- D arrows -->
-  <path class="line" d="M710,2312 L710,2380"/>
-  <path class="line" d="M990,2443 L1075,2281"/>
-  <path class="line" d="M1385,2342 L1385,2410"/>
-  <path class="line" d="M710,2506 L890,2580"/>
-  <path class="line" d="M1385,2528 L1230,2580"/>
+  <path class="line" d="M710,2338 L710,2405"/>
+  <path class="line" d="M990,2473 L1075,2293"/>
+  <path class="line" d="M1385,2366 L1385,2435"/>
+  <path class="line" d="M710,2541 L890,2610"/>
+  <path class="line" d="M1385,2571 L1230,2610"/>
 
   <!-- E arrows -->
   <path class="line" d="M690,2992 L690,3060"/>

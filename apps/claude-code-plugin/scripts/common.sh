@@ -18,6 +18,29 @@ VENV_DIR="${POWERMEM_VENV_DIR:-$DATA_DIR/venv}"
 
 mkdir -p "$DATA_DIR"
 
+choose_bootstrap_python() {
+  if [ -n "${POWERMEM_INIT_BOOTSTRAP_PYTHON:-}" ]; then
+    candidates=$POWERMEM_INIT_BOOTSTRAP_PYTHON
+  elif [ -n "${POWERMEM_INIT_PYTHON:-}" ]; then
+    candidates=$POWERMEM_INIT_PYTHON
+  else
+    candidates="python3 python python3.11"
+  fi
+  for candidate in $candidates; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      if "$candidate" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 8) else 1)
+PY
+      then
+        command -v "$candidate"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
 choose_python() {
   if [ -n "${POWERMEM_INIT_PYTHON:-}" ]; then
     candidates=$POWERMEM_INIT_PYTHON

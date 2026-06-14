@@ -16,7 +16,8 @@ Use the plugin scripts as directed by that section:
 - `scripts/status.sh`
 - `scripts/init.sh`
 
-Remember that `scripts/init.sh` installs `powermem` from PyPI by default. If the
+Remember that `scripts/init.sh` installs `powermem` from PyPI by default. It
+prefers uv and will try to install uv automatically when uv is missing. If the
 user is testing unpublished backend changes, run the script with
 `POWERMEM_INIT_PACKAGE='powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>'`
 instead of using the default PyPI package.

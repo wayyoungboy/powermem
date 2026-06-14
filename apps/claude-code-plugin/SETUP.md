@@ -27,12 +27,14 @@ already installed; this section only prepares the PowerMem backend that the plug
 connects to.
 
 Installed-plugin init creates a plugin-local Python environment and installs the
-backend package with `pip install powermem` by default. Therefore the PyPI release
-used by this flow must already contain the backend capabilities required by the
-plugin, including the local embedding dependencies. If the user is validating a
-plugin change that depends on unpublished backend code, use
-`POWERMEM_INIT_PACKAGE` to install that exact Git branch or commit instead of the
-PyPI package.
+backend package from PyPI by default. It prefers `uv`: if `uv` is missing, init
+attempts to install it automatically, then uses a uv-managed Python 3.11 runtime
+for `powermem-server`. If uv setup is unavailable, init falls back to an existing
+Python >= 3.11 plus pip. Therefore the PyPI release used by this flow must
+already contain the backend capabilities required by the plugin, including the
+local embedding dependencies. If the user is validating a plugin change that
+depends on unpublished backend code, use `POWERMEM_INIT_PACKAGE` to install that
+exact Git branch or commit instead of the PyPI package.
 
 Installed-plugin init is idempotent and uses plugin-local state:
 
@@ -103,7 +105,18 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    - `POWERMEM_INIT_PACKAGE` to test unpublished backend code instead of PyPI
      `powermem`, for example
      `powermem @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>`.
-   - `POWERMEM_INIT_PYTHON` to force a specific Python >= 3.11.
+   - `POWERMEM_INIT_UV` to force a specific `uv` executable.
+   - `POWERMEM_INIT_AUTO_INSTALL_UV=0` to disable automatic uv installation.
+   - `POWERMEM_UV_INSTALL_DIR` to choose where auto-installed uv is written
+     (default: `~/.powermem/uv/bin`).
+   - `POWERMEM_UV_PYTHON_INSTALL_MIRROR` to set `UV_PYTHON_INSTALL_MIRROR`
+     when uv-managed Python downloads need a local mirror.
+   - `POWERMEM_INIT_BOOTSTRAP_PYTHON` to force the lightweight init Python
+     >= 3.8 used for config generation and validation.
+   - `POWERMEM_INIT_PYTHON` to force the fallback runtime Python >= 3.11 when
+     uv is unavailable.
+   - `POWERMEM_INIT_UV_PYTHON` to choose the uv-managed runtime version
+     (default: `3.11`).
    - `POWERMEM_INIT_PORT` to force the managed server port.
    - `POWERMEM_INIT_PRELOAD_MODEL=1` to pre-download the default local
      `all-MiniLM-L6-v2` embedding model before starting the server.
@@ -189,18 +202,20 @@ writing. Never silently patch `.env`.**
    echo "Region: $CC"
    ```
 
-   - **If `CC=CN`**: use **ModelScope** for model downloads, and set PyPI mirror
-     to `https://pypi.tuna.tsinghua.edu.cn/simple/`.
+   - **If `CC=CN`**: use **ModelScope** for model downloads, and set package
+     index mirror to `https://pypi.tuna.tsinghua.edu.cn/simple/` for pip and uv.
    - **If `CC != CN` (or `UNKNOWN`)**: use **HuggingFace** for model downloads,
      and use the default PyPI index.
-   - Store `CC` in a shell variable — every pip install and model download step
-     below branches on this value. Re-check on every re-run (region may change
-     if the machine moves or VPN state changes).
+   - Store `CC` in a shell variable — every package install and model download
+     step below branches on this value. Re-check on every re-run (region may
+     change if the machine moves or VPN state changes).
 
-   **pip install conventions (apply to ALL pip commands in this file):**
+   **package install conventions (apply to pip and uv package installs in this file):**
 
-   a. **CN mirror** — if `CC=CN`, prefix every pip install with
-      `-i https://pypi.tuna.tsinghua.edu.cn/simple/ --trusted-host pypi.tuna.tsinghua.edu.cn`.
+   a. **CN mirror** — if `CC=CN`, use
+      `https://pypi.tuna.tsinghua.edu.cn/simple/` as the package index. For pip,
+      pass `-i https://pypi.tuna.tsinghua.edu.cn/simple/ --trusted-host pypi.tuna.tsinghua.edu.cn`.
+      For uv, set `UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple/`.
       Non-CN (or UNKNOWN) uses the default PyPI index with no extra flags.
 
    b. **Timeout — set once** before any pip install:
@@ -220,12 +235,14 @@ writing. Never silently patch `.env`.**
       done
       ```
       This applies to ALL pip install calls: editable installs, dependency installs,
-      model download dependencies, etc.
+      model download dependencies, uv bootstrap installation, etc.
 
-   d. **All four pip install locations** affected by (a)-(c):
+   d. **All package install locations** affected by (a)-(c) or the equivalent uv
+      index settings:
       1. `pip install -e '.[server,mcp,seekdb]'` (source editable install)
       2. `$POWERMEM_PYTHON -m pip install -q modelscope` (model download dep)
-      3. `pip install "powermem[mcp,seekdb]"` (PIP path)
+      3. `uv pip install --python "$POWERMEM_PYTHON" "powermem[server,seekdb]"`
+         or `pip install "powermem[server,seekdb]"` (installed-plugin path)
       4. `$POWERMEM_PYTHON -m pip install -q huggingface_hub` (non-CN model download dep)
 
 2. COLLECT CONFIG (idempotent). If a .env already exists in the working directory
@@ -755,16 +772,20 @@ Diagnosis:
 - Empty stdout/stderr after 10 seconds usually means the process started and is
   waiting for JSON-RPC input; re-check Claude-side registration next.
 
-#### [E011] Python Version Below 3.11
-**Problem**: `pip install` fails or venv created with wrong Python version.
+#### [E011] Backend Runtime Python Cannot Be Prepared
+**Problem**: backend package install fails because the runtime Python is below
+3.11, or uv cannot create a managed Python 3.11 environment.
 PowerMem requires Python >= 3.11 (`pyproject.toml: requires-python = ">=3.11"`).
-**Fix**: Verify and use Python 3.11+:
+Installed-plugin init first tries uv, automatically installs uv when allowed,
+and only then falls back to a local Python 3.11+ interpreter.
+**Fix**: Verify uv or provide Python 3.11+ explicitly:
 ```bash
-python3 --version  # must be >= 3.11
-# If too old, find and use a newer Python:
+uv --version
+POWERMEM_INIT_AUTO_INSTALL_UV=1 sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+
+# If uv is unavailable, find and use a newer Python:
 python3.11 --version
-python3.11 -m venv venv
-source venv/bin/activate
+POWERMEM_INIT_PYTHON=/path/to/python3.11 sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
 ```
 
 #### [E012] pip Too Old for Editable Install

@@ -14,10 +14,10 @@ echo "Env file: $ENV_FILE"
 echo "PID file: $(managed_pid_file)"
 echo "Base URL: $base_url"
 
-if BOOTSTRAP_PYTHON=$(choose_python 2>/dev/null); then
+if BOOTSTRAP_PYTHON=$(choose_bootstrap_python 2>/dev/null); then
   echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON"))"
 else
-  echo "Bootstrap Python: missing Python >= 3.11"
+  echo "Bootstrap Python: missing Python >= 3.8"
 fi
 
 if [ -f "$ENV_FILE" ]; then

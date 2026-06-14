@@ -31,7 +31,9 @@ installed skills such as `/memory-powermem:init`, `/memory-powermem:status`,
 
 The marketplace install only installs the Claude Code plugin connector. The
 `/memory-powermem:init` step prepares the backend by creating a plugin-local venv
-and installing `powermem` from PyPI.
+and installing `powermem` from PyPI. If `uv` is available, init uses it to create
+the venv with a managed Python 3.11; if `uv` is missing, init attempts to install
+it automatically before falling back to an existing Python 3.11+.
 
 The PyPI package used by init must include the backend features and dependencies
 required by the plugin, including the default local embedding path
