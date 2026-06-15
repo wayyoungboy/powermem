@@ -563,6 +563,123 @@ class TestOceanBaseGraph(unittest.TestCase):
         self.assertIsInstance(result, int)
         self.assertGreater(result, 0)  # Snowflake ID should be positive
 
+    def test_create_entity_uses_transaction_connection(self):
+        """Test entity creation uses the provided transaction connection."""
+        conn = MagicMock()
+
+        result = self.memory_graph._create_entity(
+            "alice",
+            "person",
+            [0.1, 0.2, 0.3],
+            self.test_filters,
+            conn=conn,
+        )
+
+        conn.execute.assert_called_once()
+        inserted_record = conn.execute.call_args.args[1]
+        self.assertEqual(inserted_record["user_id"], self.user_id)
+        self.assertEqual(inserted_record["name"], "alice")
+        self.mock_client.upsert.assert_not_called()
+        self.assertIsInstance(result, int)
+        self.assertGreater(result, 0)
+
+    def test_add_entities_passes_transaction_connection_to_entity_creation(self):
+        """Test entity creation participates in the add transaction."""
+        conn = MagicMock()
+        source_id = 641905209349505024
+        dest_id = 641905209349505025
+        to_be_added = [{
+            "source": "alice",
+            "relationship": "knows",
+            "destination": "bob",
+        }]
+        entity_type_map = {"alice": "person", "bob": "person"}
+        self.mock_embedding_model.embed.side_effect = [
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6],
+        ]
+        self.memory_graph._search_source_node = MagicMock(return_value=None)
+        self.memory_graph._search_destination_node = MagicMock(return_value=None)
+        self.memory_graph._create_entity = MagicMock(side_effect=[source_id, dest_id])
+        self.memory_graph._create_or_update_relationship = MagicMock(
+            return_value={"source": "alice", "relationship": "knows", "target": "bob"}
+        )
+
+        result = self.memory_graph._add_entities(
+            to_be_added,
+            self.test_filters,
+            entity_type_map,
+            conn=conn,
+        )
+
+        self.assertEqual(result, [{"source": "alice", "relationship": "knows", "target": "bob"}])
+        self.assertEqual(self.memory_graph._create_entity.call_count, 2)
+        self.assertIs(self.memory_graph._create_entity.call_args_list[0].kwargs["conn"], conn)
+        self.assertIs(self.memory_graph._create_entity.call_args_list[1].kwargs["conn"], conn)
+        self.memory_graph._create_or_update_relationship.assert_called_once_with(
+            source_id,
+            dest_id,
+            "knows",
+            self.test_filters,
+            conn=conn,
+        )
+
+    def test_add_entities_reuses_created_entity_within_transaction(self):
+        """Test repeated entities reuse IDs created earlier in the same add call."""
+        conn = MagicMock()
+        alice_id = 641905209349505024
+        bob_id = 641905209349505025
+        charlie_id = 641905209349505026
+        to_be_added = [
+            {"source": "alice", "relationship": "knows", "destination": "bob"},
+            {"source": "alice", "relationship": "likes", "destination": "charlie"},
+        ]
+        entity_type_map = {"alice": "person", "bob": "person", "charlie": "person"}
+        self.mock_embedding_model.embed.side_effect = [
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6],
+            [0.1, 0.2, 0.3],
+            [0.7, 0.8, 0.9],
+        ]
+        self.memory_graph._search_source_node = MagicMock(return_value=None)
+        self.memory_graph._search_destination_node = MagicMock(return_value=None)
+        self.memory_graph._create_entity = MagicMock(side_effect=[alice_id, bob_id, charlie_id])
+        self.memory_graph._create_or_update_relationship = MagicMock(side_effect=[
+            {"source": "alice", "relationship": "knows", "target": "bob"},
+            {"source": "alice", "relationship": "likes", "target": "charlie"},
+        ])
+
+        result = self.memory_graph._add_entities(
+            to_be_added,
+            self.test_filters,
+            entity_type_map,
+            conn=conn,
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(self.memory_graph._create_entity.call_count, 3)
+        created_names = [
+            call_args.args[0]
+            for call_args in self.memory_graph._create_entity.call_args_list
+        ]
+        self.assertEqual(created_names, ["alice", "bob", "charlie"])
+        self.assertEqual(self.memory_graph._search_source_node.call_count, 1)
+        self.assertEqual(self.memory_graph._search_destination_node.call_count, 2)
+        self.memory_graph._create_or_update_relationship.assert_any_call(
+            alice_id,
+            bob_id,
+            "knows",
+            self.test_filters,
+            conn=conn,
+        )
+        self.memory_graph._create_or_update_relationship.assert_any_call(
+            alice_id,
+            charlie_id,
+            "likes",
+            self.test_filters,
+            conn=conn,
+        )
+
     def test_delete_entities_uses_transaction_connection(self):
         """Test relationship deletion uses the provided transaction connection."""
         to_be_deleted = [{

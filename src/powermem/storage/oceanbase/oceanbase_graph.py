@@ -1247,6 +1247,7 @@ class MemoryGraph(GraphStoreBase):
             List of dictionaries containing added source, relationship, and target.
         """
         results = []
+        entity_ids_by_name: Dict[str, int] = {}
 
         for item in to_be_added:
             source = item["source"]
@@ -1256,25 +1257,29 @@ class MemoryGraph(GraphStoreBase):
             source_embedding = self.embedding_model.embed(source)
             dest_embedding = self.embedding_model.embed(destination)
 
-            # Search for existing similar nodes.
-            source_node = self._search_source_node(source_embedding, filters,
-                                                   threshold=constants.DEFAULT_SIMILARITY_THRESHOLD, limit=1)
-            dest_node = self._search_destination_node(dest_embedding, filters,
-                                                      threshold=constants.DEFAULT_SIMILARITY_THRESHOLD, limit=1)
-
             # Get or create source entity
-            if source_node:
-                source_id = source_node["id"]
-            else:
-                source_id = self._create_entity(source, entity_type_map.get(source, "entity"),
-                                                source_embedding, filters)
+            source_id = entity_ids_by_name.get(source)
+            if source_id is None:
+                source_node = self._search_source_node(source_embedding, filters,
+                                                       threshold=constants.DEFAULT_SIMILARITY_THRESHOLD, limit=1)
+                if source_node:
+                    source_id = source_node["id"]
+                else:
+                    source_id = self._create_entity(source, entity_type_map.get(source, "entity"),
+                                                    source_embedding, filters, conn=conn)
+                entity_ids_by_name[source] = source_id
 
             # Get or create destination entity
-            if dest_node:
-                dest_id = dest_node["id"]
-            else:
-                dest_id = self._create_entity(destination, entity_type_map.get(destination, "entity"),
-                                              dest_embedding, filters)
+            dest_id = entity_ids_by_name.get(destination)
+            if dest_id is None:
+                dest_node = self._search_destination_node(dest_embedding, filters,
+                                                          threshold=constants.DEFAULT_SIMILARITY_THRESHOLD, limit=1)
+                if dest_node:
+                    dest_id = dest_node["id"]
+                else:
+                    dest_id = self._create_entity(destination, entity_type_map.get(destination, "entity"),
+                                                  dest_embedding, filters, conn=conn)
+                entity_ids_by_name[destination] = dest_id
 
             # Create or update relationship
             rel_result = self._create_or_update_relationship(
@@ -1353,7 +1358,8 @@ class MemoryGraph(GraphStoreBase):
             name: str,
             entity_type: str,
             embedding: List[float],
-            filters: Dict[str, Any]
+            filters: Dict[str, Any],
+            conn=None
     ) -> int:
         """Create a new entity in the graph.
 
@@ -1362,6 +1368,7 @@ class MemoryGraph(GraphStoreBase):
             entity_type: Type of the entity.
             embedding: Vector embedding of the entity.
             filters: Dictionary containing user_id, agent_id, run_id.
+            conn: Optional database connection to use.
 
         Returns:
             Snowflake ID of the created entity.
@@ -1380,11 +1387,25 @@ class MemoryGraph(GraphStoreBase):
             "updated_at": current_time,
         }
 
-        # Use pyobvector upsert method
-        self.client.upsert(
-            table_name=constants.TABLE_ENTITIES,
-            data=[record],
-        )
+        if conn is not None:
+            table = Table(
+                constants.TABLE_ENTITIES,
+                MetaData(),
+                Column("id", BigInteger),
+                Column("name", String(255)),
+                Column("user_id", String(128)),
+                Column("entity_type", String(64)),
+                Column("embedding", VECTOR(self.embedding_dims)),
+                Column("created_at", TIMESTAMP),
+                Column("updated_at", TIMESTAMP),
+            )
+            conn.execute(table.insert(), record)
+        else:
+            # Use pyobvector upsert method
+            self.client.upsert(
+                table_name=constants.TABLE_ENTITIES,
+                data=[record],
+            )
 
         logger.debug("Created entity: %s with id: %s", name, entity_id)
         return entity_id
