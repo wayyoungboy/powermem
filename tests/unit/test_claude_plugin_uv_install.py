@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 COMMON_SH = ROOT / "apps" / "claude-code-plugin" / "scripts" / "common.sh"
 INIT_SH = ROOT / "apps" / "claude-code-plugin" / "scripts" / "init.sh"
+STOP_SH = ROOT / "apps" / "claude-code-plugin" / "scripts" / "stop.sh"
 RUN_HOOK_SH = ROOT / "apps" / "claude-code-plugin" / "hooks" / "run-hook.sh"
 SCRIPT_ARG0 = ROOT / "apps" / "claude-code-plugin" / "scripts" / "init.sh"
 
@@ -38,6 +39,33 @@ def write_executable(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(textwrap.dedent(content), encoding="utf-8")
     path.chmod(0o755)
+
+
+def run_stop_script(tmp_path: Path, *, bin_dir: Path) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["PATH"] = f"{bin_dir}:/usr/bin:/bin"
+    env["POWERMEM_DATA_DIR"] = str(tmp_path / ".powermem")
+    command = textwrap.dedent(
+        f"""
+        set -eu
+        kill() {{
+          printf '%s\\n' "$*" >> "$HOME/kill_calls"
+          return 0
+        }}
+        sleep() {{ :; }}
+        . "{STOP_SH}"
+        """
+    )
+    return subprocess.run(
+        ["sh", "-c", command, str(STOP_SH)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
 
 
 def fake_curl_install_script() -> str:
@@ -438,6 +466,79 @@ def test_bootstrap_python_allows_explicit_python_install_mirror(tmp_path: Path) 
         "https://example.invalid/python-build-standalone/"
     ) in result.stdout
     assert "mirrors.ustc.edu.cn/github-release/astral-sh/python-build-standalone/" not in result.stdout
+
+
+def test_stop_script_stops_orphaned_powermem_server_on_runtime_port(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    data_dir = tmp_path / ".powermem"
+    data_dir.mkdir()
+    (data_dir / "runtime.env").write_text("POWERMEM_BASE_URL=http://localhost:18848\n", encoding="utf-8")
+    write_executable(
+        bin_dir / "lsof",
+        """
+        #!/usr/bin/env sh
+        printf '%s\\n' "$*" > "$HOME/lsof_args"
+        printf '4242\\n'
+        """,
+    )
+    write_executable(
+        bin_dir / "ps",
+        """
+        #!/usr/bin/env sh
+        if [ "$1" = "-p" ] && [ "$2" = "4242" ]; then
+          printf '/usr/bin/powermem-server --host 127.0.0.1 --port 18848\\n'
+          exit 0
+        fi
+        exit 1
+        """,
+    )
+    write_executable(bin_dir / "ss", "#!/usr/bin/env sh\nexit 1\n")
+    write_executable(bin_dir / "fuser", "#!/usr/bin/env sh\nexit 1\n")
+
+    result = run_stop_script(tmp_path, bin_dir=bin_dir)
+
+    assert result.returncode == 0, result.stderr
+    assert "Stopping orphaned PowerMem server PID 4242 on port 18848" in result.stdout
+    assert "No managed PowerMem server is running." not in result.stdout
+    assert (tmp_path / "kill_calls").read_text(encoding="utf-8").splitlines() == [
+        "4242",
+        "-0 4242",
+        "-9 4242",
+    ]
+    assert "-tiTCP:18848" in (tmp_path / "lsof_args").read_text(encoding="utf-8")
+
+
+def test_stop_script_ignores_non_powermem_listener_on_runtime_port(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    data_dir = tmp_path / ".powermem"
+    data_dir.mkdir()
+    (data_dir / "runtime.env").write_text("POWERMEM_BASE_URL=http://localhost:18849\n", encoding="utf-8")
+    write_executable(
+        bin_dir / "lsof",
+        """
+        #!/usr/bin/env sh
+        printf '4242\\n'
+        """,
+    )
+    write_executable(
+        bin_dir / "ps",
+        """
+        #!/usr/bin/env sh
+        if [ "$1" = "-p" ] && [ "$2" = "4242" ]; then
+          printf 'python3 -m http.server 18849\\n'
+          exit 0
+        fi
+        exit 1
+        """,
+    )
+    write_executable(bin_dir / "ss", "#!/usr/bin/env sh\nexit 1\n")
+    write_executable(bin_dir / "fuser", "#!/usr/bin/env sh\nexit 1\n")
+
+    result = run_stop_script(tmp_path, bin_dir=bin_dir)
+
+    assert result.returncode == 0, result.stderr
+    assert "No managed PowerMem server is running." in result.stdout
+    assert not (tmp_path / "kill_calls").exists()
 
 
 def test_init_uses_uvx_launcher_instead_of_plugin_venv_install() -> None:

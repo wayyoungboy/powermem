@@ -439,6 +439,39 @@ pid_uses_env_file() {
   tr '\000' '\n' < "$environ" | grep -Fx "POWERMEM_ENV_FILE=$ENV_FILE" >/dev/null
 }
 
+local_port_from_base_url() {
+  printf '%s\n' "$1" \
+    | sed -n -E 's#^http://(localhost|127\.0\.0\.1|\[::1\]):([0-9]+)(/.*)?$#\2#p'
+}
+
+listener_pids_for_port() {
+  port=$1
+  {
+    if command -v lsof >/dev/null 2>&1; then
+      lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+    fi
+    if command -v ss >/dev/null 2>&1; then
+      ss -H -ltnp "sport = :$port" 2>/dev/null \
+        | sed -n -E 's/.*pid=([0-9]+).*/\1/p' || true
+    fi
+    if command -v fuser >/dev/null 2>&1; then
+      fuser -n tcp "$port" 2>/dev/null || true
+    fi
+  } | tr ' ' '\n' | sed -n -E '/^[0-9]+$/p' | sort -u
+}
+
+powermem_server_pids_for_port() {
+  port=$1
+  listener_pids_for_port "$port" | while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    args=$(process_args "$pid")
+    [ -n "$args" ] || continue
+    printf '%s\n' "$args" | grep -q 'powermem-server' || continue
+    pid_uses_env_file "$pid" || continue
+    printf '%s\n' "$pid"
+  done
+}
+
 port_free() {
   py=${POWERMEM_BOOTSTRAP_PYTHON:-python3}
   "$py" - "$1" <<'PY'
