@@ -38,6 +38,31 @@ PY
   return 1
 }
 
+ensure_bootstrap_python() {
+  if [ -n "${POWERMEM_INIT_PYTHON:-}" ]; then
+    BOOTSTRAP_PYTHON=$(choose_python) || {
+      echo "POWERMEM_INIT_PYTHON must point to Python >= 3.11." >&2
+      return 1
+    }
+  else
+    ensure_uv
+    echo "Ensuring Python 3.11 is available through uv."
+    "$UV_BIN" python install 3.11
+    BOOTSTRAP_PYTHON=$("$UV_BIN" python find 3.11) || {
+      echo "uv could not locate Python 3.11 after installation." >&2
+      return 1
+    }
+    if [ -z "$BOOTSTRAP_PYTHON" ]; then
+      echo "uv returned an empty Python 3.11 path." >&2
+      return 1
+    fi
+  fi
+
+  POWERMEM_BOOTSTRAP_PYTHON=$BOOTSTRAP_PYTHON
+  export BOOTSTRAP_PYTHON
+  export POWERMEM_BOOTSTRAP_PYTHON
+}
+
 python_version() {
   "$1" - <<'PY'
 import sys
@@ -45,55 +70,103 @@ print(".".join(map(str, sys.version_info[:3])))
 PY
 }
 
-detect_public_ip_country() {
-  py=${POWERMEM_BOOTSTRAP_PYTHON:-}
-  if [ -z "$py" ]; then
-    py=$(choose_python) || return 1
+find_uv_bin() {
+  if [ -n "${POWERMEM_UV_BIN:-}" ] && command -v "$POWERMEM_UV_BIN" >/dev/null 2>&1; then
+    command -v "$POWERMEM_UV_BIN"
+    return
   fi
-  "$py" - <<'PY'
-import urllib.request
 
-endpoints = [
-    "https://ipapi.co/country/",
-    "https://ifconfig.co/country-iso",
-    "https://ipinfo.io/country",
-]
+  if command -v uv >/dev/null 2>&1; then
+    command -v uv
+    return
+  fi
 
-for url in endpoints:
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "powermem-init/1.0"})
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            value = resp.read(64).decode(errors="replace").strip().upper()
-        if len(value) == 2 and value.isalpha():
-            print(value)
-            raise SystemExit(0)
-    except Exception:
-        pass
+  if [ -n "${HOME:-}" ]; then
+    for candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv"; do
+      if [ -x "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return
+      fi
+    done
+  fi
 
-raise SystemExit(1)
-PY
+  return 1
+}
+
+fetch_public_ip_country_url() {
+  url=$1
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -m 3 -A "powermem-init/1.0" "$url"
+    return
+  fi
+
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO- -T 3 --user-agent="powermem-init/1.0" "$url"
+    return
+  fi
+
+  return 1
+}
+
+detect_public_ip_country() {
+  for url in \
+    "https://ipapi.co/country/" \
+    "https://ifconfig.co/country-iso" \
+    "https://ipinfo.io/country"
+  do
+    country=$(
+      fetch_public_ip_country_url "$url" 2>/dev/null \
+        | tr -d '[:space:]' \
+        | tr '[:lower:]' '[:upper:]' \
+        | cut -c 1-2 \
+        || true
+    )
+    case "$country" in
+      [A-Z][A-Z])
+        printf '%s\n' "$country"
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
 }
 
 install_uv_from_url() {
   installer_url=$1
   download_url=${2:-}
+  installer_tmp="${TMPDIR:-/tmp}/powermem-uv-installer.$$.sh"
 
   if command -v curl >/dev/null 2>&1; then
-    if [ -n "$download_url" ]; then
-      curl -sL "$installer_url" | env UV_DOWNLOAD_URL="$download_url" sh
+    if curl -fsSL "$installer_url" -o "$installer_tmp"; then
+      if [ -n "$download_url" ]; then
+        env UV_DOWNLOAD_URL="$download_url" sh "$installer_tmp"
+      else
+        sh "$installer_tmp"
+      fi
+      status=$?
+      rm -f "$installer_tmp"
+      return "$status"
     else
-      curl -LsSf "$installer_url" | sh
+      rm -f "$installer_tmp"
+      return 1
     fi
-    return
   fi
 
   if command -v wget >/dev/null 2>&1; then
-    if [ -n "$download_url" ]; then
-      wget -qO- "$installer_url" | env UV_DOWNLOAD_URL="$download_url" sh
+    if wget -qO "$installer_tmp" "$installer_url"; then
+      if [ -n "$download_url" ]; then
+        env UV_DOWNLOAD_URL="$download_url" sh "$installer_tmp"
+      else
+        sh "$installer_tmp"
+      fi
+      status=$?
+      rm -f "$installer_tmp"
+      return "$status"
     else
-      wget -qO- "$installer_url" | sh
+      rm -f "$installer_tmp"
+      return 1
     fi
-    return
   fi
 
   echo "Neither curl nor wget is available; install uv manually and retry." >&2
@@ -101,14 +174,7 @@ install_uv_from_url() {
 }
 
 ensure_uv() {
-  if [ -n "${POWERMEM_UV_BIN:-}" ] && command -v "$POWERMEM_UV_BIN" >/dev/null 2>&1; then
-    UV_BIN=$(command -v "$POWERMEM_UV_BIN")
-    export UV_BIN
-    return
-  fi
-
-  if command -v uv >/dev/null 2>&1; then
-    UV_BIN=$(command -v uv)
+  if UV_BIN=$(find_uv_bin); then
     export UV_BIN
     return
   fi
@@ -119,7 +185,10 @@ ensure_uv() {
       echo "uv not found; installing uv from the USTC mirror for CN networks."
       install_uv_from_url \
         "https://mirrors.ustc.edu.cn/github-release/astral-sh/uv/LatestRelease/uv-installer.sh" \
-        "https://mirrors.ustc.edu.cn/github-release/astral-sh/uv/LatestRelease/"
+        "https://mirrors.ustc.edu.cn/github-release/astral-sh/uv/LatestRelease/" || {
+          echo "USTC uv mirror install failed; falling back to the official Astral installer." >&2
+          install_uv_from_url "https://astral.sh/uv/install.sh"
+        }
       ;;
     "")
       echo "uv not found; region detection failed, installing uv from the official Astral installer."
@@ -200,6 +269,28 @@ write_runtime_base_url() {
     printf 'POWERMEM_ENV_FILE=%s\n' "$ENV_FILE"
   } > "$tmp"
   mv "$tmp" "$RUNTIME_FILE"
+}
+
+export_env_file_vars() {
+  env_file=$1
+  [ -f "$env_file" ] || return 0
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ""|\#*) continue ;;
+      *=*)
+        key=${line%%=*}
+        case "$key" in
+          [A-Za-z_]*)
+            case "$key" in
+              *[!A-Za-z0-9_]*) continue ;;
+            esac
+            export "$line"
+            ;;
+        esac
+        ;;
+    esac
+  done < "$env_file"
 }
 
 health_url() {
