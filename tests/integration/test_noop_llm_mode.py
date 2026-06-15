@@ -1,3 +1,4 @@
+import json
 import uuid
 
 import pytest
@@ -50,6 +51,28 @@ def test_noop_llm_preserves_basic_memory_crud(tmp_path):
 
     assert memory.delete(memory_id, user_id="user_noop") is True
     assert memory.get(memory_id, user_id="user_noop") is None
+
+
+def test_noop_llm_imports_memories(tmp_path):
+    memory = Memory(config=_sqlite_noop_config(tmp_path))
+    source = json.dumps(
+        [
+            {
+                "content": "Imported no-LLM memory about black coffee",
+                "metadata": {"source": "import-test"},
+            }
+        ]
+    )
+
+    result = memory.import_memories(
+        source=source,
+        format="json",
+        user_id="user_import_noop",
+    )
+
+    assert result == {"success": 1, "failed": 0}
+    search_result = memory.search("black coffee", user_id="user_import_noop")
+    assert search_result["results"]
 
 
 def test_noop_llm_skips_graph_operations(tmp_path):

@@ -2716,7 +2716,7 @@ class Memory(MemoryBase):
                 mem_agent_id = agent_id or memory.get('agent_id')
                 
                 self.add(
-                    content=memory['content'],
+                    messages=memory['content'],
                     user_id=mem_user_id,
                     agent_id=mem_agent_id,
                     metadata=memory.get('metadata', {}),
