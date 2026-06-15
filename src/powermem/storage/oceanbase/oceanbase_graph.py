@@ -294,11 +294,35 @@ class MemoryGraph(GraphStoreBase):
             - graph_relationships: Stores relationships between entities
         """
 
-        if not self.client.check_table_exists(constants.TABLE_ENTITIES):
+        entities_exists = self.client.check_table_exists(constants.TABLE_ENTITIES)
+        if entities_exists:
+            has_user_id = self._entities_table_has_user_id()
+            if has_user_id is None:
+                raise RuntimeError(
+                    f"Unable to inspect {constants.TABLE_ENTITIES} schema before graph migration"
+                )
+            needs_entity_migration = not has_user_id
+        else:
+            needs_entity_migration = False
+
+        if needs_entity_migration:
+            logger.warning(
+                "%s table does not include user_id. Recreating graph tables to enforce user isolation.",
+                constants.TABLE_ENTITIES,
+            )
+            if self.client.check_table_exists(constants.TABLE_RELATIONSHIPS):
+                self.client.drop_table_if_exist(constants.TABLE_RELATIONSHIPS)
+                logger.info("Dropped %s table for graph entity user_id migration", constants.TABLE_RELATIONSHIPS)
+            self.client.drop_table_if_exist(constants.TABLE_ENTITIES)
+            logger.info("Dropped %s table for graph entity user_id migration", constants.TABLE_ENTITIES)
+            entities_exists = False
+
+        if not entities_exists:
             # Define columns for entities table
             cols = [
                 Column("id", BigInteger, primary_key=True, autoincrement=False),
                 Column("name", String(255), nullable=False),
+                Column("user_id", String(128), nullable=False),
                 Column("entity_type", String(64)),
                 Column("embedding", VECTOR(self.embedding_dims)),
                 Column("created_at", TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")),
@@ -306,7 +330,7 @@ class MemoryGraph(GraphStoreBase):
             ]
             # Define regular indexes
             indexes = [
-                Index("idx_name", "name"),
+                Index("idx_user_name", "user_id", "name"),
             ]
 
             # Map index_type string to VecIndexType enum
@@ -376,6 +400,15 @@ class MemoryGraph(GraphStoreBase):
             logger.info("%s table created successfully", constants.TABLE_RELATIONSHIPS)
         else:
             logger.info("%s table already exists", constants.TABLE_RELATIONSHIPS)
+
+    def _entities_table_has_user_id(self) -> Optional[bool]:
+        """Return whether the existing graph entity table is user-scoped."""
+        try:
+            table = Table(constants.TABLE_ENTITIES, self.metadata, autoload_with=self.engine)
+            return "user_id" in table.c
+        except Exception as exc:
+            logger.warning("Unable to inspect %s schema: %s", constants.TABLE_ENTITIES, exc)
+            return None
 
     def _get_existing_vector_dimension_for_entities(self) -> Optional[int]:
         """Get the dimension of the existing vector field in entities table.
@@ -504,9 +537,10 @@ class MemoryGraph(GraphStoreBase):
             if idx < len(search_output):
                 item = search_output[idx]
                 search_results.append({
-                    "source": item["source"], 
-                    "relationship": item["relationship"], 
-                    "destination": item["destination"]
+                    "source": item["source"],
+                    "relationship": item["relationship"],
+                    "destination": item["destination"],
+                    "score": float(scores[idx]),
                 })
 
         logger.info("Returned %d search results (from %d candidates)", len(search_results), len(search_output))
@@ -653,9 +687,16 @@ class MemoryGraph(GraphStoreBase):
         Returns:
             Dictionary mapping entity names to entity types.
         """
-        _tools = [self.graph_tools_prompts.get_extract_entities_tool()]
         if constants.is_structured_llm_provider(self.llm_provider):
-            _tools = [self.graph_tools_prompts.get_extract_entities_tool(structured=True)]
+            _tools = [
+                self.graph_tools_prompts.get_extract_entities_tool(structured=True),
+                self.graph_tools_prompts.get_noop_tool(structured=True),
+            ]
+        else:
+            _tools = [
+                self.graph_tools_prompts.get_extract_entities_tool(),
+                self.graph_tools_prompts.get_noop_tool(),
+            ]
 
         search_results = self.llm.generate_response(
             messages=[
@@ -737,9 +778,16 @@ class MemoryGraph(GraphStoreBase):
                 },
             ]
 
-        _tools = [self.graph_tools_prompts.get_relations_tool()]
         if constants.is_structured_llm_provider(self.llm_provider):
-            _tools = [self.graph_tools_prompts.get_relations_tool(structured=True)]
+            _tools = [
+                self.graph_tools_prompts.get_relations_tool(structured=True),
+                self.graph_tools_prompts.get_noop_tool(structured=True),
+            ]
+        else:
+            _tools = [
+                self.graph_tools_prompts.get_relations_tool(),
+                self.graph_tools_prompts.get_noop_tool(),
+            ]
 
         extracted_entities = self.llm.generate_response(
             messages=messages,
@@ -782,6 +830,7 @@ class MemoryGraph(GraphStoreBase):
             List of dictionaries containing source, relationship, destination and their IDs.
         """
         result_relations = []
+        seen_relations = set()
 
         for node in node_list:
             n_embedding = self.embedding_model.embed(node)
@@ -799,7 +848,16 @@ class MemoryGraph(GraphStoreBase):
 
             # Use multi-hop search with early stopping
             multi_hop_results = self._multi_hop_search(entity_ids, filters, limit)
-            result_relations.extend(multi_hop_results)
+            for relation in multi_hop_results:
+                relation_key = (
+                    relation.get("source"),
+                    relation.get("relationship"),
+                    relation.get("destination"),
+                )
+                if relation_key in seen_relations:
+                    continue
+                seen_relations.add(relation_key)
+                result_relations.append(relation)
 
         return result_relations
 
@@ -1063,23 +1121,29 @@ class MemoryGraph(GraphStoreBase):
             destination = item["destination"]
             relationship = item["relationship"]
 
-            # First, find the source and destination entities by name
+            # First, find the source and destination entities by name for this user.
             source_entities = self.client.get(
                 table_name=constants.TABLE_ENTITIES,
                 ids=None,
                 output_column_name=["id", "name"],
-                where_clause=[text(f"name = :source_name").bindparams(
-                    bindparam("source_name", source)
-                )]
+                where_clause=[
+                    text("name = :source_name AND user_id = :user_id").bindparams(
+                        bindparam("source_name", source),
+                        bindparam("user_id", filters["user_id"]),
+                    )
+                ]
             )
 
             dest_entities = self.client.get(
                 table_name=constants.TABLE_ENTITIES,
                 ids=None,
                 output_column_name=["id", "name"],
-                where_clause=[text(f"name = :dest_name").bindparams(
-                    bindparam("dest_name", destination)
-                )]
+                where_clause=[
+                    text("name = :dest_name AND user_id = :user_id").bindparams(
+                        bindparam("dest_name", destination),
+                        bindparam("user_id", filters["user_id"]),
+                    )
+                ]
             )
 
             # Get entity IDs
@@ -1254,6 +1318,10 @@ class MemoryGraph(GraphStoreBase):
         vec_str = "[" + ",".join([str(np.float32(v)) for v in embedding]) + "]"
         distance_expr = l2_distance(table.c.embedding, vec_str)
         where_clause = [distance_expr < threshold]
+        user_id = filters.get("user_id") if filters else None
+        if user_id is None:
+            raise ValueError("user_id is required for graph entity search")
+        where_clause.append(table.c.user_id == user_id)
 
         results = self.client.ann_search(
             table_name=constants.TABLE_ENTITIES,
@@ -1305,6 +1373,7 @@ class MemoryGraph(GraphStoreBase):
         record = {
             "id": entity_id,
             "name": name,
+            "user_id": filters["user_id"],
             "entity_type": entity_type,
             "embedding": embedding,
             "created_at": current_time,
