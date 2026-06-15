@@ -10,11 +10,7 @@ echo "Data dir: $DATA_DIR"
 
 base_url=$(runtime_base_url)
 
-BOOTSTRAP_PYTHON=$(choose_python) || {
-  echo "No Python >= 3.11 interpreter found. Set POWERMEM_INIT_PYTHON=/path/to/python3.11 and retry." >&2
-  exit 1
-}
-export POWERMEM_BOOTSTRAP_PYTHON=$BOOTSTRAP_PYTHON
+ensure_bootstrap_python || exit 1
 echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON"))"
 
 create_env_file() {
@@ -367,6 +363,8 @@ lines.extend(
         "# Logging",
         f"LOGGING_LEVEL={logging_level}",
         "LOGGING_FORMAT=json",
+        f"LOGGING_FILE={path_value('powermem.log')}",
+        f"AUDIT_LOG_FILE={path_value('audit.log')}",
         "",
         "# Vector store tuning",
         "VECTOR_STORE_BATCH_SIZE=50",
@@ -606,6 +604,7 @@ fi
 
 ensure_uv
 configure_uv_index
+export_env_file_vars "$ENV_FILE"
 echo "Backend package: $PACKAGE"
 echo "Backend launcher: uvx --from '$PACKAGE' powermem-server"
 
