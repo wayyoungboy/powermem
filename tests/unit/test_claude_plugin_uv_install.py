@@ -347,6 +347,7 @@ def test_bootstrap_python_uses_uv_managed_python_by_default(tmp_path: Path) -> N
 
     result = run_common(
         """
+        detect_public_ip_country() { printf 'US\n'; }
         ensure_bootstrap_python
         printf 'BOOTSTRAP_PYTHON=%s\n' "$BOOTSTRAP_PYTHON"
         printf 'POWERMEM_BOOTSTRAP_PYTHON=%s\n' "$POWERMEM_BOOTSTRAP_PYTHON"
@@ -361,6 +362,82 @@ def test_bootstrap_python_uses_uv_managed_python_by_default(tmp_path: Path) -> N
     assert f"POWERMEM_BOOTSTRAP_PYTHON={uv_python}" in result.stdout
     assert "python install 3.11" in result.stdout
     assert "python find 3.11" in result.stdout
+
+
+def test_bootstrap_python_uses_ustc_python_install_mirror_for_cn(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    uv_python = tmp_path / "uv-python-3.11"
+    write_executable(
+        bin_dir / "uv",
+        f"""
+        #!/usr/bin/env sh
+        printf '%s MIRROR=%s\\n' "$*" "${{UV_PYTHON_INSTALL_MIRROR:-}}" >> "$HOME/uv_calls"
+        if [ "$1" = "python" ] && [ "$2" = "install" ]; then
+          exit 0
+        fi
+        if [ "$1" = "python" ] && [ "$2" = "find" ]; then
+          printf '%s\\n' "{uv_python}"
+          exit 0
+        fi
+        exit 1
+        """,
+    )
+
+    result = run_common(
+        """
+        detect_public_ip_country() { printf 'CN\n'; }
+        ensure_bootstrap_python
+        cat "$HOME/uv_calls"
+        """,
+        tmp_path,
+        bin_dir=bin_dir,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        "python install 3.11 MIRROR="
+        "https://mirrors.ustc.edu.cn/github-release/astral-sh/python-build-standalone/"
+    ) in result.stdout
+    assert "python find 3.11 MIRROR=" in result.stdout
+
+
+def test_bootstrap_python_allows_explicit_python_install_mirror(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    uv_python = tmp_path / "uv-python-3.11"
+    write_executable(
+        bin_dir / "uv",
+        f"""
+        #!/usr/bin/env sh
+        printf '%s MIRROR=%s\\n' "$*" "${{UV_PYTHON_INSTALL_MIRROR:-}}" >> "$HOME/uv_calls"
+        if [ "$1" = "python" ] && [ "$2" = "install" ]; then
+          exit 0
+        fi
+        if [ "$1" = "python" ] && [ "$2" = "find" ]; then
+          printf '%s\\n' "{uv_python}"
+          exit 0
+        fi
+        exit 1
+        """,
+    )
+
+    result = run_common(
+        """
+        POWERMEM_UV_PYTHON_INSTALL_MIRROR=https://example.invalid/python-build-standalone/
+        export POWERMEM_UV_PYTHON_INSTALL_MIRROR
+        detect_public_ip_country() { printf 'CN\n'; }
+        ensure_bootstrap_python
+        cat "$HOME/uv_calls"
+        """,
+        tmp_path,
+        bin_dir=bin_dir,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        "python install 3.11 MIRROR="
+        "https://example.invalid/python-build-standalone/"
+    ) in result.stdout
+    assert "mirrors.ustc.edu.cn/github-release/astral-sh/python-build-standalone/" not in result.stdout
 
 
 def test_init_uses_uvx_launcher_instead_of_plugin_venv_install() -> None:

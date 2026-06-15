@@ -14,6 +14,7 @@ RUNTIME_FILE="${POWERMEM_RUNTIME_FILE:-$DATA_DIR/runtime.env}"
 PID_FILE="${POWERMEM_PID_FILE:-$DATA_DIR/powermem.pid}"
 LEGACY_PID_FILE="$DATA_DIR/server.pid"
 LOG_FILE="${POWERMEM_LOG_FILE:-$DATA_DIR/powermem-server.log}"
+USTC_PYTHON_INSTALL_MIRROR="https://mirrors.ustc.edu.cn/github-release/astral-sh/python-build-standalone/"
 
 mkdir -p "$DATA_DIR"
 
@@ -46,6 +47,7 @@ ensure_bootstrap_python() {
     }
   else
     ensure_uv
+    configure_uv_python_install_mirror
     echo "Ensuring Python 3.11 is available through uv."
     "$UV_BIN" python install 3.11
     BOOTSTRAP_PYTHON=$("$UV_BIN" python find 3.11) || {
@@ -61,6 +63,42 @@ ensure_bootstrap_python() {
   POWERMEM_BOOTSTRAP_PYTHON=$BOOTSTRAP_PYTHON
   export BOOTSTRAP_PYTHON
   export POWERMEM_BOOTSTRAP_PYTHON
+}
+
+configure_uv_python_install_mirror() {
+  if [ "${POWERMEM_UV_PYTHON_INSTALL_MIRROR_CONFIGURED:-0}" = "1" ]; then
+    return
+  fi
+  POWERMEM_UV_PYTHON_INSTALL_MIRROR_CONFIGURED=1
+  export POWERMEM_UV_PYTHON_INSTALL_MIRROR_CONFIGURED
+
+  if [ -n "${POWERMEM_UV_PYTHON_INSTALL_MIRROR:-}" ]; then
+    UV_PYTHON_INSTALL_MIRROR=$POWERMEM_UV_PYTHON_INSTALL_MIRROR
+    export UV_PYTHON_INSTALL_MIRROR
+    echo "uv Python install mirror: $UV_PYTHON_INSTALL_MIRROR"
+    return
+  fi
+
+  if [ -n "${UV_PYTHON_INSTALL_MIRROR:-}" ]; then
+    export UV_PYTHON_INSTALL_MIRROR
+    echo "uv Python install mirror: $UV_PYTHON_INSTALL_MIRROR"
+    return
+  fi
+
+  country=$(detect_public_ip_country || true)
+  case "$country" in
+    CN)
+      UV_PYTHON_INSTALL_MIRROR=$USTC_PYTHON_INSTALL_MIRROR
+      export UV_PYTHON_INSTALL_MIRROR
+      echo "Detected public IP country: CN; uv python install will use $UV_PYTHON_INSTALL_MIRROR"
+      ;;
+    "")
+      echo "Public IP country detection failed; uv python install will use the default Python download source."
+      ;;
+    *)
+      echo "Detected public IP country: $country; uv python install will use the default Python download source."
+      ;;
+  esac
 }
 
 python_version() {
