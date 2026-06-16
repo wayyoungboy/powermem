@@ -107,6 +107,17 @@ class StorageAdapter:
                     db_filters[self._metadata_filter_key_for_store(key)] = value
         return db_filters
 
+    def _memory_matches_filter(self, memory: Dict[str, Any], key: str, expected: Any) -> bool:
+        """Match logical filters against normalized memory payloads."""
+        actual = memory.get(key)
+        metadata = memory.get("metadata")
+        if actual is None and isinstance(metadata, dict):
+            if key.startswith("metadata."):
+                actual = metadata.get(key[len("metadata."):])
+            if actual is None:
+                actual = metadata.get(key)
+        return actual == expected
+
     def add_memory(self, memory_data: Dict[str, Any]) -> int:
         """Add a memory to the store."""
         # ID will be generated using Snowflake algorithm before insertion
@@ -606,10 +617,7 @@ class StorageAdapter:
                 for key, expected in filters.items():
                     if key in ("user_id", "agent_id", "run_id"):
                         continue
-                    actual = memory.get(key)
-                    if actual is None and memory.get("metadata"):
-                        actual = memory["metadata"].get(key)
-                    if actual != expected:
+                    if not self._memory_matches_filter(memory, key, expected):
                         break
                 else:
                     pass  # all extra filters matched

@@ -106,6 +106,7 @@ def test_storage_adapter_sqlite_filters_payload_and_metadata_keys():
     assert adapter.count_all_memories(filters={"priority": "high"}) == 1
     assert adapter.count_all_memories(filters={"metadata.priority": "high"}) == 1
 
+    listed_results = adapter.get_all_memories(filters={"metadata.priority": "high"})
     category_results = adapter.search_memories(
         query_embedding=[0.1],
         filters={"category": "preference"},
@@ -115,6 +116,7 @@ def test_storage_adapter_sqlite_filters_payload_and_metadata_keys():
         filters={"metadata.priority": "high"},
     )
 
+    assert [memory["memory"] for memory in listed_results] == ["python"]
     assert [memory["memory"] for memory in category_results] == ["python"]
     assert [memory["memory"] for memory in priority_results] == ["python"]
 
@@ -150,6 +152,51 @@ def test_storage_adapter_strips_oceanbase_dotted_metadata_prefix():
         "scope": "personal",
         "priority": "high",
     }
+
+
+def test_storage_adapter_list_matches_oceanbase_dotted_metadata_filter():
+    class Result:
+        def __init__(self, memory_id, payload):
+            self.id = memory_id
+            self.payload = payload
+
+    class OceanBaseLikeStore:
+        collection_name = "memories"
+
+        def __init__(self):
+            self.list_kwargs = None
+
+        def list(self, **kwargs):
+            self.list_kwargs = kwargs
+            return [
+                [
+                    Result(
+                        "mem-1",
+                        {
+                            "data": "personal",
+                            "metadata": {"scope": "personal"},
+                            "user_id": "u01",
+                        },
+                    ),
+                    Result(
+                        "mem-2",
+                        {
+                            "data": "group",
+                            "metadata": {"scope": "group"},
+                            "user_id": "u01",
+                        },
+                    ),
+                ]
+            ]
+
+    OceanBaseLikeStore.__module__ = "powermem.storage.oceanbase.oceanbase"
+    store = OceanBaseLikeStore()
+    adapter = StorageAdapter(store)
+
+    memories = adapter.get_all_memories(filters={"metadata.scope": "personal"})
+
+    assert store.list_kwargs["filters"] == {"scope": "personal"}
+    assert [memory["memory"] for memory in memories] == ["personal"]
 
 
 def test_storage_adapter_search_pushes_sqlite_metadata_filter_to_db():
