@@ -39,7 +39,7 @@ The init skill prepares shared local state under `~/.powermem/`:
 ~/.powermem/.env
 ~/.powermem/runtime.env
 ~/.powermem/powermem.pid
-~/.powermem/powermem-server.log
+server log under the local state directory
 ~/.powermem/venv/
 ```
 
@@ -97,7 +97,7 @@ the local server lifecycle for you.
   `codex plugin add`.
 - If MCP uses the wrong port, reload `~/.powermem/runtime.env` and re-run
   `codex mcp remove powermem` followed by `codex mcp add`.
-- If the server fails to start, read `~/.powermem/powermem-server.log`.
+- If the server fails to start, read the server log under the local state directory.
 - If package installation is slow in CN networks, init detects the current
   machine region and adds the Tsinghua PyPI mirror for `pip install`.
 
