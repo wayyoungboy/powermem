@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +47,61 @@ func baseURL() string {
 		s = defaultPowerMemBaseURL
 	}
 	return strings.TrimRight(s, "/")
+}
+
+func hookScrubEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_HOOK_SCRUB"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+var scrubPatterns = []struct {
+	re   *regexp.Regexp
+	repl string
+}{
+	{regexp.MustCompile(`SENTINEL_SECRET[A-Za-z0-9_=-]*`), "<redacted-secret>"},
+	{regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/\-=]{8,}`), "Bearer <redacted>"},
+	{regexp.MustCompile(`(?i)\b(sk-|ghp_|github_pat_|xox[baprs]-|ya29\.)[A-Za-z0-9._\-]{8,}`), "${1}<redacted>"},
+	{regexp.MustCompile(`(?i)\b(api[_-]?key|auth[_-]?token|token|secret|password)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)`), "${1}${2}<redacted>"},
+	{regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`), "AKIA<redacted>"},
+}
+
+func scrubText(s string) string {
+	if !hookScrubEnabled() || s == "" {
+		return s
+	}
+	out := s
+	for _, pattern := range scrubPatterns {
+		out = pattern.re.ReplaceAllString(out, pattern.repl)
+	}
+	return out
+}
+
+func scrubValue(v any) any {
+	if !hookScrubEnabled() {
+		return v
+	}
+	switch x := v.(type) {
+	case string:
+		return scrubText(x)
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, v := range x {
+			out[k] = scrubValue(v)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, v := range x {
+			out[i] = scrubValue(v)
+		}
+		return out
+	default:
+		return v
+	}
 }
 
 func spawnWorker(mode string, envExtra map[string]string) {
@@ -216,6 +272,7 @@ func handleUserPromptSubmit(payload map[string]any) {
 	if len(prompt) < 2 {
 		return
 	}
+	prompt = scrubText(prompt)
 	ctx, err := searchMemoriesForPrompt(prompt)
 	if err != nil || strings.TrimSpace(ctx) == "" {
 		return
@@ -240,14 +297,14 @@ func handleUserPromptSubmit(payload map[string]any) {
 func searchMemoriesForPrompt(query string) (string, error) {
 	base := baseURL()
 	body := map[string]any{
-		"query": query,
+		"query": scrubText(query),
 		"limit": promptSearchLimit(),
 	}
 	if u := searchBodyUserID(); u != "" {
-		body["user_id"] = u
+		body["user_id"] = scrubText(u)
 	}
 	if a := searchBodyAgentID(); a != "" {
-		body["agent_id"] = a
+		body["agent_id"] = scrubText(a)
 	}
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -298,7 +355,7 @@ func formatSearchResults(respBody []byte) (string, error) {
 			continue
 		}
 		content, _ := m["content"].(string)
-		content = strings.TrimSpace(content)
+		content = strings.TrimSpace(scrubText(content))
 		if content == "" {
 			continue
 		}
@@ -321,22 +378,22 @@ func formatSearchResults(respBody []byte) (string, error) {
 func postMemory(content string, meta map[string]any, runID *string, infer bool) error {
 	base := baseURL()
 	body := map[string]any{
-		"content":  content,
+		"content":  scrubText(content),
 		"infer":    infer,
-		"metadata": meta,
+		"metadata": scrubValue(meta),
 	}
 	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
-		body["user_id"] = u
+		body["user_id"] = scrubText(u)
 	} else if u := os.Getenv("USER"); u != "" {
-		body["user_id"] = u
+		body["user_id"] = scrubText(u)
 	} else if u := os.Getenv("USERNAME"); u != "" {
-		body["user_id"] = u
+		body["user_id"] = scrubText(u)
 	}
 	if a := strings.TrimSpace(os.Getenv("POWERMEM_AGENT_ID")); a != "" {
-		body["agent_id"] = a
+		body["agent_id"] = scrubText(a)
 	}
 	if runID != nil && *runID != "" {
-		body["run_id"] = *runID
+		body["run_id"] = scrubText(*runID)
 	}
 	b, err := json.Marshal(body)
 	if err != nil {
