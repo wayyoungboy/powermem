@@ -92,12 +92,21 @@ func stdinHook() {
 			return
 		}
 		reason, _ := payload["reason"].(string)
-		spawnWorker("worker-transcript", map[string]string{
+		cfg := loadHookPrivacyConfig()
+		cwd, report, ok := scrubCWDForWorker(cwd, cfg)
+		if !ok {
+			return
+		}
+		env := map[string]string{
 			"POWERMEM_WORKER_TRANSCRIPT_PATH": tp,
 			"POWERMEM_WORKER_SESSION_ID":      sid,
 			"POWERMEM_WORKER_CWD":             cwd,
 			"POWERMEM_WORKER_REASON":          reason,
-		})
+		}
+		if encoded := encodeScrubReport(report); encoded != "" {
+			env[parentScrubReportEnv] = encoded
+		}
+		spawnWorker("worker-transcript", env)
 	case "PostCompact":
 		summary, _ := payload["compact_summary"].(string)
 		if strings.TrimSpace(summary) == "" {
@@ -107,12 +116,21 @@ func stdinHook() {
 			summary = summary[:900000] + "\n…"
 		}
 		trigger, _ := payload["trigger"].(string)
-		spawnWorker("worker-compact", map[string]string{
+		cfg := loadHookPrivacyConfig()
+		summary, cwd, report, ok := scrubCompactForWorker(summary, cwd, cfg)
+		if !ok {
+			return
+		}
+		env := map[string]string{
 			"POWERMEM_WORKER_COMPACT_SUMMARY": summary,
 			"POWERMEM_WORKER_SESSION_ID":      sid,
 			"POWERMEM_WORKER_CWD":             cwd,
 			"POWERMEM_WORKER_TRIGGER":         trigger,
-		})
+		}
+		if encoded := encodeScrubReport(report); encoded != "" {
+			env[parentScrubReportEnv] = encoded
+		}
+		spawnWorker("worker-compact", env)
 	}
 }
 
@@ -165,13 +183,7 @@ func promptSearchEnabled() bool {
 }
 
 func searchBodyUserID() string {
-	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
-		return u
-	}
-	if u := os.Getenv("USER"); u != "" {
-		return u
-	}
-	return os.Getenv("USERNAME")
+	return memoryUserID()
 }
 
 func searchBodyAgentID() string {
@@ -216,9 +228,22 @@ func handleUserPromptSubmit(payload map[string]any) {
 	if len(prompt) < 2 {
 		return
 	}
+	cfg := loadHookPrivacyConfig()
+	var ok bool
+	prompt, ok = scrubPromptForSearch(prompt, cfg)
+	if !ok {
+		return
+	}
 	ctx, err := searchMemoriesForPrompt(prompt)
 	if err != nil || strings.TrimSpace(ctx) == "" {
 		return
+	}
+	if cfg.Enabled {
+		var report scrubReport
+		ctx, report = scrubText(ctx, cfg)
+		if shouldBlockWrite(cfg, report) || strings.TrimSpace(ctx) == "" {
+			return
+		}
 	}
 	maxC := promptSearchMaxContextChars()
 	if len(ctx) > maxC {
@@ -243,10 +268,24 @@ func searchMemoriesForPrompt(query string) (string, error) {
 		"query": query,
 		"limit": promptSearchLimit(),
 	}
-	if u := searchBodyUserID(); u != "" {
+	userID := searchBodyUserID()
+	agentID := searchBodyAgentID()
+	cfg := loadHookPrivacyConfig()
+	if cfg.Enabled {
+		var report scrubReport
+		userID, report = scrubSearchIdentifier(userID, cfg)
+		if cfg.SearchSecretPolicy == "skip" && report.SecretRedactions > 0 {
+			return "", nil
+		}
+		agentID, report = scrubSearchIdentifier(agentID, cfg)
+		if cfg.SearchSecretPolicy == "skip" && report.SecretRedactions > 0 {
+			return "", nil
+		}
+	}
+	if u := userID; u != "" {
 		body["user_id"] = u
 	}
-	if a := searchBodyAgentID(); a != "" {
+	if a := agentID; a != "" {
 		body["agent_id"] = a
 	}
 	b, err := json.Marshal(body)
@@ -318,25 +357,69 @@ func formatSearchResults(respBody []byte) (string, error) {
 	return s, nil
 }
 
+func scrubSearchIdentifier(value string, cfg hookPrivacyConfig) (string, scrubReport) {
+	if cfg.SearchSecretPolicy == "off" {
+		return scrubTextWithoutPromptSecretPolicy(value, cfg)
+	}
+	return scrubMetadataString("search_id", value, cfg)
+}
+
 func postMemory(content string, meta map[string]any, runID *string, infer bool) error {
+	return postMemoryWithScrubReport(content, meta, runID, infer, scrubReport{})
+}
+
+func postMemoryWithScrubReport(content string, meta map[string]any, runID *string, infer bool, parentReport scrubReport) error {
+	cfg := loadHookPrivacyConfig()
+	userID := memoryUserID()
+	agentID := strings.TrimSpace(os.Getenv("POWERMEM_AGENT_ID"))
+	runIDValue := ""
+	if runID != nil {
+		runIDValue = *runID
+	}
+	if cfg.Enabled {
+		var report scrubReport
+		userID, report = scrubMetadataString("user_id", userID, cfg)
+		parentReport.merge(report)
+		agentID, report = scrubMetadataString("agent_id", agentID, cfg)
+		parentReport.merge(report)
+		runIDValue, report = scrubMetadataString("run_id", runIDValue, cfg)
+		parentReport.merge(report)
+		if shouldBlockWrite(cfg, parentReport) {
+			return nil
+		}
+	}
+	content, meta, blocked := scrubMemoryPayload(content, meta, cfg, parentReport)
+	if blocked {
+		return nil
+	}
+	return postMemoryRaw(content, meta, userID, agentID, runIDValue, infer)
+}
+
+func memoryUserID() string {
+	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
+		return u
+	}
+	if u := os.Getenv("USER"); u != "" {
+		return u
+	}
+	return os.Getenv("USERNAME")
+}
+
+func postMemoryRaw(content string, meta map[string]any, userID string, agentID string, runID string, infer bool) error {
 	base := baseURL()
 	body := map[string]any{
 		"content":  content,
 		"infer":    infer,
 		"metadata": meta,
 	}
-	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
-		body["user_id"] = u
-	} else if u := os.Getenv("USER"); u != "" {
-		body["user_id"] = u
-	} else if u := os.Getenv("USERNAME"); u != "" {
-		body["user_id"] = u
+	if userID != "" {
+		body["user_id"] = userID
 	}
-	if a := strings.TrimSpace(os.Getenv("POWERMEM_AGENT_ID")); a != "" {
-		body["agent_id"] = a
+	if agentID != "" {
+		body["agent_id"] = agentID
 	}
-	if runID != nil && *runID != "" {
-		body["run_id"] = *runID
+	if runID != "" {
+		body["run_id"] = runID
 	}
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -377,14 +460,14 @@ func workerTranscript() {
 	reason := os.Getenv("POWERMEM_WORKER_REASON")
 	header := fmt.Sprintf("Claude Code session transcript (session_id=%s, cwd=%s, reason=%s)\n\n", sid, cwd, reason)
 	runID := sid
-	if err := postMemory(header+text, map[string]any{
+	if err := postMemoryWithScrubReport(header+text, map[string]any{
 		"source":             "claude-code-hook",
 		"kind":               "session-end-transcript",
 		"transcript_path":    path,
 		"session_id":         sid,
 		"cwd":                cwd,
 		"session_end_reason": reason,
-	}, &runID, inferTranscript()); err != nil {
+	}, &runID, inferTranscript(), decodeScrubReport(os.Getenv(parentScrubReportEnv))); err != nil {
 		os.Exit(1)
 	}
 }
@@ -399,13 +482,14 @@ func workerCompact() {
 	trigger := os.Getenv("POWERMEM_WORKER_TRIGGER")
 	runID := sid
 	content := fmt.Sprintf("Claude Code context compact summary (session_id=%s, cwd=%s, trigger=%s)\n\n%s", sid, cwd, trigger, summary)
-	if err := postMemory(content, map[string]any{
+	parentReport := decodeScrubReport(os.Getenv(parentScrubReportEnv))
+	if err := postMemoryWithScrubReport(content, map[string]any{
 		"source":          "claude-code-hook",
 		"kind":            "post-compact-summary",
 		"session_id":      sid,
 		"cwd":             cwd,
 		"compact_trigger": trigger,
-	}, &runID, inferCompact()); err != nil {
+	}, &runID, inferCompact(), parentReport); err != nil {
 		os.Exit(1)
 	}
 }
