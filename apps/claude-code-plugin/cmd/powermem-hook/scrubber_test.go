@@ -38,6 +38,7 @@ func TestScrubTextDefaultCoverage(t *testing.T) {
 	tokenRaw := "short-token-value"
 	jwt := syntheticJWT()
 	longToken := "Long" + strings.Repeat("Aa9_", 12)
+	slackToken := "xoxb-" + strings.Repeat("12ab-", 10) + "9Z"
 	input := strings.Join([]string{
 		"SERVICE_" + "TOKEN" + "=" + raw,
 		"API_" + "KEY=" + bareRaw,
@@ -53,11 +54,12 @@ func TestScrubTextDefaultCoverage(t *testing.T) {
 		privateKeyFixture(),
 		jwt,
 		longToken,
+		slackToken,
 		"normal public sentence",
 	}, "\n")
 
 	out, report := scrubText(input, cfg)
-	for _, value := range []string{raw, bareRaw, lowerRaw, tokenRaw, jwt, longToken, "not-real-key-material"} {
+	for _, value := range []string{raw, bareRaw, lowerRaw, tokenRaw, jwt, longToken, slackToken, "not-real-key-material"} {
 		if strings.Contains(out, value) {
 			t.Fatalf("scrubbed output retained raw value %q in %q", value, out)
 		}
