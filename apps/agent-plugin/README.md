@@ -99,16 +99,20 @@ To pre-download the default local embedding model through ModelScope before
 starting the server:
 
 ```bash
-POWERMEM_INIT_PRELOAD_MODEL=1 sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+PLUGIN_ROOT="${CODEX_PLUGIN_ROOT:-${POWERMEM_PLUGIN_ROOT:-}}"
+[ -n "$PLUGIN_ROOT" ] || { echo "Codex plugin root not found"; exit 1; }
+POWERMEM_INIT_PRELOAD_MODEL=1 sh "$PLUGIN_ROOT/scripts/init.sh"
 ```
 
 Uninstall:
 
-```text
-/plugin uninstall memory-powermem@powermem
-/plugin marketplace remove powermem
-/reload-plugins
+```bash
+codex plugin remove memory-powermem 2>/dev/null || true
+codex plugin marketplace remove powermem
 ```
+
+Start a new Codex thread after uninstalling or reinstalling so Codex reloads the
+plugin registry.
 
 ## Troubleshooting — Error Handling Prompt
 
