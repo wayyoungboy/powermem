@@ -19,6 +19,18 @@ def _add_memory(adapter, content, scope):
     )
 
 
+def _add_categorized_memory(adapter, content, category, priority):
+    return adapter.add_memory(
+        {
+            "content": content,
+            "user_id": "u01",
+            "agent_id": "a01",
+            "category": category,
+            "metadata": {"priority": priority},
+        }
+    )
+
+
 def test_storage_adapter_filters_metadata_before_pagination():
     store = SQLiteVectorStore(database_path=":memory:")
     adapter = StorageAdapter(store)
@@ -66,6 +78,47 @@ def test_storage_adapter_pushes_sqlite_metadata_filter_to_db():
     }
 
 
+def test_storage_adapter_preserves_sqlite_payload_and_dotted_filter_keys():
+    store = SQLiteVectorStore(database_path=":memory:")
+    adapter = StorageAdapter(store)
+
+    assert adapter._build_db_filters(
+        filters={
+            "category": "preference",
+            "metadata.priority": "high",
+            "scope": "coding_agent",
+        },
+    ) == {
+        "category": "preference",
+        "metadata.priority": "high",
+        "metadata.scope": "coding_agent",
+    }
+
+
+def test_storage_adapter_sqlite_filters_payload_and_metadata_keys():
+    store = SQLiteVectorStore(database_path=":memory:")
+    adapter = StorageAdapter(store)
+
+    _add_categorized_memory(adapter, "python", "preference", "high")
+    _add_categorized_memory(adapter, "email", "communication", "low")
+
+    assert adapter.count_all_memories(filters={"category": "preference"}) == 1
+    assert adapter.count_all_memories(filters={"priority": "high"}) == 1
+    assert adapter.count_all_memories(filters={"metadata.priority": "high"}) == 1
+
+    category_results = adapter.search_memories(
+        query_embedding=[0.1],
+        filters={"category": "preference"},
+    )
+    priority_results = adapter.search_memories(
+        query_embedding=[0.1],
+        filters={"metadata.priority": "high"},
+    )
+
+    assert [memory["memory"] for memory in category_results] == ["python"]
+    assert [memory["memory"] for memory in priority_results] == ["python"]
+
+
 def test_storage_adapter_keeps_oceanbase_metadata_filter_key():
     class OceanBaseLikeStore:
         collection_name = "memories"
@@ -81,6 +134,78 @@ def test_storage_adapter_keeps_oceanbase_metadata_filter_key():
         "user_id": "u01",
         "agent_id": "a01",
         "scope": "personal",
+    }
+
+
+def test_storage_adapter_search_pushes_sqlite_metadata_filter_to_db():
+    class SQLiteLikeSearchStore:
+        collection_name = "memories"
+
+        def __init__(self):
+            self.search_kwargs = None
+
+        def search(self, query, vectors, limit, filters=None):
+            self.search_kwargs = {
+                "query": query,
+                "vectors": vectors,
+                "limit": limit,
+                "filters": filters,
+            }
+            return []
+
+    SQLiteLikeSearchStore.__module__ = "powermem.storage.sqlite.sqlite_vector_store"
+    store = SQLiteLikeSearchStore()
+    adapter = StorageAdapter(store)
+
+    adapter.search_memories(
+        query_embedding=[0.1],
+        user_id="u01",
+        agent_id="a01",
+        filters={"scope": "coding_agent", "observation_id": "obs-1"},
+        query="pytest",
+    )
+
+    assert store.search_kwargs["filters"] == {
+        "user_id": "u01",
+        "agent_id": "a01",
+        "metadata.scope": "coding_agent",
+        "metadata.observation_id": "obs-1",
+    }
+
+
+def test_storage_adapter_search_keeps_oceanbase_metadata_filter_key():
+    class OceanBaseLikeSearchStore:
+        collection_name = "memories"
+
+        def __init__(self):
+            self.search_kwargs = None
+
+        def search(self, query, vectors, limit, filters=None):
+            self.search_kwargs = {
+                "query": query,
+                "vectors": vectors,
+                "limit": limit,
+                "filters": filters,
+            }
+            return []
+
+    OceanBaseLikeSearchStore.__module__ = "powermem.storage.oceanbase.oceanbase"
+    store = OceanBaseLikeSearchStore()
+    adapter = StorageAdapter(store)
+
+    adapter.search_memories(
+        query_embedding=[0.1],
+        user_id="u01",
+        agent_id="a01",
+        filters={"scope": "coding_agent", "observation_id": "obs-1"},
+        query="pytest",
+    )
+
+    assert store.search_kwargs["filters"] == {
+        "user_id": "u01",
+        "agent_id": "a01",
+        "scope": "coding_agent",
+        "observation_id": "obs-1",
     }
 
 

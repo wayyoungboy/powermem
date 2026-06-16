@@ -83,6 +83,46 @@ class MemoryListResponse(BaseModel):
     offset: int = Field(0, description="Offset applied")
 
 
+class ObservationIngestResponse(BaseModel):
+    """Response model for a structured observation ingest operation."""
+
+    observation_id: Optional[str] = Field(None, description="Observation ID")
+    raw_memory: Optional[MemoryResponse] = Field(None, description="Persisted raw observation memory")
+    semantic_memories: List[MemoryResponse] = Field(
+        default_factory=list,
+        description="Semantic memories extracted from the observation",
+    )
+    memories: List[MemoryResponse] = Field(
+        default_factory=list,
+        description="All memories created or returned by this ingest operation",
+    )
+    saved_raw: bool = Field(False, description="Whether a raw observation was saved")
+    inferred: bool = Field(False, description="Whether intelligent extraction was requested")
+    deduped: bool = Field(False, description="Whether an existing raw observation was reused")
+
+
+class ObservationBatchItemResponse(BaseModel):
+    """Response model for one item in a batch observation ingest operation."""
+
+    index: int = Field(..., description="Original item index")
+    success: bool = Field(..., description="Whether the item was ingested successfully")
+    observation_id: Optional[str] = Field(None, description="Observation ID")
+    result: Optional[ObservationIngestResponse] = Field(None, description="Ingest result")
+    error: Optional[str] = Field(None, description="Failure message")
+
+
+class ObservationBatchIngestResponse(BaseModel):
+    """Response model for batch observation ingest."""
+
+    items: List[ObservationBatchItemResponse] = Field(
+        default_factory=list,
+        description="Per-item ingest results",
+    )
+    total: int = Field(0, description="Total number of observations")
+    success_count: int = Field(0, description="Number of successful observations")
+    failed_count: int = Field(0, description="Number of failed observations")
+
+
 class SearchResult(BaseModel):
     """Single search result"""
 

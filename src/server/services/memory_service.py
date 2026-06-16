@@ -5,12 +5,45 @@ Memory service for PowerMem API
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from pydantic import ValidationError
 from powermem import Memory, auto_config
 from ..models.errors import ErrorCode, APIError
+from ..models.request import ObservationIngestRequest
 from ..utils.converters import memory_dict_to_response
 from ..utils.metrics import get_metrics_collector
 
 logger = logging.getLogger("server")
+
+
+OBSERVATION_SCHEMA = "powermem.coding_agent_observation.v1"
+OBSERVATION_SOURCE = "coding_agent"
+OBSERVATION_MEMORY_TYPE = "coding_agent_observation"
+OBSERVATION_SCOPE = "coding_agent"
+OBSERVATION_CONTROL_FIELDS = {
+    "save_raw",
+    "infer",
+    "dedupe",
+    "filters",
+    "user_id",
+    "agent_id",
+    "run_id",
+    "scope",
+    "memory_type",
+}
+OBSERVATION_FLAT_FIELDS = (
+    "source",
+    "observation_id",
+    "observation_kind",
+    "observation_level",
+    "observation_status",
+    "repo",
+    "branch",
+    "commit_sha",
+    "tool_name",
+    "task_id",
+    "thread_id",
+    "session_id",
+)
 
 
 class MemoryService:
@@ -28,6 +61,295 @@ class MemoryService:
         
         self.memory = Memory(config=config)
         logger.info("MemoryService initialized")
+
+    def _observation_payload(
+        self,
+        request: ObservationIngestRequest,
+    ) -> Dict[str, Any]:
+        """Return only the structured observation payload, excluding ingest controls."""
+        payload = request.model_dump(mode="json", exclude_none=True)
+        return {
+            key: value
+            for key, value in payload.items()
+            if key not in OBSERVATION_CONTROL_FIELDS
+        }
+
+    def _observation_flat_metadata(
+        self,
+        observation: Dict[str, Any],
+        record_kind: str,
+        scope: str,
+        memory_type: str,
+    ) -> Dict[str, Any]:
+        """Build flat filterable metadata for an observation record."""
+        flat = {
+            "schema": OBSERVATION_SCHEMA,
+            "source": observation.get("source") or OBSERVATION_SOURCE,
+            "record_kind": record_kind,
+            "memory_type": memory_type,
+            "scope": scope,
+        }
+        for key in OBSERVATION_FLAT_FIELDS:
+            value = observation.get(key)
+            if value is not None:
+                flat[key] = value
+        return flat
+
+    def _flat_user_metadata(
+        self,
+        metadata: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Keep user metadata filterable at the top level."""
+        if not metadata:
+            return {}
+        return {
+            key: value
+            for key, value in metadata.items()
+            if isinstance(value, (str, int, float, bool))
+        }
+
+    def _build_observation_metadata(
+        self,
+        request: ObservationIngestRequest,
+        record_kind: str,
+    ) -> Dict[str, Any]:
+        """Build storage metadata with flat fields and the full structured payload."""
+        observation = self._observation_payload(request)
+        metadata = self._flat_user_metadata(request.metadata)
+        flat = self._observation_flat_metadata(
+            observation=observation,
+            record_kind=record_kind,
+            scope=request.scope or OBSERVATION_SCOPE,
+            memory_type=request.memory_type or OBSERVATION_MEMORY_TYPE,
+        )
+        metadata.update(flat)
+        metadata["observation"] = observation
+        return metadata
+
+    def _build_observation_filters(
+        self,
+        request: ObservationIngestRequest,
+        record_kind: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Build metadata filters for observation lookup/search routing."""
+        observation = self._observation_payload(request)
+        filters = dict(request.filters or {})
+        flat = self._observation_flat_metadata(
+            observation=observation,
+            record_kind=record_kind or "observation_raw",
+            scope=request.scope or OBSERVATION_SCOPE,
+            memory_type=request.memory_type or OBSERVATION_MEMORY_TYPE,
+        )
+        filters.update(flat)
+        return filters
+
+    def _find_existing_observation(
+        self,
+        request: ObservationIngestRequest,
+        record_kind: str = "observation_raw",
+    ) -> Optional[Dict[str, Any]]:
+        """Find one existing observation record when dedupe is requested."""
+        matches = self._find_existing_observations(
+            request,
+            record_kind=record_kind,
+            limit=1,
+        )
+        return matches[0] if matches else None
+
+    def _find_existing_observations(
+        self,
+        request: ObservationIngestRequest,
+        record_kind: str,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Find existing observation records of one stored kind."""
+        if not request.observation_id:
+            return []
+
+        filters = {
+            "schema": OBSERVATION_SCHEMA,
+            "source": request.source or OBSERVATION_SOURCE,
+            "record_kind": record_kind,
+            "observation_id": request.observation_id,
+        }
+        result = self.memory.get_all(
+            user_id=request.user_id,
+            agent_id=request.agent_id,
+            run_id=request.run_id,
+            filters=filters,
+            limit=limit,
+            offset=0,
+        )
+        matches = result.get("results", []) if isinstance(result, dict) else []
+        return matches if isinstance(matches, list) else []
+
+    def _coerce_observation_request(
+        self,
+        observation: Any,
+    ) -> ObservationIngestRequest:
+        """Validate one batch item as an observation ingest request."""
+        if isinstance(observation, ObservationIngestRequest):
+            return observation
+        return ObservationIngestRequest.model_validate(observation)
+
+    def _observation_id_from_item(self, observation: Any) -> Optional[str]:
+        """Best-effort observation_id extraction for batch item errors."""
+        if isinstance(observation, ObservationIngestRequest):
+            return observation.observation_id
+        if isinstance(observation, dict):
+            value = observation.get("observation_id")
+            return str(value) if value is not None else None
+        return None
+
+    def ingest_observation(
+        self,
+        request: ObservationIngestRequest,
+    ) -> Dict[str, Any]:
+        """
+        Ingest a structured coding-agent observation.
+
+        Raw observations are stored deterministically without LLM inference.
+        When infer=True, semantic extraction is attempted after raw persistence
+        and may return zero memories in noop/no-LLM configurations.
+        """
+        try:
+            existing_raw = None
+            existing_semantic_memories: List[Dict[str, Any]] = []
+            if request.dedupe:
+                if request.save_raw:
+                    existing_raw = self._find_existing_observation(
+                        request,
+                        record_kind="observation_raw",
+                    )
+                if request.infer:
+                    existing_semantic_memories = self._find_existing_observations(
+                        request,
+                        record_kind="observation_semantic",
+                    )
+
+            filters = self._build_observation_filters(request)
+            raw_memories: List[Dict[str, Any]] = []
+            semantic_memories: List[Dict[str, Any]] = []
+
+            if existing_raw:
+                raw_memories = [existing_raw]
+            elif request.save_raw:
+                raw_metadata = self._build_observation_metadata(
+                    request,
+                    record_kind="observation_raw",
+                )
+                raw_memories = self.create_memory(
+                    content=request.content,
+                    user_id=request.user_id,
+                    agent_id=request.agent_id,
+                    run_id=request.run_id,
+                    metadata=raw_metadata,
+                    filters=filters,
+                    scope=request.scope or OBSERVATION_SCOPE,
+                    memory_type=request.memory_type or OBSERVATION_MEMORY_TYPE,
+                    infer=False,
+                )
+                if not raw_memories:
+                    raise APIError(
+                        code=ErrorCode.MEMORY_CREATE_FAILED,
+                        message="Failed to store raw observation",
+                        status_code=500,
+                    )
+
+            if request.infer and existing_semantic_memories:
+                semantic_memories = existing_semantic_memories
+            elif request.infer:
+                semantic_metadata = self._build_observation_metadata(
+                    request,
+                    record_kind="observation_semantic",
+                )
+                semantic_memories = self.create_memory(
+                    content=request.content,
+                    user_id=request.user_id,
+                    agent_id=request.agent_id,
+                    run_id=request.run_id,
+                    metadata=semantic_metadata,
+                    filters=filters,
+                    scope=request.scope or OBSERVATION_SCOPE,
+                    memory_type=request.memory_type or OBSERVATION_MEMORY_TYPE,
+                    infer=True,
+                )
+
+            return {
+                "observation_id": request.observation_id,
+                "raw_memory": raw_memories[0] if raw_memories else None,
+                "semantic_memories": semantic_memories,
+                "memories": raw_memories + semantic_memories,
+                "saved_raw": bool(raw_memories),
+                "inferred": request.infer,
+                "deduped": existing_raw is not None or bool(existing_semantic_memories),
+            }
+        except APIError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to ingest observation: {e}", exc_info=True)
+            raise APIError(
+                code=ErrorCode.MEMORY_CREATE_FAILED,
+                message=f"Failed to ingest observation: {str(e)}",
+                status_code=500,
+            )
+
+    def batch_ingest_observations(
+        self,
+        observations: List[Any],
+    ) -> Dict[str, Any]:
+        """Ingest multiple observations with per-item partial failure results."""
+        items = []
+        success_count = 0
+        failed_count = 0
+
+        for idx, observation_item in enumerate(observations):
+            observation_id = self._observation_id_from_item(observation_item)
+            try:
+                observation = self._coerce_observation_request(observation_item)
+                result = self.ingest_observation(observation)
+                items.append({
+                    "index": idx,
+                    "success": True,
+                    "observation_id": observation.observation_id,
+                    "result": result,
+                    "error": None,
+                })
+                success_count += 1
+            except ValidationError as e:
+                items.append({
+                    "index": idx,
+                    "success": False,
+                    "observation_id": observation_id,
+                    "result": None,
+                    "error": f"Request validation failed: {e.errors()}",
+                })
+                failed_count += 1
+            except APIError as e:
+                items.append({
+                    "index": idx,
+                    "success": False,
+                    "observation_id": observation_id,
+                    "result": None,
+                    "error": e.message,
+                })
+                failed_count += 1
+            except Exception as e:
+                items.append({
+                    "index": idx,
+                    "success": False,
+                    "observation_id": observation_id,
+                    "result": None,
+                    "error": str(e),
+                })
+                failed_count += 1
+
+        return {
+            "items": items,
+            "total": len(observations),
+            "success_count": success_count,
+            "failed_count": failed_count,
+        }
     
     def create_memory(
         self,
