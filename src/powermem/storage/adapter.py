@@ -70,13 +70,16 @@ class StorageAdapter:
 
     def _metadata_filter_key_for_store(self, key: str) -> str:
         """Translate logical metadata filters to backend-specific payload paths."""
-        if key in self._PAYLOAD_FILTER_KEYS or key.startswith("metadata."):
+        if key in self._PAYLOAD_FILTER_KEYS:
             return key
         store_module = self.vector_store.__class__.__module__
-        if (
+        payload_nested_store = (
             store_module.endswith("sqlite.sqlite_vector_store")
             or ".pgvector." in store_module
-        ):
+        )
+        if key.startswith("metadata."):
+            return key if payload_nested_store else key[len("metadata."):]
+        if payload_nested_store:
             return f"metadata.{key}"
         return key
 

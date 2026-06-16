@@ -137,6 +137,21 @@ def test_storage_adapter_keeps_oceanbase_metadata_filter_key():
     }
 
 
+def test_storage_adapter_strips_oceanbase_dotted_metadata_prefix():
+    class OceanBaseLikeStore:
+        collection_name = "memories"
+
+    OceanBaseLikeStore.__module__ = "powermem.storage.oceanbase.oceanbase"
+    adapter = StorageAdapter(OceanBaseLikeStore())
+
+    assert adapter._build_db_filters(
+        filters={"metadata.scope": "personal", "metadata.priority": "high"},
+    ) == {
+        "scope": "personal",
+        "priority": "high",
+    }
+
+
 def test_storage_adapter_search_pushes_sqlite_metadata_filter_to_db():
     class SQLiteLikeSearchStore:
         collection_name = "memories"
@@ -207,6 +222,35 @@ def test_storage_adapter_search_keeps_oceanbase_metadata_filter_key():
         "scope": "coding_agent",
         "observation_id": "obs-1",
     }
+
+
+def test_storage_adapter_search_strips_oceanbase_dotted_metadata_filter_key():
+    class OceanBaseLikeSearchStore:
+        collection_name = "memories"
+
+        def __init__(self):
+            self.search_kwargs = None
+
+        def search(self, query, vectors, limit, filters=None):
+            self.search_kwargs = {
+                "query": query,
+                "vectors": vectors,
+                "limit": limit,
+                "filters": filters,
+            }
+            return []
+
+    OceanBaseLikeSearchStore.__module__ = "powermem.storage.oceanbase.oceanbase"
+    store = OceanBaseLikeSearchStore()
+    adapter = StorageAdapter(store)
+
+    adapter.search_memories(
+        query_embedding=[0.1],
+        filters={"metadata.scope": "coding_agent"},
+        query="pytest",
+    )
+
+    assert store.search_kwargs["filters"] == {"scope": "coding_agent"}
 
 
 def test_storage_adapter_count_uses_db_filters_without_fetching_all():
