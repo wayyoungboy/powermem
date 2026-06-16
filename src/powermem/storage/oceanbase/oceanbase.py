@@ -889,13 +889,47 @@ class OceanBaseVectorStore(VectorStoreBase):
                limit: int = 5,
                filters: Optional[Dict] = None,
                sparse_embedding: Optional[Dict[int, float]] = None,
-               threshold: Optional[float] = None) -> list[OutputData]:
-        # Check if hybrid search is enabled, and we have query text
-        # Full-text search is always enabled by default
-        if self.hybrid_search and query:
-            return self._hybrid_search(query, vectors, limit, filters, sparse_embedding, threshold=threshold)
-        else:
-            return self._vector_search(query, vectors, limit, filters)
+               threshold: Optional[float] = None,
+               retrieval_mode: str = "auto",
+               fusion: str = "rrf",
+               vector_weight: Optional[float] = None,
+               fts_weight: Optional[float] = None,
+               rrf_k: int = 60,
+               candidate_limit: Optional[int] = None,
+               include_explanation: bool = False) -> list[OutputData]:
+        mode = (retrieval_mode or "auto").lower()
+        fusion_method = (fusion or "rrf").lower()
+        search_limit = candidate_limit if candidate_limit is not None else limit
+
+        if mode not in {"auto", "fts", "vector", "hybrid"}:
+            raise ValueError(f"Invalid retrieval mode: {retrieval_mode}")
+        if fusion_method not in {"rrf", "weighted"}:
+            raise ValueError(f"Invalid fusion method: {fusion}")
+
+        if mode == "fts":
+            results = self._fulltext_search(query, search_limit, filters)
+            if threshold is not None:
+                results = [
+                    result for result in results
+                    if result.payload.get("_quality_score", result.score) >= threshold
+                ]
+            return results
+
+        if mode == "vector" or not self.hybrid_search or not query:
+            return self._vector_search(query, vectors, search_limit, filters)
+
+        return self._hybrid_search(
+            query,
+            vectors,
+            search_limit,
+            filters,
+            sparse_embedding,
+            fusion_method=fusion_method,
+            k=rrf_k,
+            threshold=threshold,
+            vector_weight=vector_weight,
+            fts_weight=fts_weight,
+        )
 
     def _vector_search(self,
                        query: str,
@@ -1084,6 +1118,7 @@ class OceanBaseVectorStore(VectorStoreBase):
             # Store original similarity in metadata
             metadata = parsed["metadata"]
             metadata['_fts_score'] = fts_score
+            metadata['_quality_score'] = fts_score
 
             fts_results.append(self._create_output_data(
                 parsed["vector_id"],
@@ -1340,7 +1375,9 @@ class OceanBaseVectorStore(VectorStoreBase):
     def _hybrid_search(self, query: str, vectors: List[List[float]], limit: int = 5, filters: Optional[Dict] = None,
                        sparse_embedding: Optional[Dict[int, float]] = None,
                        fusion_method: str = "rrf", k: int = 60,
-                       threshold: Optional[float] = None):
+                       threshold: Optional[float] = None,
+                       vector_weight: Optional[float] = None,
+                       fts_weight: Optional[float] = None):
         """Perform hybrid search combining vector, full-text, and sparse vector search with optional reranking.
 
         When enable_native_hybrid is True and conditions are met, uses OceanBase native
@@ -1350,9 +1387,26 @@ class OceanBaseVectorStore(VectorStoreBase):
         # 1. enable_native_hybrid must be True
         # 2. threshold must be None (native search doesn't support threshold filtering)
         # 3. All filter fields must be in table columns
+        effective_vector_weight = (
+            vector_weight
+            if vector_weight is not None
+            else self.vector_weight
+        )
+        effective_fts_weight = (
+            fts_weight
+            if fts_weight is not None
+            else self.fts_weight
+        )
+        uses_configured_weights = (
+            effective_vector_weight == self.vector_weight
+            and effective_fts_weight == self.fts_weight
+        )
+
         use_native = (
             self.enable_native_hybrid
             and threshold is None
+            and fusion_method == "rrf"
+            and uses_configured_weights
             and OceanBaseUtil.check_filters_all_in_columns(filters, self.model_class)
         )
 
@@ -1454,7 +1508,15 @@ class OceanBaseVectorStore(VectorStoreBase):
 
         # Step 1: Coarse ranking - Combine results using RRF or weighted fusion
         coarse_ranked_results = self._combine_search_results(
-            vector_results, fts_results, sparse_results, candidate_limit, fusion_method, k, sparse_embedding
+            vector_results,
+            fts_results,
+            sparse_results,
+            candidate_limit,
+            fusion_method,
+            k,
+            sparse_embedding,
+            vector_weight=vector_weight,
+            fts_weight=fts_weight,
         )
         logger.debug(f"Coarse ranking completed, candidates: {len(coarse_ranked_results)}")
         
@@ -1592,15 +1654,34 @@ class OceanBaseVectorStore(VectorStoreBase):
 
     def _combine_search_results(self, vector_results: List[OutputData], fts_results: List[OutputData],
                                 sparse_results: Optional[List[OutputData]],
-                                limit: int, fusion_method: str = "rrf", k: int = 60, sparse_embedding: Optional[Dict[int, float]] = None):
+                                limit: int, fusion_method: str = "rrf", k: int = 60,
+                                sparse_embedding: Optional[Dict[int, float]] = None,
+                                vector_weight: Optional[float] = None,
+                                fts_weight: Optional[float] = None):
         """Combine and rerank vector, full-text, and sparse vector search results using RRF or weighted fusion."""
         if sparse_results is None:
             sparse_results = []
 
         if fusion_method == "rrf":
-            return self._rrf_fusion(vector_results, fts_results, sparse_results, limit, k, sparse_embedding)
+            return self._rrf_fusion(
+                vector_results,
+                fts_results,
+                sparse_results,
+                limit,
+                k,
+                sparse_embedding,
+                vector_weight=vector_weight,
+                fts_weight=fts_weight,
+            )
         else:
-            return self._weighted_fusion(vector_results, fts_results, sparse_results, limit)
+            return self._weighted_fusion(
+                vector_results,
+                fts_results,
+                sparse_results,
+                limit,
+                vector_weight=vector_weight,
+                text_weight=fts_weight,
+            )
 
     def _normalize_weights_adaptively(
         self,
@@ -1656,7 +1737,9 @@ class OceanBaseVectorStore(VectorStoreBase):
 
     def _rrf_fusion(self, vector_results: List[OutputData], fts_results: List[OutputData],
                     sparse_results: Optional[List[OutputData]],
-                    limit: int, k: int = 60, sparse_embedding: Optional[Dict[int, float]] = None):
+                    limit: int, k: int = 60, sparse_embedding: Optional[Dict[int, float]] = None,
+                    vector_weight: Optional[float] = None,
+                    fts_weight: Optional[float] = None):
         """
         Reciprocal Rank Fusion (RRF) for combining search results from vector, FTS, and sparse vector searches.
         
@@ -1665,8 +1748,16 @@ class OceanBaseVectorStore(VectorStoreBase):
         if sparse_results is None:
             sparse_results = []
 
-        vector_w = self.vector_weight if self.vector_weight is not None else 0
-        fts_w = self.fts_weight if self.fts_weight is not None else 0
+        vector_w = (
+            vector_weight
+            if vector_weight is not None
+            else self.vector_weight if self.vector_weight is not None else 0
+        )
+        fts_w = (
+            fts_weight
+            if fts_weight is not None
+            else self.fts_weight if self.fts_weight is not None else 0
+        )
         sparse_w = 0
 
         if self.include_sparse and sparse_results and sparse_embedding:
@@ -1783,7 +1874,9 @@ class OceanBaseVectorStore(VectorStoreBase):
 
     def _weighted_fusion(self, vector_results: List[OutputData], fts_results: List[OutputData],
                          sparse_results: Optional[List[OutputData]],
-                         limit: int, vector_weight: float = 0.7, text_weight: float = 0.3, sparse_weight: float = 0.0):
+                         limit: int, vector_weight: Optional[float] = 0.7,
+                         text_weight: Optional[float] = 0.3,
+                         sparse_weight: float = 0.0):
         """
         Traditional weighted score fusion (fallback method).
 
@@ -1794,8 +1887,16 @@ class OceanBaseVectorStore(VectorStoreBase):
             sparse_results = []
 
         # Use instance weights if available
-        vector_w = self.vector_weight if self.vector_weight is not None else vector_weight
-        fts_w = self.fts_weight if self.fts_weight is not None else text_weight
+        vector_w = (
+            vector_weight
+            if vector_weight is not None
+            else self.vector_weight if self.vector_weight is not None else 0.7
+        )
+        fts_w = (
+            text_weight
+            if text_weight is not None
+            else self.fts_weight if self.fts_weight is not None else 0.3
+        )
         sparse_w = 0.0
         if self.include_sparse and sparse_results:
             sparse_w = self.sparse_weight if self.sparse_weight is not None else sparse_weight
