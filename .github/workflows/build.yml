@@ -20,7 +20,7 @@ on:
           - '3.12'
 
 env:
-  GO_VERSION: '1.22.x'
+  GO_VERSION: '1.22.12'
 
 jobs:
   build-dashboard:
@@ -191,6 +191,57 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  build-linux-binaries-centos7:
+    name: Build Linux amd64 binaries on CentOS 7
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Docker build Linux binaries on CentOS 7
+        run: |
+          set -eux
+          docker build \
+            -t powermem-binaries-centos7 \
+            -f docker/Dockerfile.binaries-centos7 \
+            .
+
+      - name: Copy Linux binaries out of image
+        run: |
+          set -eux
+          mkdir -p dist-binaries
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/dist-binaries:/out" \
+            --entrypoint /bin/bash \
+            powermem-binaries-centos7 \
+            -c 'cp -av /powermem/dist-binaries/*.tar.gz /powermem/dist-binaries/SHA256SUMS /out/'
+
+      - name: Verify Linux binary package
+        run: |
+          set -eux
+          cd dist-binaries
+          sha256sum -c SHA256SUMS
+          tar -tzf powermem-*-linux-amd64-binaries.tar.gz | tee tar-entries.txt
+          grep -E '/bin/powermem$' tar-entries.txt
+          grep -E '/bin/powermem-server$' tar-entries.txt
+          grep -E '/bin/powermem-mcp$' tar-entries.txt
+          tar -xzf powermem-*-linux-amd64-binaries.tar.gz
+          BIN_ROOT="$(find . -maxdepth 1 -type d -name 'powermem-*-linux-amd64' | head -1)"
+          "${BIN_ROOT}/bin/powermem" --help
+          "${BIN_ROOT}/bin/powermem-server" --help
+          "${BIN_ROOT}/bin/powermem-mcp" --help
+
+      - name: Upload Linux amd64 binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-amd64-binaries
+          path: dist-binaries/*
+          if-no-files-found: error
+          retention-days: 30
+
   build-and-release:
     runs-on: ubuntu-latest
     # Only release on version tags v*; do not run for plugin-only tags (plugins-v*)
@@ -198,6 +249,7 @@ jobs:
     needs:
       - combine-artifacts
       - package-claude-plugin
+      - build-linux-binaries-centos7
     permissions:
       contents: write
 
@@ -214,12 +266,19 @@ jobs:
           name: powermem-claude-code-plugin-zip
           path: plugin-dist
 
+      - name: Download Linux amd64 binaries
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-amd64-binaries
+          path: linux-binaries
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*
             plugin-dist/powermem-claude-code-plugin-*.zip
+            linux-binaries/*
           draft: false
           prerelease: false
           generate_release_notes: true
