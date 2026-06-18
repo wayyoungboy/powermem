@@ -145,9 +145,10 @@ jobs:
     if: success()
 
     steps:
-      - name: Download all artifacts
+      - name: Download package artifacts
         uses: actions/download-artifact@v8
         with:
+          pattern: dist-*
           path: dist-all
 
       - name: Combine distribution files
