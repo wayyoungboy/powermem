@@ -3,5 +3,5 @@
   "session_id": "session-compact-1049",
   "cwd": "/workspace/project",
   "trigger": "manual",
-  "compact_summary": "Compact summary for a no-LLM hook test. Sentinel marker SENTINEL_SECRET_DO_NOT_LEAK_1049 must stay private."
+  "compact_summary": "Compact summary for a no-LLM hook test. Marker Bearer sentinelsecret1049 must stay private."
 }

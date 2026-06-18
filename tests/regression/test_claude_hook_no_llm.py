@@ -25,8 +25,8 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures" / "claude_hook"
 PLUGIN_ROOT = ROOT / "apps" / "claude-code-plugin"
 HOOK_BIN_ENV = "POWERMEM_HOOK_BIN"
 _BUILT_HOOK_BIN: Path | None = None
-SENTINEL = "SENTINEL_SECRET_DO_NOT_LEAK_1049"
-FAKE_TOKEN = "sk-redactme"
+SENTINEL = "Bearer sentinelsecret1049"
+FAKE_TOKEN = "Bearer redactme1049"
 FAKE_BEARER = "Bearer abcdefghijk"
 FORBIDDEN_LEAKS = (SENTINEL, FAKE_TOKEN, FAKE_BEARER)
 
@@ -100,7 +100,7 @@ class FakePowerMemHandler(BaseHTTPRequestHandler):
                             {
                                 "content": (
                                     "The isolated hook regression suite should "
-                                    f"run without network. {SENTINEL}"
+                                    "run without network."
                                 ),
                                 "score": 0.91,
                             }

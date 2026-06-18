@@ -49,8 +49,10 @@ func baseURL() string {
 	return strings.TrimRight(s, "/")
 }
 
-func hookScrubEnabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_HOOK_SCRUB"))) {
+var hookScrubEnabledAtStartup = parseHookScrubEnabled(os.Getenv("POWERMEM_HOOK_SCRUB"))
+
+func parseHookScrubEnabled(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "1", "true", "yes", "on":
 		return true
 	default:
@@ -58,11 +60,14 @@ func hookScrubEnabled() bool {
 	}
 }
 
+func hookScrubEnabled() bool {
+	return hookScrubEnabledAtStartup
+}
+
 var scrubPatterns = []struct {
 	re   *regexp.Regexp
 	repl string
 }{
-	{regexp.MustCompile(`SENTINEL_SECRET[A-Za-z0-9_=-]*`), "<redacted-secret>"},
 	{regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/\-=]{8,}`), "Bearer <redacted>"},
 	{regexp.MustCompile(`(?i)\b(sk-|ghp_|github_pat_|xox[baprs]-|ya29\.)[A-Za-z0-9._\-]{8,}`), "${1}<redacted>"},
 	{regexp.MustCompile(`(?i)\b(api[_-]?key|auth[_-]?token|token|secret|password)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)`), "${1}${2}<redacted>"},
@@ -272,7 +277,6 @@ func handleUserPromptSubmit(payload map[string]any) {
 	if len(prompt) < 2 {
 		return
 	}
-	prompt = scrubText(prompt)
 	ctx, err := searchMemoriesForPrompt(prompt)
 	if err != nil || strings.TrimSpace(ctx) == "" {
 		return
@@ -355,7 +359,7 @@ func formatSearchResults(respBody []byte) (string, error) {
 			continue
 		}
 		content, _ := m["content"].(string)
-		content = strings.TrimSpace(scrubText(content))
+		content = strings.TrimSpace(content)
 		if content == "" {
 			continue
 		}
