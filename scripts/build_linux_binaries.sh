@@ -21,21 +21,21 @@ PY
 rm -rf "${BUILD}" "${DIST}"
 mkdir -p "${ENTRYPOINTS}" "${BIN_DIR}"
 
-cat > "${ENTRYPOINTS}/powermem.py" <<'PY'
+cat > "${ENTRYPOINTS}/powermem_cli_entry.py" <<'PY'
 from powermem.cli.main import cli
 
 if __name__ == "__main__":
     cli()
 PY
 
-cat > "${ENTRYPOINTS}/powermem-server.py" <<'PY'
+cat > "${ENTRYPOINTS}/powermem_server_entry.py" <<'PY'
 from server.cli.server import server
 
 if __name__ == "__main__":
     server()
 PY
 
-cat > "${ENTRYPOINTS}/powermem-mcp.py" <<'PY'
+cat > "${ENTRYPOINTS}/powermem_mcp_entry.py" <<'PY'
 from powermem.mcp.server import main
 
 if __name__ == "__main__":
@@ -62,17 +62,17 @@ COMMON_OPTS=(
 
 build_binary() {
   local name="$1"
-  local entrypoint="${ENTRYPOINTS}/${name}.py"
+  local entrypoint="$2"
   echo "Building ${name}"
   "${PYTHON}" -m PyInstaller "${COMMON_OPTS[@]}" --name "${name}" "${entrypoint}"
   chmod +x "${BIN_DIR}/${name}"
   file "${BIN_DIR}/${name}"
-  ldd "${BIN_DIR}/${name}" || true
+  ldd "${BIN_DIR}/${name}"
 }
 
-build_binary powermem
-build_binary powermem-server
-build_binary powermem-mcp
+build_binary powermem "${ENTRYPOINTS}/powermem_cli_entry.py"
+build_binary powermem-server "${ENTRYPOINTS}/powermem_server_entry.py"
+build_binary powermem-mcp "${ENTRYPOINTS}/powermem_mcp_entry.py"
 
 PACKAGE_DIR="${DIST}/powermem-${VERSION}-linux-amd64"
 mkdir -p "${PACKAGE_DIR}/bin"

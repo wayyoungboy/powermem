@@ -222,6 +222,33 @@ jobs:
             -f docker/Dockerfile.binaries-centos7 \
             .
 
+      - name: Verify Linux binary package in CentOS 7
+        run: |
+          set -eux
+          docker run --rm \
+            --entrypoint /bin/bash \
+            powermem-binaries-centos7 \
+            -lc '
+              set -eux
+              cd /powermem/dist-binaries
+              sha256sum -c SHA256SUMS
+              tar -tzf powermem-*-linux-amd64-binaries.tar.gz | tee /tmp/linux-binary-tar-entries.txt
+              grep -E "/bin/powermem$" /tmp/linux-binary-tar-entries.txt
+              grep -E "/bin/powermem-server$" /tmp/linux-binary-tar-entries.txt
+              grep -E "/bin/powermem-mcp$" /tmp/linux-binary-tar-entries.txt
+              rm -rf /tmp/linux-binary-smoke
+              mkdir -p /tmp/linux-binary-smoke
+              tar -xzf powermem-*-linux-amd64-binaries.tar.gz -C /tmp/linux-binary-smoke
+              BIN_ROOT="$(find /tmp/linux-binary-smoke -maxdepth 1 -type d -name "powermem-*-linux-amd64" | head -1)"
+              "${BIN_ROOT}/bin/powermem" --help
+              "${BIN_ROOT}/bin/powermem-server" --help
+              set +e
+              timeout 10s "${BIN_ROOT}/bin/powermem-mcp" stdio < /dev/null
+              mcp_status="$?"
+              set -e
+              test "${mcp_status}" -eq 0 -o "${mcp_status}" -eq 124
+            '
+
       - name: Copy Linux binaries out of image
         run: |
           set -eux
@@ -232,25 +259,12 @@ jobs:
             powermem-binaries-centos7 \
             -c 'cp -av /powermem/dist-binaries/*.tar.gz /powermem/dist-binaries/SHA256SUMS /out/'
 
-      - name: Verify Linux binary package
+      - name: Verify copied Linux binary artifacts
         run: |
           set -eux
           cd dist-binaries
           sha256sum -c SHA256SUMS
-          tar -tzf powermem-*-linux-amd64-binaries.tar.gz | tee "${RUNNER_TEMP}/linux-binary-tar-entries.txt"
-          grep -E '/bin/powermem$' "${RUNNER_TEMP}/linux-binary-tar-entries.txt"
-          grep -E '/bin/powermem-server$' "${RUNNER_TEMP}/linux-binary-tar-entries.txt"
-          grep -E '/bin/powermem-mcp$' "${RUNNER_TEMP}/linux-binary-tar-entries.txt"
-          mkdir -p "${RUNNER_TEMP}/linux-binary-smoke"
-          tar -xzf powermem-*-linux-amd64-binaries.tar.gz -C "${RUNNER_TEMP}/linux-binary-smoke"
-          BIN_ROOT="$(find "${RUNNER_TEMP}/linux-binary-smoke" -maxdepth 1 -type d -name 'powermem-*-linux-amd64' | head -1)"
-          "${BIN_ROOT}/bin/powermem" --help
-          "${BIN_ROOT}/bin/powermem-server" --help
-          set +e
-          timeout 10s "${BIN_ROOT}/bin/powermem-mcp" stdio < /dev/null
-          mcp_status="$?"
-          set -e
-          test "${mcp_status}" -eq 0 -o "${mcp_status}" -eq 124
+          ls -lh powermem-*-linux-amd64-binaries.tar.gz SHA256SUMS
 
       - name: Upload Linux amd64 binaries
         uses: actions/upload-artifact@v7
