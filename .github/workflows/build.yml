@@ -19,6 +19,9 @@ on:
           - '3.11'
           - '3.12'
 
+env:
+  GO_VERSION: '1.22.x'
+
 jobs:
   build-dashboard:
     runs-on: ubuntu-latest
@@ -165,11 +168,36 @@ jobs:
           path: dist/*
           retention-days: 30
 
+  package-claude-plugin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Package Claude Code plugin
+        run: bash apps/claude-code-plugin/scripts/package-plugin.sh
+
+      - name: Upload Claude Code plugin zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: powermem-claude-code-plugin-zip
+          path: apps/claude-code-plugin/dist/powermem-claude-code-plugin-*.zip
+          if-no-files-found: error
+          retention-days: 30
+
   build-and-release:
     runs-on: ubuntu-latest
     # Only release on version tags v*; do not run for plugin-only tags (plugins-v*)
     if: startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/plugins-')
-    needs: combine-artifacts
+    needs:
+      - combine-artifacts
+      - package-claude-plugin
     permissions:
       contents: write
 
@@ -180,10 +208,18 @@ jobs:
           name: dist-packages
           path: dist
 
+      - name: Download Claude Code plugin zip
+        uses: actions/download-artifact@v8
+        with:
+          name: powermem-claude-code-plugin-zip
+          path: plugin-dist
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/*
+          files: |
+            dist/*
+            plugin-dist/powermem-claude-code-plugin-*.zip
           draft: false
           prerelease: false
           generate_release_notes: true
