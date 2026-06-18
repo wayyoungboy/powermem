@@ -254,7 +254,8 @@ jobs:
               trap "kill ${server_pid} 2>/dev/null || true" EXIT
               ready=0
               for _ in $(seq 1 60); do
-                if curl -fsS http://localhost:18848/ >/tmp/powermem-server-root.json \
+                root_status="$(curl -sS -o /tmp/powermem-server-root.out -w "%{http_code}" http://localhost:18848/ || true)"
+                if test "${root_status}" != "000" \
                   && curl -fsS http://localhost:18848/dashboard/ >/tmp/powermem-dashboard.html; then
                   ready=1
                   break
