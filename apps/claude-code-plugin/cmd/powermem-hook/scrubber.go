@@ -1008,12 +1008,15 @@ func replaceGenericUnixPathMatches(input string, cfg hookPrivacyConfig, initialC
 }
 
 func looksLikeGenericUnixFilesystemPath(path string) bool {
-	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || looksLikeScrubbableUnixPath(path) {
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
 		return false
 	}
 	segments := strings.Split(strings.Trim(path, "/"), "/")
 	if len(segments) < 3 || isLikelyWebRouteRoot(segments[0]) {
 		return false
+	}
+	if looksLikeScrubbableUnixPath(path) {
+		return true
 	}
 	base := pathBase(path)
 	if hasFileExtension(base) {

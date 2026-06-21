@@ -130,6 +130,13 @@ func TestPathPrivacyModes(t *testing.T) {
 	if display := scrubPathForDisplay("/workspace/alice/project/file.go", cfg); display != "file.go" {
 		t.Fatalf("display path privacy failed: %q", display)
 	}
+	out, report = scrubText("open /workspace/alice/project/secret-plan.md", cfg)
+	if strings.Contains(out, "/workspace/alice") || !strings.Contains(out, "secret-plan.md") {
+		t.Fatalf("basename text path privacy failed: out=%q report=%+v", out, report)
+	}
+	if report.PathRedactions != 1 {
+		t.Fatalf("expected one basename text path redaction, got %+v", report)
+	}
 	displayURL := scrubTextForDisplay("https://"+syntheticToken()+"@example.com/api?to"+"ken="+syntheticToken(), cfg)
 	if strings.Contains(displayURL, "Cd2") {
 		t.Fatalf("display URL retained sentinel fragments: %q", displayURL)

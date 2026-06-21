@@ -20,6 +20,16 @@ import (
 // Default REST base when POWERMEM_BASE_URL is unset (matches .mcp.json local server).
 const defaultPowerMemBaseURL = "http://localhost:8848"
 
+const workerPayloadPathEnv = "POWERMEM_WORKER_PAYLOAD_PATH"
+
+type workerHandoffPayload struct {
+	TranscriptPath    string `json:"transcript_path,omitempty"`
+	SessionID         string `json:"session_id,omitempty"`
+	CWD               string `json:"cwd,omitempty"`
+	Reason            string `json:"reason,omitempty"`
+	ParentScrubReport string `json:"parent_scrub_report,omitempty"`
+}
+
 func main() {
 	if len(os.Args) >= 2 {
 		switch os.Args[1] {
@@ -48,10 +58,10 @@ func baseURL() string {
 	return strings.TrimRight(s, "/")
 }
 
-func spawnWorker(mode string, envExtra map[string]string) {
+func spawnWorker(mode string, envExtra map[string]string) bool {
 	self, err := os.Executable()
 	if err != nil {
-		return
+		return false
 	}
 	env := os.Environ()
 	for k, v := range envExtra {
@@ -63,7 +73,48 @@ func spawnWorker(mode string, envExtra map[string]string) {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	setDetachedChild(cmd)
-	_ = cmd.Start()
+	return cmd.Start() == nil
+}
+
+func spawnPayloadWorker(mode string, payload workerHandoffPayload) {
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	f, err := os.CreateTemp("", "powermem-hook-worker-*.json")
+	if err != nil {
+		return
+	}
+	path := f.Name()
+	if _, err := f.Write(b); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return
+	}
+	if !spawnWorker(mode, map[string]string{workerPayloadPathEnv: path}) {
+		_ = os.Remove(path)
+	}
+}
+
+func readWorkerPayload() (workerHandoffPayload, bool) {
+	path := strings.TrimSpace(os.Getenv(workerPayloadPathEnv))
+	if path == "" {
+		return workerHandoffPayload{}, false
+	}
+	b, err := os.ReadFile(path)
+	_ = os.Remove(path)
+	if err != nil {
+		return workerHandoffPayload{}, false
+	}
+	var payload workerHandoffPayload
+	if json.Unmarshal(b, &payload) != nil {
+		return workerHandoffPayload{}, false
+	}
+	return payload, true
 }
 
 func stdinHook() {
@@ -97,16 +148,17 @@ func stdinHook() {
 		if !ok {
 			return
 		}
-		env := map[string]string{
-			"POWERMEM_WORKER_TRANSCRIPT_PATH": tp,
-			"POWERMEM_WORKER_SESSION_ID":      sid,
-			"POWERMEM_WORKER_CWD":             cwd,
-			"POWERMEM_WORKER_REASON":          reason,
-		}
+		parentReportRaw := ""
 		if encoded := encodeScrubReport(report); encoded != "" {
-			env[parentScrubReportEnv] = encoded
+			parentReportRaw = encoded
 		}
-		spawnWorker("worker-transcript", env)
+		spawnPayloadWorker("worker-transcript", workerHandoffPayload{
+			TranscriptPath:    tp,
+			SessionID:         sid,
+			CWD:               cwd,
+			Reason:            reason,
+			ParentScrubReport: parentReportRaw,
+		})
 	case "PostCompact":
 		summary, _ := payload["compact_summary"].(string)
 		if strings.TrimSpace(summary) == "" {
@@ -448,6 +500,27 @@ func postMemoryRaw(content string, meta map[string]any, userID string, agentID s
 
 func workerTranscript() {
 	path := os.Getenv("POWERMEM_WORKER_TRANSCRIPT_PATH")
+	sid := os.Getenv("POWERMEM_WORKER_SESSION_ID")
+	cwd := os.Getenv("POWERMEM_WORKER_CWD")
+	reason := os.Getenv("POWERMEM_WORKER_REASON")
+	parentReportRaw := os.Getenv(parentScrubReportEnv)
+	if payload, ok := readWorkerPayload(); ok {
+		if payload.TranscriptPath != "" {
+			path = payload.TranscriptPath
+		}
+		if payload.SessionID != "" {
+			sid = payload.SessionID
+		}
+		if payload.CWD != "" {
+			cwd = payload.CWD
+		}
+		if payload.Reason != "" {
+			reason = payload.Reason
+		}
+		if payload.ParentScrubReport != "" {
+			parentReportRaw = payload.ParentScrubReport
+		}
+	}
 	if path == "" {
 		return
 	}
@@ -455,9 +528,6 @@ func workerTranscript() {
 	if err != nil || strings.TrimSpace(text) == "" {
 		return
 	}
-	sid := os.Getenv("POWERMEM_WORKER_SESSION_ID")
-	cwd := os.Getenv("POWERMEM_WORKER_CWD")
-	reason := os.Getenv("POWERMEM_WORKER_REASON")
 	header := fmt.Sprintf("Claude Code session transcript (session_id=%s, cwd=%s, reason=%s)\n\n", sid, cwd, reason)
 	runID := sid
 	if err := postMemoryWithScrubReport(header+text, map[string]any{
@@ -467,7 +537,7 @@ func workerTranscript() {
 		"session_id":         sid,
 		"cwd":                cwd,
 		"session_end_reason": reason,
-	}, &runID, inferTranscript(), decodeScrubReport(os.Getenv(parentScrubReportEnv))); err != nil {
+	}, &runID, inferTranscript(), decodeScrubReport(parentReportRaw)); err != nil {
 		os.Exit(1)
 	}
 }
