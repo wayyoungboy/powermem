@@ -299,15 +299,18 @@ The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob
 
 | Hook | What happens |
 |------|----------------|
+| `SessionStart` | By default, **`POST …/api/v1/memories/search`** with bounded session metadata such as `cwd`, `session_title`, `source`, and `agent_type`; hits are injected as **additional context** before the first turn. Set **`POWERMEM_SESSION_START_SEARCH=0`** to disable. |
 | `UserPromptSubmit` | By default, **`POST …/api/v1/memories/search`** with the submitted `prompt`; top results are injected as **additional context** for that turn ([Claude Code hooks](https://code.claude.com/docs/en/hooks#userpromptsubmit)). Set **`POWERMEM_PROMPT_SEARCH=0`** (or `false` / `no` / `off`) to skip search (hook still registered; overhead is small when disabled). |
 | `SessionEnd` | Full **transcript** from `transcript_path` (parsed JSONL: user/assistant/summary lines) → **`POST …/api/v1/memories`**. |
 | `PostCompact` | The **`compact_summary`** field after `/compact` or auto-compact → **`POST …/api/v1/memories`**. |
 | `PreCompact` | Bounded tail snapshot from `transcript_path` before compaction → **`POST …/api/v1/memories`**, with transcript fingerprint and byte offsets for auditability. |
 | `PostToolUse` | Structured summaries for high-signal successful tools (`Write`, `Edit`, `MultiEdit`, `Bash`, `Agent`, `ExitPlanMode` by default) → **`POST …/api/v1/memories`**. Content and metadata are scrubbed, and deterministic event IDs are included when `session_id` and `tool_use_id` are available. |
+| `PostToolUseFailure` | Structured summaries for failed tools → **`POST …/api/v1/memories`** with `success=false`, error metadata, bounded scrubbed summaries, and interrupts skipped by default. |
+| `Stop` | Optional lightweight per-turn rollup after the main agent finishes responding → **`POST …/api/v1/memories`**. Disabled by default because it can run frequently; set **`POWERMEM_CAPTURE_STOP_ROLLUP=1`** to enable. |
 | `SubagentStart` / `SubagentStop` | Lifecycle observations keyed by the hook event name, not by `transcript_path`; raw scrubbed payload is preserved in metadata for later linking. |
 | `TaskCreated` / `TaskCompleted` | Task lifecycle observations keyed by the hook event name, with link fields such as `session_id`, `task_id`, and `tool_use_id` when present. |
 
-**Write** hooks use `POST {POWERMEM_BASE_URL}/api/v1/memories`. **Prompt search** uses `POST {POWERMEM_BASE_URL}/api/v1/memories/search`. Neither path requires MCP.
+**Write** hooks use `POST {POWERMEM_BASE_URL}/api/v1/memories`. **Prompt and session-start search** use `POST {POWERMEM_BASE_URL}/api/v1/memories/search`. Neither path requires MCP.
 
 Optional environment variables (where you launch Claude Code):
 
@@ -324,6 +327,9 @@ Optional environment variables (where you launch Claude Code):
 | `POWERMEM_PROMPT_SEARCH` | No | **Default: on** — injects semantic search results on every user prompt via `UserPromptSubmit`. Set **`0`** / **`false`** / **`no`** / **`off`** to disable. |
 | `POWERMEM_PROMPT_SEARCH_LIMIT` | No | Max memories returned per prompt (default **8**, cap **30**). |
 | `POWERMEM_PROMPT_SEARCH_MAX_CHARS` | No | Cap on injected context string (default **24000**). |
+| `POWERMEM_SESSION_START_SEARCH` | No | **Default: on** — injects semantic search results at `SessionStart` using bounded session metadata. Set **`0`** / **`false`** / **`no`** / **`off`** to disable. |
+| `POWERMEM_SESSION_START_LIMIT` | No | Max memories returned for `SessionStart` search (default **6**, cap **30**). |
+| `POWERMEM_SESSION_START_MAX_CHARS` | No | Cap on `SessionStart` injected context string (default **16000**). |
 | `POWERMEM_CAPTURE_PRECOMPACT` | No | Set `0` / `false` / `no` / `off` to disable `PreCompact` snapshots (default on). |
 | `POWERMEM_PRECOMPACT_MAX_CHARS` | No | Max transcript tail characters for `PreCompact` snapshots (default **120000**). |
 | `POWERMEM_PRECOMPACT_TAIL_LINES` | No | Max transcript tail lines for `PreCompact` snapshots (default **200**). |
@@ -333,6 +339,13 @@ Optional environment variables (where you launch Claude Code):
 | `POWERMEM_TOOL_SUCCESS_EXCLUDE` | No | Comma-separated denied tool names. Exclude wins over include; `*` disables all tool success capture. |
 | `POWERMEM_TOOL_EVENT_MAX_CHARS` | No | Max characters for a structured tool event memory (default **6000**). |
 | `POWERMEM_INFER_TOOL_EVENTS` | No | Set `1` to enable server-side infer for tool event memories (default off). |
+| `POWERMEM_CAPTURE_TOOL_FAILURES` | No | Set `0` / `false` / `no` / `off` to disable `PostToolUseFailure` capture (default on). |
+| `POWERMEM_CAPTURE_INTERRUPTS` | No | Set `1` to capture interrupted tool events; interrupts are skipped by default. |
+| `POWERMEM_TOOL_FAILURE_MAX_CHARS` | No | Max characters for a structured tool failure memory (default **6000**). |
+| `POWERMEM_INFER_TOOL_FAILURES` | No | Set `1` to enable server-side infer for failed tool memories (default off). |
+| `POWERMEM_CAPTURE_STOP_ROLLUP` | No | Set `1` to enable lightweight `Stop` rollup capture (default off). |
+| `POWERMEM_STOP_MAX_CHARS` | No | Max characters for the `Stop` final-message preview (default **3000**). |
+| `POWERMEM_INFER_STOP` | No | Set `1` to enable server-side infer for `Stop` rollups (default off). |
 | `POWERMEM_CAPTURE_SUBAGENTS` | No | Set `0` / `false` / `no` / `off` to disable subagent lifecycle capture (default on). |
 | `POWERMEM_CAPTURE_TASKS` | No | Set `0` / `false` / `no` / `off` to disable task lifecycle capture (default on). |
 | `POWERMEM_INFER_LIFECYCLE_EVENTS` | No | Set `1` to enable server-side infer for all lifecycle events (default off). |

@@ -192,6 +192,133 @@ func TestBuildToolEventPostCapturesAgentResponseLink(t *testing.T) {
 	requireNoUnitSecret(t, meta)
 }
 
+func TestBuildSessionStartQueryUsesBoundedMetadata(t *testing.T) {
+	query := buildSessionStartQuery(map[string]any{
+		"session_title": "No-LLM hook work",
+		"source":        "startup",
+		"agent_type":    "coder",
+		"cwd":           "/workspace/project",
+		"ignored":       "not included",
+	})
+	for _, want := range []string{
+		"session_title: No-LLM hook work",
+		"source: startup",
+		"agent_type: coder",
+		"cwd: /workspace/project",
+	} {
+		if !strings.Contains(query, want) {
+			t.Fatalf("query %q did not include %q", query, want)
+		}
+	}
+	if strings.Contains(query, "ignored") {
+		t.Fatalf("query included unexpected metadata: %q", query)
+	}
+}
+
+func TestBuildToolFailurePostCapturesStructuredFailure(t *testing.T) {
+	setHookScrubForTest(t, true)
+	t.Setenv("POWERMEM_TOOL_FAILURE_MAX_CHARS", "900")
+	t.Setenv("POWERMEM_INFER_TOOL_FAILURES", "0")
+
+	content, meta, runID, infer, ok := buildToolFailurePost(map[string]any{
+		"session_id":  "session-failure",
+		"cwd":         "/workspace/project",
+		"tool_name":   "Bash",
+		"tool_use_id": "tool-failure-unit",
+		"duration_ms": float64(456),
+		"tool_input": map[string]any{
+			"command": "pytest tests/unit --token " + unitSecret,
+		},
+		"tool_response": map[string]any{
+			"exit_code": float64(2),
+			"stderr":    "failed with " + unitSecret,
+		},
+		"error_type":    "non_zero_exit",
+		"error_message": "pytest failed with " + unitSecret,
+	})
+	if !ok {
+		t.Fatal("expected tool failure post")
+	}
+	if infer {
+		t.Fatal("tool failure infer should default to false")
+	}
+	if runID != "session-failure" {
+		t.Fatalf("unexpected run id: %q", runID)
+	}
+	if meta["event_name"] != "PostToolUseFailure" {
+		t.Fatalf("unexpected event name: %v", meta["event_name"])
+	}
+	if meta["success"] != false {
+		t.Fatalf("expected success=false, got %v", meta["success"])
+	}
+	if meta["command_class"] != "test" {
+		t.Fatalf("unexpected command class: %v", meta["command_class"])
+	}
+	if meta["exit_code"] != int64(2) {
+		t.Fatalf("unexpected exit code: %#v", meta["exit_code"])
+	}
+	requireNoUnitSecret(t, content)
+	requireNoUnitSecret(t, meta)
+}
+
+func TestToolFailureInterruptsAreSkippedByDefaultInDispatcherGate(t *testing.T) {
+	payload := map[string]any{
+		"hook_event_name": "PostToolUseFailure",
+		"tool_name":       "Bash",
+		"is_interrupt":    true,
+	}
+	t.Setenv("POWERMEM_CAPTURE_INTERRUPTS", "")
+	if !isInterruptPayload(payload) {
+		t.Fatal("expected interrupt payload")
+	}
+	if captureInterrupts() {
+		t.Fatal("interrupt capture should default to disabled")
+	}
+	t.Setenv("POWERMEM_CAPTURE_INTERRUPTS", "1")
+	if !captureInterrupts() {
+		t.Fatal("interrupt capture should be enabled by env")
+	}
+}
+
+func TestBuildStopRollupPostBoundsAndScrubsFinalMessage(t *testing.T) {
+	setHookScrubForTest(t, true)
+	t.Setenv("POWERMEM_STOP_MAX_CHARS", "500")
+	t.Setenv("POWERMEM_INFER_STOP", "0")
+
+	content, meta, runID, infer, ok := buildStopRollupPost(map[string]any{
+		"session_id":             "session-stop",
+		"cwd":                    "/workspace/project",
+		"last_assistant_message": "Implemented tests with " + unitSecret,
+		"changed_files":          []any{"apps/claude-code-plugin/cmd/powermem-hook/main.go"},
+		"background_tasks":       []any{"none"},
+	})
+	if !ok {
+		t.Fatal("expected stop rollup")
+	}
+	if infer {
+		t.Fatal("stop infer should default to false")
+	}
+	if runID != "session-stop" {
+		t.Fatalf("unexpected run id: %q", runID)
+	}
+	if meta["kind"] != "stop-rollup" {
+		t.Fatalf("unexpected kind: %v", meta["kind"])
+	}
+	if meta["event_name"] != "Stop" {
+		t.Fatalf("unexpected event name: %v", meta["event_name"])
+	}
+	requireNoUnitSecret(t, content)
+	requireNoUnitSecret(t, meta)
+
+	_, _, _, _, ok = buildStopRollupPost(map[string]any{
+		"session_id":             "session-empty-stop",
+		"last_assistant_message": "   ",
+	})
+	if ok {
+		t.Fatal("empty stop rollup should no-op")
+	}
+}
+
 func TestBuildToolEventPostUnknownToolShapeOnlyWithWildcard(t *testing.T) {
 	setHookScrubForTest(t, true)
 	t.Setenv("POWERMEM_TOOL_SUCCESS_INCLUDE", "*")

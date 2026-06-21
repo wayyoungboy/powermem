@@ -190,6 +190,8 @@ func stdinHook() {
 	cwd, _ := payload["cwd"].(string)
 
 	switch event {
+	case "SessionStart":
+		handleSessionStart(payload)
 	case "UserPromptSubmit":
 		handleUserPromptSubmit(payload)
 	case "SessionEnd":
@@ -251,6 +253,27 @@ func stdinHook() {
 			return
 		}
 		handoff := prepareToolEventHandoff(payload)
+		if handoff == nil {
+			return
+		}
+		spawnPayloadWorker("worker-tool-event", handoff)
+	case "PostToolUseFailure":
+		if !captureToolFailures() {
+			return
+		}
+		if isInterruptPayload(payload) && !captureInterrupts() {
+			return
+		}
+		handoff := prepareToolFailureHandoff(payload)
+		if handoff == nil {
+			return
+		}
+		spawnPayloadWorker("worker-tool-event", handoff)
+	case "Stop":
+		if !captureStopRollup() || boolField(payload, "stop_hook_active", false) {
+			return
+		}
+		handoff := prepareStopRollupHandoff(payload)
 		if handoff == nil {
 			return
 		}
@@ -354,6 +377,34 @@ func inferToolEvents() bool {
 
 func maxToolEventChars() int {
 	return envInt("POWERMEM_TOOL_EVENT_MAX_CHARS", 6000, 500, 120000)
+}
+
+func captureToolFailures() bool {
+	return envBool("POWERMEM_CAPTURE_TOOL_FAILURES", true)
+}
+
+func captureInterrupts() bool {
+	return envBool("POWERMEM_CAPTURE_INTERRUPTS", false)
+}
+
+func maxToolFailureChars() int {
+	return envInt("POWERMEM_TOOL_FAILURE_MAX_CHARS", 6000, 500, 120000)
+}
+
+func inferToolFailures() bool {
+	return envBool("POWERMEM_INFER_TOOL_FAILURES", false)
+}
+
+func captureStopRollup() bool {
+	return envBool("POWERMEM_CAPTURE_STOP_ROLLUP", false)
+}
+
+func maxStopChars() int {
+	return envInt("POWERMEM_STOP_MAX_CHARS", 3000, 500, 120000)
+}
+
+func inferStop() bool {
+	return envBool("POWERMEM_INFER_STOP", false)
 }
 
 func captureSubagents() bool {
@@ -476,6 +527,57 @@ func promptSearchMaxContextChars() int {
 	return n
 }
 
+func sessionStartSearchEnabled() bool {
+	return envBool("POWERMEM_SESSION_START_SEARCH", true)
+}
+
+func sessionStartLimit() int {
+	return envInt("POWERMEM_SESSION_START_LIMIT", 6, 1, 30)
+}
+
+func sessionStartMaxContextChars() int {
+	return envInt("POWERMEM_SESSION_START_MAX_CHARS", 16000, 500, 120000)
+}
+
+func buildSessionStartQuery(payload map[string]any) string {
+	parts := []string{}
+	for _, key := range []string{"session_title", "source", "agent_type", "cwd"} {
+		if value := stringField(payload, key); value != "" {
+			parts = append(parts, key+": "+value)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func handleSessionStart(payload map[string]any) {
+	if !sessionStartSearchEnabled() {
+		return
+	}
+	query := strings.TrimSpace(buildSessionStartQuery(payload))
+	if query == "" {
+		return
+	}
+	ctx, err := searchMemories(query, sessionStartLimit())
+	if err != nil || strings.TrimSpace(ctx) == "" {
+		return
+	}
+	maxC := sessionStartMaxContextChars()
+	if len(ctx) > maxC {
+		ctx = ctx[:maxC] + "\n…"
+	}
+	out := map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":     "SessionStart",
+			"additionalContext": ctx,
+		},
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return
+	}
+	_, _ = os.Stdout.Write(b)
+}
+
 func handleUserPromptSubmit(payload map[string]any) {
 	if !promptSearchEnabled() {
 		return
@@ -507,10 +609,14 @@ func handleUserPromptSubmit(payload map[string]any) {
 }
 
 func searchMemoriesForPrompt(query string) (string, error) {
+	return searchMemories(query, promptSearchLimit())
+}
+
+func searchMemories(query string, limit int) (string, error) {
 	base := baseURL()
 	body := map[string]any{
 		"query": scrubText(query),
-		"limit": promptSearchLimit(),
+		"limit": limit,
 	}
 	if u := searchBodyUserID(); u != "" {
 		body["user_id"] = scrubText(u)
@@ -560,7 +666,7 @@ func formatSearchResults(respBody []byte) (string, error) {
 		return "", nil
 	}
 	var b strings.Builder
-	b.WriteString("## PowerMem (retrieved for this prompt)\n\nRelevant long-term memories from PowerMem; use if they help answer the user. Ignore if unrelated.\n\n")
+	b.WriteString("## PowerMem (retrieved for this context)\n\nRelevant long-term memories from PowerMem; use if they help with the current Claude Code context. Ignore if unrelated.\n\n")
 	for i, el := range results {
 		m, ok := el.(map[string]any)
 		if !ok {
@@ -817,6 +923,34 @@ func prepareToolEventHandoff(payload map[string]any) map[string]any {
 	}
 }
 
+func prepareMemoryPostHandoff(content string, meta map[string]any, runID string, infer bool) map[string]any {
+	if strings.TrimSpace(content) == "" || meta == nil {
+		return nil
+	}
+	return map[string]any{
+		"_powermem_content":  scrubText(content),
+		"_powermem_metadata": scrubValue(meta),
+		"_powermem_run_id":   scrubText(runID),
+		"_powermem_infer":    infer,
+	}
+}
+
+func prepareToolFailureHandoff(payload map[string]any) map[string]any {
+	content, meta, runID, infer, ok := buildToolFailurePost(payload)
+	if !ok {
+		return nil
+	}
+	return prepareMemoryPostHandoff(content, meta, runID, infer)
+}
+
+func prepareStopRollupHandoff(payload map[string]any) map[string]any {
+	content, meta, runID, infer, ok := buildStopRollupPost(payload)
+	if !ok {
+		return nil
+	}
+	return prepareMemoryPostHandoff(content, meta, runID, infer)
+}
+
 func preparedToolEventPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
 	content := stringField(payload, "_powermem_content")
 	meta := nestedMap(payload["_powermem_metadata"])
@@ -826,6 +960,17 @@ func preparedToolEventPost(payload map[string]any) (string, map[string]any, stri
 	runID := stringField(payload, "_powermem_run_id")
 	infer := boolField(payload, "_powermem_infer", inferToolEvents())
 	return content, meta, runID, infer, true
+}
+
+func isInterruptPayload(payload map[string]any) bool {
+	if payload == nil {
+		return false
+	}
+	if boolField(payload, "is_interrupt", false) || boolField(payload, "interrupted", false) {
+		return true
+	}
+	raw := strings.ToLower(firstString(payload, "error_type", "status", "reason"))
+	return strings.Contains(raw, "interrupt")
 }
 
 func boolField(m map[string]any, key string, def bool) bool {
@@ -924,6 +1069,113 @@ func buildToolEventPost(payload map[string]any) (string, map[string]any, string,
 		meta["duration_ms"] = duration
 	}
 	return content, meta, runID, inferToolEvents(), true
+}
+
+func buildToolFailurePost(payload map[string]any) (string, map[string]any, string, bool, bool) {
+	if payload == nil {
+		return "", nil, "", false, false
+	}
+	toolName := toolNameFromPayload(payload)
+	if toolName == "" {
+		toolName = "unknown"
+	}
+	sid := stringField(payload, "session_id")
+	cwd := stringField(payload, "cwd")
+	toolUseID := firstString(payload, "tool_use_id", "toolUseID", "toolUseId", "id")
+	input := firstAny(payload, "tool_input", "input", "toolInput")
+	response := firstAny(payload, "tool_response", "response", "toolResponse", "result")
+	errorType := firstString(payload, "error_type", "errorType", "status", "reason")
+	errorMessage := firstString(payload, "error_message", "errorMessage", "message", "error")
+	if errorMessage == "" {
+		errorMessage = textField(nestedMap(response), "stderr")
+	}
+	if errorMessage == "" {
+		errorMessage = textFromAny(response)
+	}
+	if toolName == "unknown" && sid == "" && toolUseID == "" && strings.TrimSpace(errorMessage) == "" {
+		return "", nil, "", false, false
+	}
+	maxC := maxToolFailureChars()
+	inputSummary := summarizeToolInput(toolName, input, maxC/2)
+	errorSummary := truncateText(errorMessage, maxC/2)
+	if errorSummary == "" {
+		errorSummary = "shape=" + valueShape(response)
+	}
+	paths := extractPaths(input, 20)
+	status := "failure"
+	content := fmt.Sprintf("Claude Code tool failure (tool=%s, status=%s, session_id=%s, cwd=%s)\n\nInput summary:\n%s\n\nError summary:\n%s", toolName, status, sid, cwd, inputSummary, errorSummary)
+	if len(content) > maxC {
+		content = content[:maxC] + "\n..."
+	}
+	runID := sid
+	meta := map[string]any{
+		"source":         "claude-code-hook",
+		"kind":           "post-tool-use-failure",
+		"event_name":     "PostToolUseFailure",
+		"session_id":     sid,
+		"cwd":            cwd,
+		"tool_name":      toolName,
+		"tool_use_id":    toolUseID,
+		"status":         status,
+		"success":        false,
+		"is_interrupt":   isInterruptPayload(payload),
+		"error_type":     errorType,
+		"error_message":  errorSummary,
+		"input_summary":  inputSummary,
+		"affected_paths": paths,
+		"schema_version": 1,
+		"scrub_mode":     hookScrubEnabled(),
+		"infer_mode":     inferToolFailures(),
+	}
+	if commandClass := classifyCommand(commandFromToolInput(input)); commandClass != "" {
+		meta["command_class"] = commandClass
+	}
+	if exitCode, ok := numericField(response, "exit_code", "exitCode", "code"); ok {
+		meta["exit_code"] = exitCode
+	}
+	if duration, ok := numericField(payload, "duration_ms", "durationMs", "duration"); ok {
+		meta["duration_ms"] = duration
+	}
+	return content, meta, runID, inferToolFailures(), true
+}
+
+func buildStopRollupPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
+	if payload == nil {
+		return "", nil, "", false, false
+	}
+	sid := stringField(payload, "session_id")
+	cwd := stringField(payload, "cwd")
+	finalMessage := firstString(payload, "last_assistant_message", "assistant_message", "message", "summary")
+	if finalMessage == "" {
+		finalMessage = textField(payload, "transcript_tail")
+	}
+	finalMessage = truncateText(finalMessage, maxStopChars())
+	if strings.TrimSpace(finalMessage) == "" {
+		return "", nil, "", false, false
+	}
+	changed := firstAny(payload, "changed_files", "edited_files", "affected_paths")
+	background := firstAny(payload, "background_tasks", "session_crons")
+	runID := sid
+	content := fmt.Sprintf("Claude Code stop rollup (session_id=%s, cwd=%s)\n\nFinal assistant message preview:\n%s", sid, cwd, finalMessage)
+	meta := map[string]any{
+		"source":           "claude-code-hook",
+		"kind":             "stop-rollup",
+		"event_name":       "Stop",
+		"session_id":       sid,
+		"cwd":              cwd,
+		"success":          true,
+		"stop_hook_active": boolField(payload, "stop_hook_active", false),
+		"schema_version":   1,
+		"scrub_mode":       hookScrubEnabled(),
+		"infer_mode":       inferStop(),
+	}
+	if changed != nil {
+		meta["changed_files"] = scrubValue(changed)
+	}
+	if background != nil {
+		meta["background_tasks"] = scrubValue(background)
+	}
+	return content, meta, runID, inferStop(), true
 }
 
 func workerToolEvent() {

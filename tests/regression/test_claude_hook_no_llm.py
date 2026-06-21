@@ -324,6 +324,41 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
         self.assert_no_request("/api/v1/memories/search")
         self.assert_no_sentinel(result.stdout, result.stderr)
 
+    def test_session_start_searches_and_injects_context(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = load_fixture_json("payloads/session_start.json")
+            result = self.run_hook(payload, Path(raw_tmp))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        request = self.wait_for_request("/api/v1/memories/search")
+
+        self.assertEqual(request.headers.get("x-api-key"), "hook-api-key")
+        self.assertEqual(request.body["user_id"], "hook-user")
+        self.assertEqual(request.body["agent_id"], "hook-agent")
+        self.assertEqual(request.body["limit"], 6)
+        self.assertIn("session_title: Hook session bootstrap", request.body["query"])
+        self.assertIn("cwd: /workspace/powermem", request.body["query"])
+
+        output = json.loads(result.stdout)
+        hook_output = output["hookSpecificOutput"]
+        self.assertEqual(hook_output["hookEventName"], "SessionStart")
+        self.assertIn("isolated hook regression suite", hook_output["additionalContext"])
+        self.assert_no_sentinel(request.body, result.stdout, result.stderr)
+
+    def test_session_start_can_disable_search(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = load_fixture_json("payloads/session_start.json")
+            result = self.run_hook(
+                payload,
+                Path(raw_tmp),
+                POWERMEM_SESSION_START_SEARCH="0",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assert_no_request("/api/v1/memories/search")
+        self.assert_no_sentinel(result.stdout, result.stderr)
+
     def test_session_end_posts_transcript_and_ignores_bad_transcripts(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp_path = Path(raw_tmp)
@@ -528,6 +563,80 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
             self.wait_for_no_hook_workers()
             self.assert_no_request("/api/v1/memories")
             self.assert_no_sentinel(result.stdout, result.stderr)
+
+    def test_post_tool_use_failure_posts_structured_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp_path = Path(raw_tmp)
+            payload = load_fixture_json("payloads/post_tool_use_failure_bash.json")
+            result = self.run_hook(payload, tmp_path)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            request = self.wait_for_request(
+                "/api/v1/memories",
+                kind="post-tool-use-failure",
+            )
+            self.wait_for_no_hook_workers()
+
+            metadata = request.body["metadata"]
+            self.assertFalse(request.body["infer"])
+            self.assertEqual(request.body["run_id"], "session-failure-1042")
+            self.assertEqual(metadata["event_name"], "PostToolUseFailure")
+            self.assertEqual(metadata["tool_name"], "Bash")
+            self.assertEqual(metadata["tool_use_id"], "tool-failure-1042")
+            self.assertEqual(metadata["success"], False)
+            self.assertEqual(metadata["is_interrupt"], False)
+            self.assertEqual(metadata["error_type"], "non_zero_exit")
+            self.assertEqual(metadata["command_class"], "test")
+            self.assertEqual(metadata["exit_code"], 2)
+            self.assertIn("Error summary", request.body["content"])
+            self.assert_no_sentinel(request.body, result.stdout, result.stderr)
+
+            self.server.clear()
+            interrupt_payload = load_fixture_json("payloads/post_tool_use_failure_bash.json")
+            interrupt_payload["is_interrupt"] = True
+            interrupt_result = self.run_hook(interrupt_payload, tmp_path)
+            self.assertEqual(interrupt_result.returncode, 0, interrupt_result.stderr)
+            self.wait_for_no_hook_workers()
+            self.assert_no_request("/api/v1/memories")
+
+    def test_stop_rollup_posts_when_enabled_and_skips_recursion(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp_path = Path(raw_tmp)
+            payload = load_fixture_json("payloads/stop_rollup.json")
+
+            disabled_result = self.run_hook(payload, tmp_path)
+            self.assertEqual(disabled_result.returncode, 0, disabled_result.stderr)
+            self.wait_for_no_hook_workers()
+            self.assert_no_request("/api/v1/memories")
+
+            enabled_result = self.run_hook(
+                payload,
+                tmp_path,
+                POWERMEM_CAPTURE_STOP_ROLLUP="1",
+            )
+            self.assertEqual(enabled_result.returncode, 0, enabled_result.stderr)
+            request = self.wait_for_request("/api/v1/memories", kind="stop-rollup")
+            self.wait_for_no_hook_workers()
+
+            metadata = request.body["metadata"]
+            self.assertFalse(request.body["infer"])
+            self.assertEqual(request.body["run_id"], "session-stop-1043")
+            self.assertEqual(metadata["event_name"], "Stop")
+            self.assertEqual(metadata["session_id"], "session-stop-1043")
+            self.assertIn("Final assistant message preview", request.body["content"])
+            self.assert_no_sentinel(request.body, enabled_result.stdout, enabled_result.stderr)
+
+            self.server.clear()
+            recursive_payload = load_fixture_json("payloads/stop_rollup.json")
+            recursive_payload["stop_hook_active"] = True
+            recursive_result = self.run_hook(
+                recursive_payload,
+                tmp_path,
+                POWERMEM_CAPTURE_STOP_ROLLUP="1",
+            )
+            self.assertEqual(recursive_result.returncode, 0, recursive_result.stderr)
+            self.wait_for_no_hook_workers()
+            self.assert_no_request("/api/v1/memories")
 
     def test_pre_compact_posts_tail_snapshot_with_offsets(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
