@@ -248,6 +248,12 @@ func TestPromptSearchPolicy(t *testing.T) {
 		t.Fatalf("redact policy failed, ok=%v query=%q", ok, query)
 	}
 
+	cfg = defaultHookPrivacyConfig()
+	query, ok = scrubPromptForSearch("please use Bearer abcdefghijk carefully", cfg)
+	if !ok || strings.Contains(query, "abcdefghijk") || !strings.Contains(query, redactedSecret) {
+		t.Fatalf("loose bearer token should redact without skipping, ok=%v query=%q", ok, query)
+	}
+
 	cfg.SearchSecretPolicy = "off"
 	cfg.PathPrivacy = "basename"
 	query, ok = scrubPromptForSearch(prompt+" file=/src/customer/private/repo/config.yaml", cfg)

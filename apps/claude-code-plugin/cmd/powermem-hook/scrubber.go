@@ -113,7 +113,9 @@ func scrubPromptForSearch(prompt string, cfg hookPrivacyConfig) (string, bool) {
 	} else {
 		scrubbed, report = scrubText(prompt, cfg)
 	}
-	if cfg.SearchSecretPolicy == "skip" && report.SecretRedactions > 0 {
+	_, highConfidenceSecrets := applyHighConfidenceSecretRedactions(prompt)
+	_, looseBearerSecrets := replaceAllWithCount(bearerTokenRE, prompt, "$1"+redactedSecret)
+	if cfg.SearchSecretPolicy == "skip" && (highConfidenceSecrets > 0 || report.SecretRedactions > looseBearerSecrets) {
 		return "", false
 	}
 	if strings.TrimSpace(scrubbed) == "" {
@@ -272,6 +274,7 @@ var (
 	singleQuotedKVRE     = regexp.MustCompile(`(?im)(["']?(?:api[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|client[_-]?secret|secret|password|passwd|private[_-]?key)["']?\s*[:=]\s*')[^'\r\n]{4,}(')`)
 	yamlKVRE             = regexp.MustCompile(`(?im)^(\s*(?:api[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|client[_-]?secret|secret|password|passwd|private[_-]?key)\s*:\s*)[^\s#][^\r\n]*`)
 	authHeaderRE         = regexp.MustCompile(`(?im)\b(Authorization\s*:\s*(?:Bearer|Basic)\s+)[A-Za-z0-9._~+/=-]{8,}`)
+	bearerTokenRE        = regexp.MustCompile(`(?i)\b(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}`)
 	urlUserinfoRE        = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://)([^/\s@]+@)`)
 	queryParamRE         = regexp.MustCompile(`(?i)([?&](?:api[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|pwd)=)[^&#\s]+`)
 	prefixedTokenRE      = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[a-z]-[A-Za-z0-9-]{20,}|xapp-[A-Za-z0-9-]{20,})\b`)
@@ -372,6 +375,8 @@ func applySecretRedactions(input string) (string, int) {
 	out, count = replaceAllWithCount(yamlKVRE, out, "$1"+redactedSecret)
 	total += count
 	out, count = replaceAllWithCount(authHeaderRE, out, "$1"+redactedSecret)
+	total += count
+	out, count = replaceAllWithCount(bearerTokenRE, out, "$1"+redactedSecret)
 	total += count
 	out, count = replaceAllWithCount(urlUserinfoRE, out, "$1"+redactedSecret+"@")
 	total += count
