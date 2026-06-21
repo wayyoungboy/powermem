@@ -39,6 +39,8 @@ func TestScrubTextDefaultCoverage(t *testing.T) {
 	jwt := syntheticJWT()
 	longToken := "Long" + strings.Repeat("Aa9_", 12)
 	slackToken := "xoxb-" + strings.Repeat("12ab-", 10) + "9Z"
+	googleToken := "ya29." + strings.Repeat("Ab3_", 8)
+	githubPAT := "github_pat_" + strings.Repeat("Cd4_", 8)
 	input := strings.Join([]string{
 		"SERVICE_" + "TOKEN" + "=" + raw,
 		"API_" + "KEY=" + bareRaw,
@@ -55,16 +57,18 @@ func TestScrubTextDefaultCoverage(t *testing.T) {
 		jwt,
 		longToken,
 		slackToken,
+		googleToken,
+		githubPAT,
 		"normal public sentence",
 	}, "\n")
 
 	out, report := scrubText(input, cfg)
-	for _, value := range []string{raw, bareRaw, lowerRaw, tokenRaw, jwt, longToken, slackToken, "not-real-key-material"} {
+	for _, value := range []string{raw, bareRaw, lowerRaw, tokenRaw, jwt, longToken, slackToken, googleToken, githubPAT, "not-real-key-material"} {
 		if strings.Contains(out, value) {
 			t.Fatalf("scrubbed output retained raw value %q in %q", value, out)
 		}
 	}
-	if report.SecretRedactions < 13 {
+	if report.SecretRedactions < 15 {
 		t.Fatalf("expected broad high-confidence redaction coverage, got %+v", report)
 	}
 	if !strings.Contains(out, "normal public sentence") {
@@ -254,6 +258,13 @@ func TestPromptSearchPolicy(t *testing.T) {
 		t.Fatalf("loose bearer token should redact without skipping, ok=%v query=%q", ok, query)
 	}
 
+	cfg = defaultHookPrivacyConfig()
+	googleToken := "ya29." + strings.Repeat("Ab3_", 8)
+	query, ok = scrubPromptForSearch("please use "+googleToken, cfg)
+	if ok || query != "" {
+		t.Fatalf("default policy should skip Google OAuth token, ok=%v query=%q", ok, query)
+	}
+
 	cfg.SearchSecretPolicy = "off"
 	cfg.PathPrivacy = "basename"
 	query, ok = scrubPromptForSearch(prompt+" file=/src/customer/private/repo/config.yaml", cfg)
@@ -264,6 +275,31 @@ func TestPromptSearchPolicy(t *testing.T) {
 	query, ok = scrubPromptForSearch("look up https://example.com/items?key=sort", defaultHookPrivacyConfig())
 	if !ok || !strings.Contains(query, "key=sort") {
 		t.Fatalf("ordinary key query parameter should not skip search, ok=%v query=%q", ok, query)
+	}
+}
+
+func TestHandleUserPromptSubmitDoesNotSearchWhenDisabledOrHighConfidenceSecret(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		t.Fatalf("unexpected prompt search request: %s", r.URL.Path)
+	}))
+	defer server.Close()
+	t.Setenv("POWERMEM_BASE_URL", server.URL)
+
+	handleUserPromptSubmit(map[string]any{
+		"prompt": "please use Authorization: Bearer " + syntheticToken(),
+	})
+	if requests != 0 {
+		t.Fatalf("high-confidence secret prompt should not trigger search, got %d request(s)", requests)
+	}
+
+	t.Setenv("POWERMEM_PROMPT_SEARCH", "0")
+	handleUserPromptSubmit(map[string]any{
+		"prompt": "ordinary prompt",
+	})
+	if requests != 0 {
+		t.Fatalf("disabled prompt search should not trigger search, got %d request(s)", requests)
 	}
 }
 

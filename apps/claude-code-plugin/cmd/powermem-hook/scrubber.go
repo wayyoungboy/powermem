@@ -277,7 +277,7 @@ var (
 	bearerTokenRE        = regexp.MustCompile(`(?i)\b(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}`)
 	urlUserinfoRE        = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://)([^/\s@]+@)`)
 	queryParamRE         = regexp.MustCompile(`(?i)([?&](?:api[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|pwd)=)[^&#\s]+`)
-	prefixedTokenRE      = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[a-z]-[A-Za-z0-9-]{20,}|xapp-[A-Za-z0-9-]{20,})\b`)
+	prefixedTokenRE      = regexp.MustCompile(`\b(?:sk-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|ya29\.[A-Za-z0-9._-]{8,}|AKIA[0-9A-Z]{16}|xox[a-z]-[A-Za-z0-9-]{20,}|xapp-[A-Za-z0-9-]{20,})\b`)
 	jwtRE                = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
 	longTokenRE          = regexp.MustCompile(`\b[A-Za-z0-9][A-Za-z0-9_+-]{39,}\b`)
 	emailRE              = regexp.MustCompile(`\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b`)
