@@ -240,8 +240,11 @@ jobs:
               mkdir -p /tmp/linux-binary-smoke
               tar -xzf powermem-*-linux-amd64-binaries.tar.gz -C /tmp/linux-binary-smoke
               BIN_ROOT="$(find /tmp/linux-binary-smoke -maxdepth 1 -type d -name "powermem-*-linux-amd64" | head -1)"
-              "${BIN_ROOT}/bin/powermem" --help
-              "${BIN_ROOT}/bin/powermem-server" --help
+              find "${BIN_ROOT}/bin" -mindepth 1 -maxdepth 1 -printf "%f\n" | sort | tee /tmp/linux-binary-bin-files.txt
+              printf "powermem\npowermem-mcp\npowermem-server\n" >/tmp/linux-binary-expected-bin-files.txt
+              diff -u /tmp/linux-binary-expected-bin-files.txt /tmp/linux-binary-bin-files.txt
+              timeout 10s "${BIN_ROOT}/bin/powermem" --help
+              timeout 10s "${BIN_ROOT}/bin/powermem-server" --help
               export CI=1
               export DATABASE_PROVIDER=sqlite
               export SQLITE_PATH=/tmp/powermem-binary-smoke.db
@@ -254,8 +257,7 @@ jobs:
               trap "kill ${server_pid} 2>/dev/null || true" EXIT
               ready=0
               for _ in $(seq 1 60); do
-                root_status="$(curl -sS -o /tmp/powermem-server-root.out -w "%{http_code}" http://localhost:18848/ || true)"
-                if test "${root_status}" != "000" \
+                if curl -fsS http://localhost:18848/api/v1/system/health >/tmp/powermem-health.json \
                   && curl -fsS http://localhost:18848/dashboard/ >/tmp/powermem-dashboard.html; then
                   ready=1
                   break
@@ -267,6 +269,8 @@ jobs:
                 sleep 1
               done
               test "${ready}" -eq 1
+              grep -Eq "\"success\"[[:space:]]*:[[:space:]]*true" /tmp/powermem-health.json
+              grep -Eq "\"status\"[[:space:]]*:[[:space:]]*\"healthy\"" /tmp/powermem-health.json
               kill "${server_pid}"
               wait "${server_pid}" || true
               trap - EXIT
