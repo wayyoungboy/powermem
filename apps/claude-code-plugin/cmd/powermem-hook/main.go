@@ -5,6 +5,8 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +32,15 @@ func main() {
 			return
 		case "worker-compact":
 			workerCompact()
+			return
+		case "worker-precompact":
+			workerPreCompact()
+			return
+		case "worker-tool-event":
+			workerToolEvent()
+			return
+		case "worker-lifecycle":
+			workerLifecycleEvent()
 			return
 		case "worker-file":
 			workerFile()
@@ -53,10 +65,12 @@ var hookScrubEnabledAtStartup = parseHookScrubEnabled(os.Getenv("POWERMEM_HOOK_S
 
 func parseHookScrubEnabled(raw string) bool {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "0", "false", "no", "off":
+		return false
 	case "1", "true", "yes", "on":
 		return true
 	default:
-		return false
+		return true
 	}
 }
 
@@ -109,10 +123,10 @@ func scrubValue(v any) any {
 	}
 }
 
-func spawnWorker(mode string, envExtra map[string]string) {
+func spawnWorker(mode string, envExtra map[string]string) bool {
 	self, err := os.Executable()
 	if err != nil {
-		return
+		return false
 	}
 	env := os.Environ()
 	for k, v := range envExtra {
@@ -124,7 +138,41 @@ func spawnWorker(mode string, envExtra map[string]string) {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	setDetachedChild(cmd)
-	_ = cmd.Start()
+	return cmd.Start() == nil
+}
+
+func spawnPayloadWorker(mode string, payload map[string]any) {
+	f, err := os.CreateTemp("", "powermem-hook-payload-*.json")
+	if err != nil {
+		return
+	}
+	name := f.Name()
+	encErr := json.NewEncoder(f).Encode(payload)
+	closeErr := f.Close()
+	if encErr != nil || closeErr != nil {
+		_ = os.Remove(name)
+		return
+	}
+	if !spawnWorker(mode, map[string]string{"POWERMEM_WORKER_PAYLOAD_PATH": name}) {
+		_ = os.Remove(name)
+	}
+}
+
+func readWorkerPayload() map[string]any {
+	path := strings.TrimSpace(os.Getenv("POWERMEM_WORKER_PAYLOAD_PATH"))
+	if path == "" {
+		return nil
+	}
+	defer os.Remove(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var payload map[string]any
+	if json.Unmarshal(data, &payload) != nil {
+		return nil
+	}
+	return payload
 }
 
 func stdinHook() {
@@ -174,7 +222,80 @@ func stdinHook() {
 			"POWERMEM_WORKER_CWD":             cwd,
 			"POWERMEM_WORKER_TRIGGER":         trigger,
 		})
+	case "PreCompact":
+		if !capturePreCompact() {
+			return
+		}
+		tp, _ := payload["transcript_path"].(string)
+		if tp == "" {
+			return
+		}
+		if st, err := os.Stat(tp); err != nil || st.IsDir() {
+			return
+		}
+		snapshot, err := readTranscriptTail(tp, maxPreCompactChars(), maxPreCompactLines())
+		if err != nil || strings.TrimSpace(snapshot.Text) == "" {
+			return
+		}
+		payload["_powermem_precompact_text"] = scrubText(snapshot.Text)
+		payload["_powermem_precompact_start_byte"] = snapshot.StartByte
+		payload["_powermem_precompact_end_byte"] = snapshot.EndByte
+		payload["_powermem_precompact_max_chars"] = maxPreCompactChars()
+		payload["_powermem_precompact_max_lines"] = maxPreCompactLines()
+		spawnPayloadWorker("worker-precompact", payload)
+	case "PostToolUse":
+		if !captureToolSuccess() {
+			return
+		}
+		if !toolEventAllowed(toolNameFromPayload(payload)) {
+			return
+		}
+		handoff := prepareToolEventHandoff(payload)
+		if handoff == nil {
+			return
+		}
+		spawnPayloadWorker("worker-tool-event", handoff)
+	case "SubagentStart", "SubagentStop":
+		if !captureSubagents() {
+			return
+		}
+		spawnPayloadWorker("worker-lifecycle", payload)
+	case "TaskCreated", "TaskCompleted":
+		if !captureTasks() {
+			return
+		}
+		spawnPayloadWorker("worker-lifecycle", payload)
 	}
+}
+
+func envBool(name string, def bool) bool {
+	s := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	if s == "" {
+		return def
+	}
+	switch s {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
+}
+
+func envInt(name string, def int, min int, max int) int {
+	s := strings.TrimSpace(os.Getenv(name))
+	if s == "" {
+		return def
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < min {
+		return def
+	}
+	if max > 0 && n > max {
+		return max
+	}
+	return n
 }
 
 func maxHookChars() int {
@@ -207,6 +328,56 @@ func inferCompact() bool {
 	}
 }
 
+func capturePreCompact() bool {
+	return envBool("POWERMEM_CAPTURE_PRECOMPACT", true)
+}
+
+func inferPreCompact() bool {
+	return envBool("POWERMEM_INFER_PRECOMPACT", false)
+}
+
+func maxPreCompactChars() int {
+	return envInt("POWERMEM_PRECOMPACT_MAX_CHARS", 120000, 500, 900000)
+}
+
+func maxPreCompactLines() int {
+	return envInt("POWERMEM_PRECOMPACT_TAIL_LINES", 200, 1, 10000)
+}
+
+func captureToolSuccess() bool {
+	return envBool("POWERMEM_CAPTURE_TOOL_SUCCESS", true)
+}
+
+func inferToolEvents() bool {
+	return envBool("POWERMEM_INFER_TOOL_EVENTS", false)
+}
+
+func maxToolEventChars() int {
+	return envInt("POWERMEM_TOOL_EVENT_MAX_CHARS", 6000, 500, 120000)
+}
+
+func captureSubagents() bool {
+	return envBool("POWERMEM_CAPTURE_SUBAGENTS", true)
+}
+
+func captureTasks() bool {
+	return envBool("POWERMEM_CAPTURE_TASKS", true)
+}
+
+func inferLifecycleEvent(eventName string) bool {
+	if envBool("POWERMEM_INFER_LIFECYCLE_EVENTS", false) {
+		return true
+	}
+	switch eventName {
+	case "SubagentStop":
+		return envBool("POWERMEM_INFER_SUBAGENT_STOP", false)
+	case "TaskCompleted":
+		return envBool("POWERMEM_INFER_TASK_COMPLETED", false)
+	default:
+		return false
+	}
+}
+
 func inferFile() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_INFER_FILE"))) {
 	case "1", "true", "yes":
@@ -214,6 +385,43 @@ func inferFile() bool {
 	default:
 		return false
 	}
+}
+
+func splitCSVSet(raw string) map[string]bool {
+	out := map[string]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		item := strings.TrimSpace(part)
+		if item != "" {
+			out[item] = true
+		}
+	}
+	return out
+}
+
+func defaultToolIncludeSet() map[string]bool {
+	return map[string]bool{
+		"Write":        true,
+		"Edit":         true,
+		"MultiEdit":    true,
+		"Bash":         true,
+		"Agent":        true,
+		"ExitPlanMode": true,
+	}
+}
+
+func toolEventAllowed(toolName string) bool {
+	if toolName == "" {
+		toolName = "unknown"
+	}
+	exclude := splitCSVSet(os.Getenv("POWERMEM_TOOL_SUCCESS_EXCLUDE"))
+	if exclude["*"] || exclude[toolName] {
+		return false
+	}
+	include := splitCSVSet(os.Getenv("POWERMEM_TOOL_SUCCESS_INCLUDE"))
+	if len(include) == 0 {
+		include = defaultToolIncludeSet()
+	}
+	return include["*"] || include[toolName]
 }
 
 func promptSearchEnabled() bool {
@@ -468,6 +676,691 @@ func workerCompact() {
 		"compact_trigger": trigger,
 	}, &runID, inferCompact()); err != nil {
 		os.Exit(1)
+	}
+}
+
+type transcriptTailSnapshot struct {
+	Text      string
+	StartByte int64
+	EndByte   int64
+}
+
+func transcriptFingerprint(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
+	sum := sha256.Sum256([]byte(abs))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
+func readTranscriptTail(path string, maxChars int, maxLines int) (transcriptTailSnapshot, error) {
+	st, err := os.Stat(path)
+	if err != nil {
+		return transcriptTailSnapshot{}, err
+	}
+	size := st.Size()
+	if size <= 0 {
+		return transcriptTailSnapshot{}, nil
+	}
+	window := int64(maxChars*4 + 64*1024)
+	if window < int64(maxChars) {
+		window = int64(maxChars)
+	}
+	start := int64(0)
+	if size > window {
+		start = size - window
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return transcriptTailSnapshot{}, err
+	}
+	defer f.Close()
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return transcriptTailSnapshot{}, err
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return transcriptTailSnapshot{}, err
+	}
+	if start > 0 {
+		if idx := bytes.IndexByte(data, '\n'); idx >= 0 && idx+1 < len(data) {
+			start += int64(idx + 1)
+			data = data[idx+1:]
+		}
+	}
+	if maxLines > 0 {
+		lineStarts := []int{0}
+		for i, b := range data {
+			if b == '\n' && i+1 < len(data) {
+				lineStarts = append(lineStarts, i+1)
+			}
+		}
+		if len(lineStarts) > maxLines {
+			lineStart := lineStarts[len(lineStarts)-maxLines]
+			start += int64(lineStart)
+			data = data[lineStart:]
+		}
+	}
+	if len(data) > maxChars {
+		trim := len(data) - maxChars
+		if idx := bytes.IndexByte(data[trim:], '\n'); idx >= 0 && trim+idx+1 < len(data) {
+			trim += idx + 1
+		}
+		start += int64(trim)
+		data = data[trim:]
+	}
+	text := strings.TrimSpace(string(data))
+	if text == "" {
+		return transcriptTailSnapshot{}, nil
+	}
+	return transcriptTailSnapshot{Text: text, StartByte: start, EndByte: size}, nil
+}
+
+func workerPreCompact() {
+	payload := readWorkerPayload()
+	if payload == nil {
+		return
+	}
+	path := stringField(payload, "transcript_path")
+	if path == "" {
+		return
+	}
+	text := stringField(payload, "_powermem_precompact_text")
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	startByte := int64Field(payload, "_powermem_precompact_start_byte")
+	endByte := int64Field(payload, "_powermem_precompact_end_byte")
+	maxC := intField(payload, "_powermem_precompact_max_chars", maxPreCompactChars())
+	maxL := intField(payload, "_powermem_precompact_max_lines", maxPreCompactLines())
+	sid := stringField(payload, "session_id")
+	cwd := stringField(payload, "cwd")
+	trigger := stringField(payload, "trigger")
+	runID := sid
+	content := fmt.Sprintf("Claude Code pre-compact context snapshot (session_id=%s, cwd=%s, trigger=%s)\n\n%s", sid, cwd, trigger, text)
+	meta := map[string]any{
+		"source":                      "claude-code-hook",
+		"kind":                        "pre-compact-snapshot",
+		"event_name":                  "PreCompact",
+		"session_id":                  sid,
+		"cwd":                         cwd,
+		"compact_trigger":             trigger,
+		"transcript_path":             path,
+		"transcript_path_fingerprint": transcriptFingerprint(path),
+		"start_byte_offset":           startByte,
+		"end_byte_offset":             endByte,
+		"max_chars":                   maxC,
+		"max_lines":                   maxL,
+		"schema_version":              1,
+		"scrub_mode":                  hookScrubEnabled(),
+		"infer_mode":                  inferPreCompact(),
+	}
+	if custom := stringField(payload, "custom_instructions"); custom != "" {
+		meta["custom_instructions"] = custom
+	}
+	if err := postMemory(content, meta, &runID, inferPreCompact()); err != nil {
+		os.Exit(1)
+	}
+}
+
+func prepareToolEventHandoff(payload map[string]any) map[string]any {
+	content, meta, runID, infer, ok := buildToolEventPost(payload)
+	if !ok {
+		return nil
+	}
+	return map[string]any{
+		"_powermem_content":  scrubText(content),
+		"_powermem_metadata": scrubValue(meta),
+		"_powermem_run_id":   scrubText(runID),
+		"_powermem_infer":    infer,
+	}
+}
+
+func preparedToolEventPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
+	content := stringField(payload, "_powermem_content")
+	meta := nestedMap(payload["_powermem_metadata"])
+	if content == "" || meta == nil {
+		return "", nil, "", false, false
+	}
+	runID := stringField(payload, "_powermem_run_id")
+	infer := boolField(payload, "_powermem_infer", inferToolEvents())
+	return content, meta, runID, infer, true
+}
+
+func boolField(m map[string]any, key string, def bool) bool {
+	if m == nil {
+		return def
+	}
+	switch x := m[key].(type) {
+	case bool:
+		return x
+	case string:
+		return envBoolValue(x, def)
+	default:
+		return def
+	}
+}
+
+func envBoolValue(raw string, def bool) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
+}
+
+func buildToolEventPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
+	if payload == nil {
+		return "", nil, "", false, false
+	}
+	toolName := toolNameFromPayload(payload)
+	if toolName == "" {
+		toolName = "unknown"
+	}
+	if !toolEventAllowed(toolName) {
+		return "", nil, "", false, false
+	}
+	sid := stringField(payload, "session_id")
+	cwd := stringField(payload, "cwd")
+	toolUseID := firstString(payload, "tool_use_id", "toolUseID", "toolUseId", "id")
+	input := firstAny(payload, "tool_input", "input", "toolInput")
+	response := firstAny(payload, "tool_response", "response", "toolResponse", "result")
+	maxC := maxToolEventChars()
+	inputSummary := summarizeToolInput(toolName, input, maxC/2)
+	responseSummary := summarizeToolResponse(toolName, response, maxC/2)
+	paths := extractPaths(input, 20)
+	eventID := ""
+	if sid != "" && toolUseID != "" {
+		eventID = "claude-code:" + sid + ":" + toolUseID
+	}
+	status := firstString(payload, "status")
+	if status == "" {
+		status = "success"
+	}
+	content := fmt.Sprintf("Claude Code tool event (tool=%s, status=%s, session_id=%s, cwd=%s)\n\nInput summary:\n%s\n\nResponse summary:\n%s", toolName, status, sid, cwd, inputSummary, responseSummary)
+	if len(content) > maxC {
+		content = content[:maxC] + "\n..."
+	}
+	runID := sid
+	meta := map[string]any{
+		"source":           "claude-code-hook",
+		"kind":             "post-tool-use",
+		"event_name":       "PostToolUse",
+		"event_id":         eventID,
+		"session_id":       sid,
+		"cwd":              cwd,
+		"tool_name":        toolName,
+		"tool_use_id":      toolUseID,
+		"status":           status,
+		"success":          true,
+		"input_summary":    inputSummary,
+		"response_summary": responseSummary,
+		"affected_paths":   paths,
+		"schema_version":   1,
+		"scrub_mode":       hookScrubEnabled(),
+		"infer_mode":       inferToolEvents(),
+	}
+	if toolName == "Agent" {
+		if responseMap := nestedMap(response); responseMap != nil {
+			copyStringMeta(meta, responseMap, "agent_id", "agentId", "agent_id", "subagent_id", "subagentId")
+			copyStringMeta(meta, responseMap, "agent_type", "agentType", "agent_type", "subagent_type", "subagentType")
+			copyStringMeta(meta, responseMap, "agent_status", "status")
+			if usage := firstAny(responseMap, "token_usage", "tokenUsage", "usage"); usage != nil {
+				meta["token_usage"] = scrubValue(usage)
+			}
+		}
+	}
+	if commandClass := classifyCommand(commandFromToolInput(input)); commandClass != "" {
+		meta["command_class"] = commandClass
+	}
+	if exitCode, ok := numericField(response, "exit_code", "exitCode", "code"); ok {
+		meta["exit_code"] = exitCode
+	}
+	if duration, ok := numericField(payload, "duration_ms", "durationMs", "duration"); ok {
+		meta["duration_ms"] = duration
+	}
+	return content, meta, runID, inferToolEvents(), true
+}
+
+func workerToolEvent() {
+	payload := readWorkerPayload()
+	if payload == nil {
+		return
+	}
+	content, meta, runID, infer, ok := preparedToolEventPost(payload)
+	if !ok {
+		content, meta, runID, infer, ok = buildToolEventPost(payload)
+	}
+	if !ok {
+		return
+	}
+	if err := postMemory(content, meta, &runID, infer); err != nil {
+		os.Exit(1)
+	}
+}
+
+func workerLifecycleEvent() {
+	payload := readWorkerPayload()
+	if payload == nil {
+		return
+	}
+	eventName := stringField(payload, "hook_event_name")
+	if eventName == "" {
+		return
+	}
+	sid := stringField(payload, "session_id")
+	cwd := stringField(payload, "cwd")
+	runID := sid
+	kind := eventKind(eventName)
+	content := lifecycleContent(eventName, sid, cwd, payload)
+	infer := inferLifecycleEvent(eventName)
+	meta := map[string]any{
+		"source":         "claude-code-hook",
+		"kind":           kind,
+		"event_name":     eventName,
+		"session_id":     sid,
+		"cwd":            cwd,
+		"schema_version": 1,
+		"scrub_mode":     hookScrubEnabled(),
+		"infer_mode":     infer,
+		"raw_payload":    scrubValue(payload),
+	}
+	copyStringMeta(meta, payload, "agent_id", "agent_id", "agentId", "subagent_id", "subagentId")
+	copyStringMeta(meta, payload, "agent_type", "agent_type", "agentType", "subagent_type", "subagentType")
+	copyStringMeta(meta, payload, "task_id", "task_id", "taskId")
+	copyStringMeta(meta, payload, "tool_use_id", "tool_use_id", "toolUseID", "toolUseId")
+	copyStringMeta(meta, payload, "status", "status")
+	if usage := firstAny(payload, "token_usage", "tokenUsage", "usage"); usage != nil {
+		meta["token_usage"] = scrubValue(usage)
+	}
+	if err := postMemory(content, meta, &runID, infer); err != nil {
+		os.Exit(1)
+	}
+}
+
+func stringFromAny(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case fmt.Stringer:
+		return x.String()
+	case float64:
+		if x == float64(int64(x)) {
+			return strconv.FormatInt(int64(x), 10)
+		}
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(x)
+	default:
+		return ""
+	}
+}
+
+func stringField(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSpace(stringFromAny(m[key]))
+}
+
+func firstString(m map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if s := stringField(m, key); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func firstAny(m map[string]any, keys ...string) any {
+	for _, key := range keys {
+		if v, ok := m[key]; ok {
+			return v
+		}
+	}
+	return nil
+}
+
+func int64Field(m map[string]any, key string) int64 {
+	if m == nil {
+		return 0
+	}
+	n, _ := int64FromAny(m[key])
+	return n
+}
+
+func intField(m map[string]any, key string, def int) int {
+	if m == nil {
+		return def
+	}
+	n, ok := int64FromAny(m[key])
+	if !ok {
+		return def
+	}
+	return int(n)
+}
+
+func int64FromAny(v any) (int64, bool) {
+	switch x := v.(type) {
+	case float64:
+		return int64(x), true
+	case int:
+		return int64(x), true
+	case int64:
+		return x, true
+	case json.Number:
+		n, err := x.Int64()
+		if err == nil {
+			return n, true
+		}
+		f, err := strconv.ParseFloat(x.String(), 64)
+		if err != nil {
+			return 0, false
+		}
+		return int64(f), true
+	case string:
+		n, err := strconv.ParseInt(strings.TrimSpace(x), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
+func nestedMap(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return nil
+}
+
+func toolNameFromPayload(payload map[string]any) string {
+	if name := firstString(payload, "tool_name", "toolName", "name"); name != "" {
+		return name
+	}
+	for _, key := range []string{"tool", "tool_use", "toolUse"} {
+		if m := nestedMap(payload[key]); m != nil {
+			if name := firstString(m, "name", "tool_name", "toolName"); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+func valueShape(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return "null"
+	case string:
+		return "string"
+	case float64:
+		return "number"
+	case bool:
+		return "bool"
+	case []any:
+		return fmt.Sprintf("array[%d]", len(x))
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for key := range x {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		if len(keys) > 12 {
+			keys = append(keys[:12], "...")
+		}
+		return "object{" + strings.Join(keys, ",") + "}"
+	default:
+		return fmt.Sprintf("%T", v)
+	}
+}
+
+func truncateText(s string, max int) string {
+	s = strings.TrimSpace(scrubText(s))
+	if max > 0 && len(s) > max {
+		return s[:max] + "\n..."
+	}
+	return s
+}
+
+func textFromAny(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case []any:
+		return flattenContent(x)
+	case map[string]any:
+		if content, ok := x["content"]; ok {
+			return flattenContent(content)
+		}
+		for _, key := range []string{"text", "summary", "result", "message", "last_assistant_message", "prompt"} {
+			if s := stringField(x, key); s != "" {
+				return s
+			}
+		}
+		b, err := json.Marshal(x)
+		if err != nil {
+			return fmt.Sprint(x)
+		}
+		return string(b)
+	default:
+		return stringFromAny(v)
+	}
+}
+
+func textField(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSpace(textFromAny(m[key]))
+}
+
+func summarizeToolInput(toolName string, input any, maxChars int) string {
+	m := nestedMap(input)
+	switch toolName {
+	case "Write", "Edit", "MultiEdit":
+		paths := extractPaths(input, 10)
+		parts := []string{"operation=" + toolName}
+		if len(paths) > 0 {
+			parts = append(parts, "paths="+strings.Join(paths, ", "))
+		}
+		if edits, ok := m["edits"].([]any); ok {
+			parts = append(parts, fmt.Sprintf("edit_count=%d", len(edits)))
+		}
+		if content := stringField(m, "content"); content != "" {
+			parts = append(parts, fmt.Sprintf("content_chars=%d", len(content)))
+		}
+		return strings.Join(parts, "; ")
+	case "Bash":
+		cmd := commandFromToolInput(input)
+		parts := []string{"command_class=" + classifyCommand(cmd)}
+		if cmd != "" {
+			parts = append(parts, "command="+truncateText(cmd, maxChars))
+		}
+		return strings.Join(parts, "; ")
+	case "Agent":
+		parts := []string{}
+		for _, key := range []string{"agent_type", "agentType", "description", "task", "prompt"} {
+			if s := stringField(m, key); s != "" {
+				parts = append(parts, key+"="+truncateText(s, maxChars/2))
+			}
+		}
+		if len(parts) == 0 {
+			return "shape=" + valueShape(input)
+		}
+		return strings.Join(parts, "; ")
+	case "ExitPlanMode":
+		for _, key := range []string{"plan", "content", "text"} {
+			if s := stringField(m, key); s != "" {
+				return "plan=" + truncateText(s, maxChars)
+			}
+		}
+	}
+	return "shape=" + valueShape(input)
+}
+
+func summarizeToolResponse(toolName string, response any, maxChars int) string {
+	m := nestedMap(response)
+	if m == nil {
+		if s := stringFromAny(response); s != "" {
+			return truncateText(s, maxChars)
+		}
+		return "shape=" + valueShape(response)
+	}
+	parts := []string{"shape=" + valueShape(response)}
+	for _, key := range []string{"status", "exit_code", "exitCode"} {
+		if s := stringField(m, key); s != "" {
+			parts = append(parts, key+"="+s)
+		}
+	}
+	switch toolName {
+	case "Bash":
+		for _, key := range []string{"stdout", "stderr", "output"} {
+			if s := stringField(m, key); s != "" {
+				parts = append(parts, key+"="+truncateText(s, maxChars/2))
+			}
+		}
+	case "Agent":
+		for _, key := range []string{"agentId", "agent_id", "summary", "result", "last_assistant_message", "message", "content"} {
+			if s := textField(m, key); s != "" {
+				parts = append(parts, key+"="+truncateText(s, maxChars/2))
+			}
+		}
+	default:
+		for _, key := range []string{"summary", "message"} {
+			if s := stringField(m, key); s != "" {
+				parts = append(parts, key+"="+truncateText(s, maxChars/2))
+			}
+		}
+	}
+	return strings.Join(parts, "; ")
+}
+
+func commandFromToolInput(input any) string {
+	m := nestedMap(input)
+	if m == nil {
+		return ""
+	}
+	return firstString(m, "command", "cmd")
+}
+
+func classifyCommand(cmd string) string {
+	fields := strings.Fields(strings.TrimSpace(cmd))
+	if len(fields) == 0 {
+		return ""
+	}
+	first := filepath.Base(fields[0])
+	switch first {
+	case "go", "pytest", "python", "python3", "npm", "pnpm", "yarn", "make":
+		for _, f := range fields[1:] {
+			if strings.Contains(f, "test") || strings.Contains(f, "pytest") {
+				return "test"
+			}
+			if strings.Contains(f, "build") {
+				return "build"
+			}
+		}
+		if first == "pytest" {
+			return "test"
+		}
+		return "build"
+	case "git":
+		return "git"
+	default:
+		return "other"
+	}
+}
+
+func extractPaths(v any, limit int) []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(any)
+	walk = func(cur any) {
+		if len(out) >= limit {
+			return
+		}
+		switch x := cur.(type) {
+		case map[string]any:
+			for key, val := range x {
+				lower := strings.ToLower(key)
+				if lower == "path" || lower == "file_path" || lower == "filepath" || lower == "notebook_path" {
+					if s := strings.TrimSpace(stringFromAny(val)); s != "" && !seen[s] {
+						seen[s] = true
+						out = append(out, scrubText(s))
+						if len(out) >= limit {
+							return
+						}
+					}
+				}
+				walk(val)
+			}
+		case []any:
+			for _, el := range x {
+				walk(el)
+			}
+		}
+	}
+	walk(v)
+	return out
+}
+
+func numericField(v any, keys ...string) (any, bool) {
+	m := nestedMap(v)
+	if m == nil {
+		return nil, false
+	}
+	for _, key := range keys {
+		switch x := m[key].(type) {
+		case float64:
+			if x == float64(int64(x)) {
+				return int64(x), true
+			}
+			return x, true
+		case int:
+			return x, true
+		case int64:
+			return x, true
+		case json.Number:
+			return x.String(), true
+		}
+	}
+	return nil, false
+}
+
+func eventKind(eventName string) string {
+	var b strings.Builder
+	for i, r := range eventName {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			b.WriteByte('-')
+		}
+		b.WriteByte(byte(strings.ToLower(string(r))[0]))
+	}
+	return b.String()
+}
+
+func lifecycleContent(eventName string, sid string, cwd string, payload map[string]any) string {
+	parts := []string{
+		fmt.Sprintf("Claude Code lifecycle event (event=%s, session_id=%s, cwd=%s)", eventName, sid, cwd),
+	}
+	for _, key := range []string{"agent_id", "agentId", "subagent_id", "subagentId", "agent_type", "agentType", "task_id", "taskId", "status", "description", "subject"} {
+		if s := stringField(payload, key); s != "" {
+			parts = append(parts, key+": "+truncateText(s, 2000))
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func copyStringMeta(meta map[string]any, payload map[string]any, metaKey string, sourceKeys ...string) {
+	if value := firstString(payload, sourceKeys...); value != "" {
+		meta[metaKey] = value
 	}
 }
 

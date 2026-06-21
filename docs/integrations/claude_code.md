@@ -302,6 +302,10 @@ The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob
 | `UserPromptSubmit` | By default, **`POST …/api/v1/memories/search`** with the submitted `prompt`; top results are injected as **additional context** for that turn ([Claude Code hooks](https://code.claude.com/docs/en/hooks#userpromptsubmit)). Set **`POWERMEM_PROMPT_SEARCH=0`** (or `false` / `no` / `off`) to skip search (hook still registered; overhead is small when disabled). |
 | `SessionEnd` | Full **transcript** from `transcript_path` (parsed JSONL: user/assistant/summary lines) → **`POST …/api/v1/memories`**. |
 | `PostCompact` | The **`compact_summary`** field after `/compact` or auto-compact → **`POST …/api/v1/memories`**. |
+| `PreCompact` | Bounded tail snapshot from `transcript_path` before compaction → **`POST …/api/v1/memories`**, with transcript fingerprint and byte offsets for auditability. |
+| `PostToolUse` | Structured summaries for high-signal successful tools (`Write`, `Edit`, `MultiEdit`, `Bash`, `Agent`, `ExitPlanMode` by default) → **`POST …/api/v1/memories`**. Content and metadata are scrubbed, and deterministic event IDs are included when `session_id` and `tool_use_id` are available. |
+| `SubagentStart` / `SubagentStop` | Lifecycle observations keyed by the hook event name, not by `transcript_path`; raw scrubbed payload is preserved in metadata for later linking. |
+| `TaskCreated` / `TaskCompleted` | Task lifecycle observations keyed by the hook event name, with link fields such as `session_id`, `task_id`, and `tool_use_id` when present. |
 
 **Write** hooks use `POST {POWERMEM_BASE_URL}/api/v1/memories`. **Prompt search** uses `POST {POWERMEM_BASE_URL}/api/v1/memories/search`. Neither path requires MCP.
 
@@ -314,11 +318,26 @@ Optional environment variables (where you launch Claude Code):
 | `POWERMEM_USER_ID` | No | Defaults to OS login name |
 | `POWERMEM_AGENT_ID` | No | Optional `agent_id` on memories |
 | `POWERMEM_HOOK_MAX_CHARS` | No | Transcript cap (default `120000`) |
+| `POWERMEM_HOOK_SCRUB` | No | Scrubs sensitive-looking tokens from hook content and metadata by default; set `0` / `false` / `no` / `off` only for trusted local debugging. |
 | `POWERMEM_INFER_TRANSCRIPT` | No | Set `1` to enable server-side infer on large transcripts (default off) |
 | `POWERMEM_INFER_COMPACT` | No | Set `0` to disable infer on compact summaries (default on) |
 | `POWERMEM_PROMPT_SEARCH` | No | **Default: on** — injects semantic search results on every user prompt via `UserPromptSubmit`. Set **`0`** / **`false`** / **`no`** / **`off`** to disable. |
 | `POWERMEM_PROMPT_SEARCH_LIMIT` | No | Max memories returned per prompt (default **8**, cap **30**). |
 | `POWERMEM_PROMPT_SEARCH_MAX_CHARS` | No | Cap on injected context string (default **24000**). |
+| `POWERMEM_CAPTURE_PRECOMPACT` | No | Set `0` / `false` / `no` / `off` to disable `PreCompact` snapshots (default on). |
+| `POWERMEM_PRECOMPACT_MAX_CHARS` | No | Max transcript tail characters for `PreCompact` snapshots (default **120000**). |
+| `POWERMEM_PRECOMPACT_TAIL_LINES` | No | Max transcript tail lines for `PreCompact` snapshots (default **200**). |
+| `POWERMEM_INFER_PRECOMPACT` | No | Set `1` to enable server-side infer for `PreCompact` snapshots (default off). |
+| `POWERMEM_CAPTURE_TOOL_SUCCESS` | No | Set `0` / `false` / `no` / `off` to disable `PostToolUse` capture (default on). |
+| `POWERMEM_TOOL_SUCCESS_INCLUDE` | No | Comma-separated allowed tool names. Defaults to `Write,Edit,MultiEdit,Bash,Agent,ExitPlanMode`; `*` allows all tools. |
+| `POWERMEM_TOOL_SUCCESS_EXCLUDE` | No | Comma-separated denied tool names. Exclude wins over include; `*` disables all tool success capture. |
+| `POWERMEM_TOOL_EVENT_MAX_CHARS` | No | Max characters for a structured tool event memory (default **6000**). |
+| `POWERMEM_INFER_TOOL_EVENTS` | No | Set `1` to enable server-side infer for tool event memories (default off). |
+| `POWERMEM_CAPTURE_SUBAGENTS` | No | Set `0` / `false` / `no` / `off` to disable subagent lifecycle capture (default on). |
+| `POWERMEM_CAPTURE_TASKS` | No | Set `0` / `false` / `no` / `off` to disable task lifecycle capture (default on). |
+| `POWERMEM_INFER_LIFECYCLE_EVENTS` | No | Set `1` to enable server-side infer for all lifecycle events (default off). |
+| `POWERMEM_INFER_SUBAGENT_STOP` | No | Set `1` to enable infer for `SubagentStop` when the generic lifecycle infer flag is off. |
+| `POWERMEM_INFER_TASK_COMPLETED` | No | Set `1` to enable infer for `TaskCompleted` when the generic lifecycle infer flag is off. |
 
 **SessionEnd timeout:** Claude Code defaults to a short timeout for `SessionEnd` hooks. The hook **returns immediately** and uploads in a **detached worker process**, so large transcripts still upload without blocking exit. If you ever switch to a synchronous upload inside the hook, raise `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` (see [Claude Code hooks – SessionEnd](https://code.claude.com/docs/en/hooks#sessionend)).
 
