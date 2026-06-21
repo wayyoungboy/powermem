@@ -762,7 +762,6 @@ async def import_memories(
     result = service.memory.import_memories(
         source=content,
         format=fmt,
-        is_file=False,
         user_id=user_id,
         agent_id=agent_id,
     )

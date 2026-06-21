@@ -269,6 +269,24 @@ describe("Sessions dashboard route", () => {
 		expect(screen.getByText("Showing 0 of 0 sessions")).toBeTruthy();
 	});
 
+	it("does not show the snapshot banner for event-log precision", () => {
+		queryMocks.stats = {
+			...defaultStats,
+			precision: "event_log",
+			capabilities: { memory_snapshot: false, event_log: true },
+		};
+		queryMocks.timeline = {
+			...defaultTimeline,
+			precision: "event_log",
+			capabilities: { memory_snapshot: false, event_log: true },
+		};
+
+		renderSessions();
+
+		expect(screen.queryByText("Snapshot precision.")).toBeNull();
+		expect(screen.getByText("Session List")).toBeTruthy();
+	});
+
 	it("applies user, agent, run, and content filters through route search", async () => {
 		renderSessions({ page: 3, cursor: "old-cursor" });
 
