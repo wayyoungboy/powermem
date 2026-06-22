@@ -36,6 +36,9 @@ def test_release_binary_server_smoke_checks_health_json_and_dashboard() -> None:
 
     assert "/api/v1/system/health" in smoke_script
     assert "/dashboard/" in smoke_script
+    assert 'ready_timeout = 180 if os.name == "nt" else 60' in smoke_script
+    assert '"taskkill", "/F", "/T", "/PID"' in smoke_script
+    assert "ignore_cleanup_errors=os.name == \"nt\"" in smoke_script
     assert 'health.get("success") is not True' in smoke_script
     assert 'health.get("data", {}).get("status") != "healthy"' in smoke_script
 

@@ -87,6 +87,13 @@ def _verify_tar_members(tar: tarfile.TarFile, target: Path) -> None:
             _fail(f"unsafe tar member link: {member.name}")
 
 
+def _temporary_directory(prefix: str) -> tempfile.TemporaryDirectory[str]:
+    return tempfile.TemporaryDirectory(
+        prefix=prefix,
+        ignore_cleanup_errors=os.name == "nt",
+    )
+
+
 def _run_checked(
     command: list[str],
     *,
@@ -128,9 +135,44 @@ def _fetch(url: str) -> bytes:
         return response.read()
 
 
+def _read_process_output(process: subprocess.Popen[str]) -> str:
+    if process.stdout is None:
+        return ""
+    try:
+        return process.stdout.read()
+    except OSError as exc:
+        return f"<failed to read process output: {exc}>"
+
+
+def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                check=False,
+                timeout=15,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            process.kill()
+    else:
+        process.terminate()
+
+    try:
+        process.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=15)
+
+
 def _smoke_server(server_binary: Path, port: int) -> None:
     env = os.environ.copy()
-    with tempfile.TemporaryDirectory(prefix="powermem-server-smoke-") as tmp:
+    with _temporary_directory(prefix="powermem-server-smoke-") as tmp:
         env.update(
             {
                 "CI": "1",
@@ -159,46 +201,53 @@ def _smoke_server(server_binary: Path, port: int) -> None:
             text=True,
         )
 
+        failure: str | None = None
         try:
-            deadline = time.monotonic() + 60
+            ready_timeout = 180 if os.name == "nt" else 60
+            deadline = time.monotonic() + ready_timeout
             health_body: bytes | None = None
             dashboard_body: bytes | None = None
             while time.monotonic() < deadline:
                 if process.poll() is not None:
-                    output = process.stdout.read() if process.stdout else ""
-                    _fail(
+                    failure = (
                         "powermem-server exited before becoming ready "
-                        f"with code {process.returncode}\n{output}"
+                        f"with code {process.returncode}"
                     )
+                    break
                 try:
                     health_body = _fetch(f"http://localhost:{port}/api/v1/system/health")
                     dashboard_body = _fetch(f"http://localhost:{port}/dashboard/")
                     break
                 except urllib.error.HTTPError as exc:
                     if exc.code == 404:
-                        _fail("dashboard endpoint returned 404")
+                        failure = "dashboard endpoint returned 404"
+                        break
                     time.sleep(1)
                 except (OSError, urllib.error.URLError):
                     time.sleep(1)
 
-            if health_body is None or dashboard_body is None:
-                _fail("powermem-server did not become ready before timeout")
+            if failure is None and (health_body is None or dashboard_body is None):
+                failure = (
+                    "powermem-server did not become ready before timeout "
+                    f"({ready_timeout} seconds)"
+                )
 
-            health = json.loads(health_body.decode("utf-8"))
-            if health.get("success") is not True:
-                _fail(f"health response did not report success=true: {health}")
-            if health.get("data", {}).get("status") != "healthy":
-                _fail(f"health response did not report status=healthy: {health}")
-            if not dashboard_body.strip():
-                _fail("dashboard response body is empty")
+            if failure is None:
+                assert health_body is not None
+                assert dashboard_body is not None
+                health = json.loads(health_body.decode("utf-8"))
+                if health.get("success") is not True:
+                    failure = f"health response did not report success=true: {health}"
+                elif health.get("data", {}).get("status") != "healthy":
+                    failure = f"health response did not report status=healthy: {health}"
+                elif not dashboard_body.strip():
+                    failure = "dashboard response body is empty"
         finally:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=10)
+            _terminate_process_tree(process)
+
+        if failure is not None:
+            output = _read_process_output(process)
+            _fail(f"{failure}\n{output}")
 
 
 def _smoke_mcp(mcp_binary: Path) -> None:
@@ -238,7 +287,7 @@ def main() -> None:
     )
     _verify_checksum(archive)
 
-    with tempfile.TemporaryDirectory(prefix="powermem-binary-smoke-") as tmp:
+    with _temporary_directory(prefix="powermem-binary-smoke-") as tmp:
         extract_root = Path(tmp)
         _extract(archive, extract_root)
         package_root = extract_root / _package_name(archive)
