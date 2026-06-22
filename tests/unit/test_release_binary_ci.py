@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from scripts.smoke_binary_package import _package_name
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -13,24 +15,68 @@ def test_binary_builder_verifies_miniconda_installer_checksum() -> None:
 
 
 def test_release_binary_help_smokes_are_bounded() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text()
+    smoke_script = (ROOT / "scripts" / "smoke_binary_package.py").read_text()
 
-    assert 'timeout 10s "${BIN_ROOT}/bin/powermem" --help' in workflow
-    assert 'timeout 10s "${BIN_ROOT}/bin/powermem-server" --help' in workflow
+    assert "[str(binary), \"--help\"]" in smoke_script
+    assert "timeout=10" in smoke_script
 
 
 def test_release_binary_tarball_bin_contents_are_exact() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text()
+    smoke_script = (ROOT / "scripts" / "smoke_binary_package.py").read_text()
 
-    assert 'find "${BIN_ROOT}/bin" -mindepth 1 -maxdepth 1 -printf "%f\\n"' in workflow
-    assert 'printf "powermem\\npowermem-mcp\\npowermem-server\\n"' in workflow
-    assert "diff -u /tmp/linux-binary-expected-bin-files.txt /tmp/linux-binary-bin-files.txt" in workflow
+    assert 'f"powermem{exe_suffix}"' in smoke_script
+    assert 'f"powermem-server{exe_suffix}"' in smoke_script
+    assert 'f"powermem-mcp{exe_suffix}"' in smoke_script
+    assert "actual != expected" in smoke_script
 
 
 def test_release_binary_server_smoke_checks_health_json_and_dashboard() -> None:
+    smoke_script = (ROOT / "scripts" / "smoke_binary_package.py").read_text()
+
+    assert "/api/v1/system/health" in smoke_script
+    assert "/dashboard/" in smoke_script
+    assert 'health.get("success") is not True' in smoke_script
+    assert 'health.get("data", {}).get("status") != "healthy"' in smoke_script
+
+
+def test_release_binary_builder_accepts_platform_and_arch_targets() -> None:
+    builder = (ROOT / "scripts" / "build_binary_package.sh").read_text()
+
+    assert "POWERMEM_BINARY_OS" in builder
+    assert "POWERMEM_BINARY_ARCH" in builder
+    assert "PACKAGE_BASENAME=\"powermem-${VERSION}-${TARGET_OS}-${TARGET_ARCH}\"" in builder
+    assert "POWERMEM_BINARY_FORMAT" in builder
+    assert ".sha256" in builder
+
+
+def test_release_binary_matrix_includes_supported_macos_and_windows_arches() -> None:
     workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text()
 
-    assert "http://localhost:18848/api/v1/system/health" in workflow
-    assert "http://localhost:18848/dashboard/" in workflow
-    assert '"success\\"[[:space:]]*:[[:space:]]*true"' in workflow
-    assert '"status\\"[[:space:]]*:[[:space:]]*\\"healthy\\""' in workflow
+    assert "build-native-binaries:" in workflow
+    assert "macos-15-intel" in workflow
+    assert "macos-15" in workflow
+    assert "windows-2022" in workflow
+    assert "windows-11-arm" not in workflow
+    assert "binary-arch: amd64" in workflow
+    assert "binary-arch: aarch64" in workflow
+    assert 'python -m pip install ".[cli,server,mcp,seekdb]" pyinstaller' in workflow
+
+
+def test_release_uploads_arch_named_binary_assets() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text()
+
+    assert "name: powermem-linux-amd64-binaries" in workflow
+    assert "name: powermem-${{ matrix.binary-os }}-${{ matrix.binary-arch }}-binaries" in workflow
+    assert "pattern: powermem-*-binaries" in workflow
+    assert "binary-artifacts/*" in workflow
+
+
+def test_smoke_script_maps_archive_names_to_package_dirs() -> None:
+    assert (
+        _package_name(Path("powermem-1.1.4-linux-amd64-binaries.tar.gz"))
+        == "powermem-1.1.4-linux-amd64"
+    )
+    assert (
+        _package_name(Path("powermem-1.1.4-windows-aarch64-binaries.zip"))
+        == "powermem-1.1.4-windows-aarch64"
+    )
