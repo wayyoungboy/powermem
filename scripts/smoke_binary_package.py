@@ -181,6 +181,7 @@ def _smoke_server(server_binary: Path, port: int) -> None:
                 "LLM_PROVIDER": "noop",
                 "EMBEDDING_PROVIDER": "mock",
                 "RERANKER_ENABLED": "false",
+                "AGENT_MEMORY_MODE": "multi_user",
                 "POWERMEM_SERVER_LOG_FILE": "",
             }
         )
