@@ -135,15 +135,6 @@ def _fetch(url: str) -> bytes:
         return response.read()
 
 
-def _read_process_output(process: subprocess.Popen[str]) -> str:
-    if process.stdout is None:
-        return ""
-    try:
-        return process.stdout.read()
-    except OSError as exc:
-        return f"<failed to read process output: {exc}>"
-
-
 def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
@@ -173,6 +164,7 @@ def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
 def _smoke_server(server_binary: Path, port: int) -> None:
     env = os.environ.copy()
     with _temporary_directory(prefix="powermem-server-smoke-") as tmp:
+        log_path = Path(tmp) / "powermem-server-smoke.log"
         env.update(
             {
                 "CI": "1",
@@ -185,69 +177,71 @@ def _smoke_server(server_binary: Path, port: int) -> None:
                 "POWERMEM_SERVER_LOG_FILE": "",
             }
         )
-        process = subprocess.Popen(
-            [
-                str(server_binary),
-                "--host",
-                "localhost",
-                "--port",
-                str(port),
-                "--workers",
-                "1",
-                "--no-open-browser",
-            ],
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
 
-        failure: str | None = None
-        try:
-            ready_timeout = 180 if os.name == "nt" else 60
-            deadline = time.monotonic() + ready_timeout
-            health_body: bytes | None = None
-            dashboard_body: bytes | None = None
-            while time.monotonic() < deadline:
-                if process.poll() is not None:
-                    failure = (
-                        "powermem-server exited before becoming ready "
-                        f"with code {process.returncode}"
-                    )
-                    break
-                try:
-                    health_body = _fetch(f"http://localhost:{port}/api/v1/system/health")
-                    dashboard_body = _fetch(f"http://localhost:{port}/dashboard/")
-                    break
-                except urllib.error.HTTPError as exc:
-                    if exc.code == 404:
-                        failure = "dashboard endpoint returned 404"
+        with log_path.open("w", encoding="utf-8", errors="replace") as server_output:
+            process = subprocess.Popen(
+                [
+                    str(server_binary),
+                    "--host",
+                    "localhost",
+                    "--port",
+                    str(port),
+                    "--workers",
+                    "1",
+                    "--no-open-browser",
+                ],
+                env=env,
+                stdout=server_output,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+
+            failure: str | None = None
+            try:
+                ready_timeout = 180 if os.name == "nt" else 60
+                deadline = time.monotonic() + ready_timeout
+                health_body: bytes | None = None
+                dashboard_body: bytes | None = None
+                while time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        failure = (
+                            "powermem-server exited before becoming ready "
+                            f"with code {process.returncode}"
+                        )
                         break
-                    time.sleep(1)
-                except (OSError, urllib.error.URLError):
-                    time.sleep(1)
+                    try:
+                        health_body = _fetch(f"http://localhost:{port}/api/v1/system/health")
+                        dashboard_body = _fetch(f"http://localhost:{port}/dashboard/")
+                        break
+                    except urllib.error.HTTPError as exc:
+                        if exc.code == 404:
+                            failure = "dashboard endpoint returned 404"
+                            break
+                        time.sleep(1)
+                    except (OSError, urllib.error.URLError):
+                        time.sleep(1)
 
-            if failure is None and (health_body is None or dashboard_body is None):
-                failure = (
-                    "powermem-server did not become ready before timeout "
-                    f"({ready_timeout} seconds)"
-                )
+                if failure is None and (health_body is None or dashboard_body is None):
+                    failure = (
+                        "powermem-server did not become ready before timeout "
+                        f"({ready_timeout} seconds)"
+                    )
 
-            if failure is None:
-                assert health_body is not None
-                assert dashboard_body is not None
-                health = json.loads(health_body.decode("utf-8"))
-                if health.get("success") is not True:
-                    failure = f"health response did not report success=true: {health}"
-                elif health.get("data", {}).get("status") != "healthy":
-                    failure = f"health response did not report status=healthy: {health}"
-                elif not dashboard_body.strip():
-                    failure = "dashboard response body is empty"
-        finally:
-            _terminate_process_tree(process)
+                if failure is None:
+                    assert health_body is not None
+                    assert dashboard_body is not None
+                    health = json.loads(health_body.decode("utf-8"))
+                    if health.get("success") is not True:
+                        failure = f"health response did not report success=true: {health}"
+                    elif health.get("data", {}).get("status") != "healthy":
+                        failure = f"health response did not report status=healthy: {health}"
+                    elif not dashboard_body.strip():
+                        failure = "dashboard response body is empty"
+            finally:
+                _terminate_process_tree(process)
 
         if failure is not None:
-            output = _read_process_output(process)
+            output = log_path.read_text(encoding="utf-8", errors="replace")
             _fail(f"{failure}\n{output}")
 
 
