@@ -256,6 +256,8 @@ def test_cli_starts_one_browser_waiter_with_reload_and_workers(monkeypatch):
     bind_available = Mock()
     start_browser = Mock()
     uvicorn_run = Mock()
+    embedded_storage = Mock(return_value=False)
+    mcp_enabled = Mock(return_value=True)
     original = {
         "host": server_cli.config.host,
         "port": server_cli.config.port,
@@ -265,7 +267,8 @@ def test_cli_starts_one_browser_waiter_with_reload_and_workers(monkeypatch):
     monkeypatch.setattr(server_cli, "_should_open_browser", lambda _requested: True)
     monkeypatch.setattr(server_cli, "_assert_bind_available", bind_available)
     monkeypatch.setattr(server_cli, "_start_dashboard_browser", start_browser)
-    monkeypatch.setattr(server_cli, "_is_embedded_storage", lambda: False)
+    monkeypatch.setattr(server_cli, "_is_embedded_storage", embedded_storage)
+    monkeypatch.setattr(server_cli, "_is_mcp_enabled", mcp_enabled)
     monkeypatch.setattr(server_cli, "_setup_server_logging", lambda: None)
     monkeypatch.setattr(server_cli, "_run_server_app", uvicorn_run)
 
@@ -290,8 +293,73 @@ def test_cli_starts_one_browser_waiter_with_reload_and_workers(monkeypatch):
     assert result.exit_code == 0
     bind_available.assert_called_once_with("0.0.0.0", 9988)
     start_browser.assert_called_once_with("0.0.0.0", 9988)
+    embedded_storage.assert_not_called()
+    mcp_enabled.assert_not_called()
     uvicorn_run.assert_called_once()
     assert uvicorn_run.call_args.kwargs["workers"] == 1
+
+
+def test_cli_forces_single_worker_when_mcp_is_enabled(monkeypatch):
+    runner = CliRunner()
+    uvicorn_run = Mock()
+    original = {
+        "host": server_cli.config.host,
+        "port": server_cli.config.port,
+        "workers": server_cli.config.workers,
+        "reload": server_cli.config.reload,
+    }
+    monkeypatch.setattr(server_cli, "_should_open_browser", lambda _requested: False)
+    monkeypatch.setattr(server_cli, "_assert_bind_available", Mock())
+    monkeypatch.setattr(server_cli, "_is_embedded_storage", lambda: False)
+    monkeypatch.setattr(server_cli, "_is_mcp_enabled", lambda: True)
+    monkeypatch.setattr(server_cli, "_setup_server_logging", lambda: None)
+    monkeypatch.setattr(server_cli, "_run_server_app", uvicorn_run)
+
+    try:
+        result = runner.invoke(
+            server_cli.server,
+            ["--workers", "4", "--no-open-browser"],
+        )
+    finally:
+        for name, value in original.items():
+            setattr(server_cli.config, name, value)
+
+    assert result.exit_code == 0
+    assert "MCP streamable HTTP sessions are process-local" in result.stderr
+    assert "Forcing workers=1 (was 4)" in result.stderr
+    uvicorn_run.assert_called_once()
+    assert uvicorn_run.call_args.kwargs["workers"] == 1
+
+
+def test_cli_keeps_multiple_workers_without_process_local_modes(monkeypatch):
+    runner = CliRunner()
+    uvicorn_run = Mock()
+    original = {
+        "host": server_cli.config.host,
+        "port": server_cli.config.port,
+        "workers": server_cli.config.workers,
+        "reload": server_cli.config.reload,
+    }
+    monkeypatch.setattr(server_cli, "_should_open_browser", lambda _requested: False)
+    monkeypatch.setattr(server_cli, "_assert_bind_available", Mock())
+    monkeypatch.setattr(server_cli, "_is_embedded_storage", lambda: False)
+    monkeypatch.setattr(server_cli, "_is_mcp_enabled", lambda: False)
+    monkeypatch.setattr(server_cli, "_setup_server_logging", lambda: None)
+    monkeypatch.setattr(server_cli, "_run_server_app", uvicorn_run)
+
+    try:
+        result = runner.invoke(
+            server_cli.server,
+            ["--workers", "4", "--no-open-browser"],
+        )
+    finally:
+        for name, value in original.items():
+            setattr(server_cli.config, name, value)
+
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    uvicorn_run.assert_called_once()
+    assert uvicorn_run.call_args.kwargs["workers"] == 4
 
 
 def test_cli_no_open_browser_disables_waiter(monkeypatch):

@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
+from importlib.util import find_spec
 from typing import Optional
 
 
@@ -240,6 +241,11 @@ def _is_embedded_storage() -> bool:
     return False
 
 
+def _is_mcp_enabled() -> bool:
+    """Return whether the in-process server will mount the streamable HTTP MCP app."""
+    return find_spec("fastmcp") is not None
+
+
 def _run_server_app(**kwargs) -> None:
     """Start uvicorn after verifying server extras are installed."""
     _require_server_deps()
@@ -293,6 +299,16 @@ def server(host, port, workers, reload, log_level, open_browser):
     if not config.reload and config.workers != 1 and _is_embedded_storage():
         print(
             f"[server] Embedded storage detected (SQLite or seekdb without host). "
+            f"Forcing workers=1 (was {config.workers}).",
+            file=sys.stderr,
+        )
+        config.workers = 1
+
+    # MCP streamable HTTP sessions are process-local, so multiple worker
+    # processes would split session state and break follow-up requests.
+    if not config.reload and config.workers != 1 and _is_mcp_enabled():
+        print(
+            f"[server] MCP streamable HTTP sessions are process-local. "
             f"Forcing workers=1 (was {config.workers}).",
             file=sys.stderr,
         )
