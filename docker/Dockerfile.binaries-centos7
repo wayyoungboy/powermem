@@ -26,7 +26,7 @@ WORKDIR /powermem
 COPY ./ ./
 
 RUN /opt/miniconda3/bin/conda create --name powermem python=3.11 -y \
-    && /opt/miniconda3/envs/powermem/bin/python -m pip install --upgrade pip setuptools wheel \
+    && /opt/miniconda3/envs/powermem/bin/python -m pip install --upgrade pip "setuptools<81" wheel \
     && /opt/miniconda3/envs/powermem/bin/pip install ".[cli,server,mcp,seekdb]" pyinstaller \
     && /opt/miniconda3/envs/powermem/bin/python scripts/check_package_versions.py \
     && PATH="/opt/miniconda3/envs/powermem/bin:${PATH}" bash scripts/build_linux_binaries.sh

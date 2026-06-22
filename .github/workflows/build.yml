@@ -313,7 +313,7 @@ jobs:
       - name: Install binary build dependencies
         shell: bash
         run: |
-          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade pip "setuptools<81" wheel
           python -m pip install ".[cli,server,mcp,seekdb]" pyinstaller
           python scripts/check_package_versions.py
 

@@ -18,7 +18,8 @@ def test_release_binary_help_smokes_are_bounded() -> None:
     smoke_script = (ROOT / "scripts" / "smoke_binary_package.py").read_text()
 
     assert "[str(binary), \"--help\"]" in smoke_script
-    assert "timeout=10" in smoke_script
+    assert "timeout=60" in smoke_script
+    assert "_run_checked(" in smoke_script
 
 
 def test_release_binary_tarball_bin_contents_are_exact() -> None:
@@ -59,7 +60,14 @@ def test_release_binary_matrix_includes_supported_macos_and_windows_arches() -> 
     assert "windows-11-arm" not in workflow
     assert "binary-arch: amd64" in workflow
     assert "binary-arch: aarch64" in workflow
+    assert 'python -m pip install --upgrade pip "setuptools<81" wheel' in workflow
     assert 'python -m pip install ".[cli,server,mcp,seekdb]" pyinstaller' in workflow
+
+
+def test_linux_binary_dockerfile_pins_pyinstaller_setuptools_runtime_api() -> None:
+    dockerfile = (ROOT / "docker" / "Dockerfile.binaries-centos7").read_text()
+
+    assert 'python -m pip install --upgrade pip "setuptools<81" wheel' in dockerfile
 
 
 def test_release_uploads_arch_named_binary_assets() -> None:
