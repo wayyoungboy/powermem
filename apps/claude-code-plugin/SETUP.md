@@ -349,7 +349,7 @@ writing. Never silently patch `.env`.**
       uv pip install --python "$POWERMEM_PYTHON" -e '.[server,seekdb]'
       ```
       ⚠️ Both extras are required: `[server]` adds fastapi/uvicorn and
-      fastmcp for the HTTP API plus MCP entry points;
+      fastmcp for the HTTP API plus MCP transports;
       `[seekdb]` adds the embedded seekdb storage backend (default).
     - Immediately after `uv pip install`, detect which Python interpreter was used. Read
       the shebang from the freshly-installed `powermem-server` entry point — this is
@@ -488,7 +488,7 @@ writing. Never silently patch `.env`.**
       now; every `claude` and `claude -p` loads it automatically.
 
 3b. PYPI/MCP path:
-    - Install the MCP extra in the environment that Claude will use, then:
+    - Install the server extra in the environment that Claude will use, then:
       uv venv venv --python python3.11
       POWERMEM_PYTHON="$(pwd)/venv/bin/python"
       export PATH="$(pwd)/venv/bin:$PATH"
@@ -734,7 +734,7 @@ resets initialization and makes startup take even longer.
 **Problem**: Server exits immediately after launch with "Missing dependencies" error.
 **Cause**: installing only the base project skips optional server dependencies.
 `powermem[server]` installs fastapi, uvicorn, and fastmcp for the HTTP API plus
-MCP entry points.
+MCP transports.
 **Fix**:
 ```bash
 uv pip install --python "$POWERMEM_PYTHON" -e '.[server,seekdb]'
