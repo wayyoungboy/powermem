@@ -321,13 +321,12 @@ def test_observation_route_response_reuses_memory_serialization():
 
 
 def test_observation_router_is_registered_under_api_v1():
-    prefixes = {
-        route.original_router.prefix
-        for route in v1_router.routes
-        if hasattr(route, "original_router")
-    }
+    app = FastAPI()
+    app.include_router(v1_router)
+    paths = app.openapi()["paths"]
 
-    assert "/observations" in prefixes
+    assert "post" in paths["/api/v1/observations"]
+    assert "post" in paths["/api/v1/observations/batch"]
 
 
 class FakeObservationService:
