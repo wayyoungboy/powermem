@@ -37,9 +37,9 @@ For **OpenClaw**, use the separate [`memory-powermem`](https://github.com/ob-lab
 
 Each setup guide is **idempotent**: re-running it reuses an existing healthy backend and updates the target client config instead of duplicating entries.
 
-For manual installs, `powermem[server]` provides the HTTP API server and `powermem[mcp]`
-provides the MCP entry point. Add `seekdb` (for example `powermem[server,seekdb]` or
-`powermem[mcp,seekdb]`) when you want the default embedded seekdb storage/embedder.
+For manual installs, `powermem[server]` provides both the HTTP API server and
+the MCP entry point. Add `seekdb` (for example `powermem[server,seekdb]`) when
+you want the default embedded seekdb storage/embedder.
 
 ## Backend strategy
 
