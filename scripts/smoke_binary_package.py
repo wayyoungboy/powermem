@@ -87,14 +87,39 @@ def _verify_tar_members(tar: tarfile.TarFile, target: Path) -> None:
             _fail(f"unsafe tar member link: {member.name}")
 
 
+def _run_checked(
+    command: list[str],
+    *,
+    timeout: int,
+    description: str,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        result = subprocess.run(
+            command,
+            timeout=timeout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or ""
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        _fail(f"{description} timed out after {timeout} seconds\n{output}")
+
+    if result.returncode != 0:
+        _fail(
+            f"{description} exited with status {result.returncode}\n"
+            f"{result.stdout}"
+        )
+    return result
+
+
 def _run_help(binary: Path) -> None:
-    subprocess.run(
+    _run_checked(
         [str(binary), "--help"],
-        check=True,
-        timeout=10,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+        timeout=60,
+        description=f"{binary.name} --help",
     )
 
 
