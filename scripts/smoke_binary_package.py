@@ -164,7 +164,7 @@ def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
 def _smoke_server(server_binary: Path, port: int) -> None:
     env = os.environ.copy()
     with _temporary_directory(prefix="powermem-server-smoke-") as tmp:
-        log_path = Path(tmp) / "powermem-server-smoke.log"
+        server_output_path = Path(tmp) / "powermem-server-smoke-output.txt"
         env.update(
             {
                 "CI": "1",
@@ -178,7 +178,7 @@ def _smoke_server(server_binary: Path, port: int) -> None:
             }
         )
 
-        with log_path.open("w", encoding="utf-8", errors="replace") as server_output:
+        with server_output_path.open("w", encoding="utf-8", errors="replace") as server_output:
             process = subprocess.Popen(
                 [
                     str(server_binary),
