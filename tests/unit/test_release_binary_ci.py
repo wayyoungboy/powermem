@@ -41,6 +41,8 @@ def test_release_binary_server_smoke_checks_health_json_and_dashboard() -> None:
     assert "ignore_cleanup_errors=os.name == \"nt\"" in smoke_script
     assert "powermem-server-smoke-output.txt" in smoke_script
     assert "stdout=server_output" in smoke_script
+    assert "log_path" not in smoke_script
+    assert "server_output_path.read_text" in smoke_script
     assert '"AGENT_MEMORY_MODE": "multi_user"' in smoke_script
     assert 'health.get("success") is not True' in smoke_script
     assert 'health.get("data", {}).get("status") != "healthy"' in smoke_script

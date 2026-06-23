@@ -241,7 +241,7 @@ def _smoke_server(server_binary: Path, port: int) -> None:
                 _terminate_process_tree(process)
 
         if failure is not None:
-            output = log_path.read_text(encoding="utf-8", errors="replace")
+            output = server_output_path.read_text(encoding="utf-8", errors="replace")
             _fail(f"{failure}\n{output}")
 
 
