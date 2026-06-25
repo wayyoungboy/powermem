@@ -33,14 +33,14 @@ Prefer to wire it by hand? The full plugin reference below covers every option.
 |--------|----------------|-------|
 | Claude Code | No | |
 | MCP tools | No | **Off by default** (HTTP mode). Run `apply-connection-mode.sh mcp` to enable. |
-| **Hooks** (transcript / compact → HTTP API) | **No** | Native binaries under `hooks/bin/` + `run-hook.sh` (macOS/Linux) or PowerShell on Windows. **`POWERMEM_BASE_URL` defaults to `http://localhost:8848`.** |
+| **Hooks** (transcript / compact → HTTP API) | **No** | Release plugin zips include native binaries under `hooks/bin/` + `run-hook.sh` (macOS/Linux) or PowerShell on Windows. Source checkouts build them locally. **`POWERMEM_BASE_URL` defaults to `http://localhost:8848`.** |
 | Optional **file poller** | No | Same binary: `sh hooks/run-hook.sh poll` — see [watcher/README.md](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/watcher/README.md). |
 
 **macOS / Linux:** default `hooks/hooks.json` runs `sh …/run-hook.sh`. POSIX `sh` is always present.
 
-**Windows (native, no Git Bash):** if `sh` is missing, merge the commands from [`hooks/hooks.windows.example.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.windows.example.json) into your Claude `settings.json` so hooks call `powershell.exe -File …/run-hook.ps1`. The zip includes `hooks/bin/powermem-hook-windows-amd64.exe` (add `windows/arm64` to the build script if you need it).
+**Windows (native, no Git Bash):** if `sh` is missing, merge the commands from [`hooks/hooks.windows.example.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.windows.example.json) into your Claude `settings.json` so hooks call `powershell.exe -File …/run-hook.ps1`. The release zip includes `hooks/bin/powermem-hook-windows-amd64.exe`; source checkouts should run the build script first (add `windows/arm64` to the build script if you need it).
 
-**Rebuilding binaries** (developers / CI): Go **1.22+**, then `bash scripts/build-hook-binaries.sh` or `make build-claude-hook` from the repo root. `make package-claude-plugin` builds them automatically before zipping.
+**Rebuilding binaries** (developers / CI): Go **1.22+**, then `make build-claude-hook` or `bash apps/claude-code-plugin/scripts/build-hook-binaries.sh` from the repo root. The generated `hooks/bin/` directory is a local build artifact and is not tracked by git. `make package-claude-plugin` builds the binaries automatically before zipping, and release plugin assets carry the generated binaries.
 
 ## Prerequisites
 
@@ -63,10 +63,11 @@ cd powermem
 
 Copy the template and set your Anthropic credential. For direct Anthropic API
 access use `LLM_API_KEY`; for a Claude Code-style bearer-token gateway use
-`LLM_AUTH_TOKEN` together with `ANTHROPIC_LLM_BASE_URL`. Storage defaults to the
-embedded **seekdb** database (no separate database), and the embedder to a local
+`LLM_AUTH_TOKEN` together with `ANTHROPIC_LLM_BASE_URL`. Storage defaults to a
+local **SQLite** database (no separate service), and the embedder to a local
 `sentence-transformers/all-MiniLM-L6-v2` model (no API key, auto-downloaded on
-first use).
+first use). Set `DATABASE_PROVIDER=oceanbase` / the OceanBase settings when you
+want the embedded seekdb path instead.
 
 ```bash
 cp .env.example .env
@@ -103,15 +104,15 @@ uv --version
 
 ### Step 4 — Install PowerMem and build the hook binaries
 
-`uv pip install -e '.[server,seekdb]'` provides the `powermem-server` and
-`pmem` commands plus the zero-config local seekdb path and local embedder.
+`uv pip install -e '.[server,extras]'` provides the `powermem-server` and
+`pmem` commands plus the zero-config local SQLite path and local embedder.
 `make build-claude-hook` compiles the native Go hook binaries (requires
 **Go 1.22+**):
 
 ```bash
 uv venv venv --python python3.11
 source venv/bin/activate
-uv pip install --python "$VIRTUAL_ENV/bin/python" -e '.[server,seekdb]'
+uv pip install --python "$VIRTUAL_ENV/bin/python" -e '.[server,extras]'
 make build-claude-hook        # outputs apps/claude-code-plugin/hooks/bin/
 ```
 
@@ -156,8 +157,10 @@ When the PowerMem marketplace entry is available, install it with:
 
 The marketplace step installs the Claude Code plugin connector. The
 `/memory-powermem:init` step prepares the PowerMem backend by ensuring `uv`, then
-starts it with the uvx-style launcher
-`uvx --from 'powermem[server,seekdb]' powermem-server`. The PyPI release must
+starts it with the uvx-style launcher. The package spec depends on the storage
+backend: the default SQLite path uses `powermem[server,extras]` (pulls
+`sentence-transformers` for the local `huggingface` embedder), while the
+OceanBase/seekdb path uses `powermem[server,seekdb]`. The PyPI release must
 include the backend features required by the plugin, including the default local
 embedding dependencies. If `uv` is missing, init installs it automatically:
 non-CN networks use the official Astral installer, while CN networks use the USTC
@@ -175,7 +178,12 @@ passes it to `uvx --from`:
 ```
 
 ```bash
+# Default SQLite path
+POWERMEM_INIT_PACKAGE='powermem[server,extras] @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>' \
+  sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+# OceanBase/seekdb path
 POWERMEM_INIT_PACKAGE='powermem[server,seekdb] @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>' \
+  POWERMEM_INIT_DATABASE_PROVIDER=oceanbase \
   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
 ```
 
@@ -231,7 +239,7 @@ The hook binary only **writes** to your PowerMem server; it does not install a s
 | Install style | Update steps |
 |---------------|--------------|
 | **Zip** | Download the new `.zip`, replace the old folder (delete the previous `powermem-claude-code-plugin` tree, unzip the new one to the same or a new path), then start Claude with `--plugin-dir` pointing at the new folder. |
-| **Repo / `git`** | `git pull` (or fetch the release you want), run `make package-claude-plugin` or `bash scripts/package-plugin.sh` if you need a fresh zip, then restart Claude Code. |
+| **Repo / `git`** | `git pull` (or fetch the release you want), run `make package-claude-plugin` or `bash apps/claude-code-plugin/scripts/package-plugin.sh` if you need a fresh zip, then restart Claude Code. |
 | **Marketplace** | Run `/plugin uninstall memory-powermem@powermem`, reinstall from the marketplace, then run `/reload-plugins`. If the backend package changed, re-run `/memory-powermem:init` so uvx resolves the new PyPI release. |
 
 After updating, restart the Claude Code session (or the whole app) so MCP config, skills, and hooks reload.
@@ -287,7 +295,7 @@ After `apply-connection-mode.sh mcp`, edit `.mcp.json` or `config/mcp-mode.mcp.j
 }
 ```
 
-Ensure PowerMem is installed (`uv pip install --python "$VIRTUAL_ENV/bin/python" "powermem[mcp,seekdb]"`) and a `.env` is available when using stdio.
+Ensure PowerMem is installed (`uv pip install --python "$VIRTUAL_ENV/bin/python" "powermem[server,seekdb]"`) and a `.env` is available when using stdio.
 
 ### HTTP mode: REST only (standard)
 
@@ -295,7 +303,7 @@ This is the **default** root `.mcp.json`. Claude has **no** PowerMem MCP tools; 
 
 ### Seamless recording (hooks + HTTP API)
 
-The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.json), [`hooks/run-hook.sh`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/run-hook.sh), and **native** `hooks/bin/powermem-hook-*` (built from [`cmd/powermem-hook`](https://github.com/oceanbase/powermem/tree/main/apps/claude-code-plugin/cmd/powermem-hook/)). When the plugin is enabled, Claude Code merges these hooks:
+The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.json) and [`hooks/run-hook.sh`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/run-hook.sh). Release zips also include **native** `hooks/bin/powermem-hook-*` binaries built from [`cmd/powermem-hook`](https://github.com/oceanbase/powermem/tree/main/apps/claude-code-plugin/cmd/powermem-hook/); source checkouts build that ignored `hooks/bin/` directory locally. When the plugin is enabled, Claude Code merges these hooks:
 
 | Hook | What happens |
 |------|----------------|
@@ -321,7 +329,11 @@ Optional environment variables (where you launch Claude Code):
 | `POWERMEM_USER_ID` | No | Defaults to OS login name |
 | `POWERMEM_AGENT_ID` | No | Optional `agent_id` on memories |
 | `POWERMEM_HOOK_MAX_CHARS` | No | Transcript cap (default `120000`) |
-| `POWERMEM_HOOK_SCRUB` | No | Scrubs sensitive-looking tokens from hook content and metadata by default; set `0` / `false` / `no` / `off` only for trusted local debugging. |
+| `POWERMEM_HOOK_SCRUB` | No | Deterministic local scrubber for hook payloads. Default `1`; set `0` / `false` / `no` / `off` only if you want raw hook data sent to the configured server. |
+| `POWERMEM_HOOK_PRIVACY_LEVEL` | No | `standard` (default) redacts high-confidence credential patterns; `strict` also redacts common emails and phone numbers. |
+| `POWERMEM_HOOK_SECRET_ACTION` | No | `redact` (default) replaces matched values; `block` skips the memory write successfully when a high-confidence credential is found. |
+| `POWERMEM_HOOK_PATH_PRIVACY` | No | Path handling for content and metadata: `home` (default; home paths become `~/...`, other absolute paths keep only the basename), `basename`, `omit`, or `full`. |
+| `POWERMEM_HOOK_SEARCH_SECRET_POLICY` | No | Prompt-search handling for high-confidence credential patterns: `skip` (default), `redact`, or `off` (disables only the search secret skip/redact policy; path privacy and strict PII scrubbing still apply when hook scrubbing is enabled). |
 | `POWERMEM_INFER_TRANSCRIPT` | No | Set `1` to enable server-side infer on large transcripts (default off) |
 | `POWERMEM_INFER_COMPACT` | No | Set `0` to disable infer on compact summaries (default on) |
 | `POWERMEM_PROMPT_SEARCH` | No | **Default: on** — injects semantic search results on every user prompt via `UserPromptSubmit`. Set **`0`** / **`false`** / **`no`** / **`off`** to disable. |
@@ -351,6 +363,8 @@ Optional environment variables (where you launch Claude Code):
 | `POWERMEM_INFER_LIFECYCLE_EVENTS` | No | Set `1` to enable server-side infer for all lifecycle events (default off). |
 | `POWERMEM_INFER_SUBAGENT_STOP` | No | Set `1` to enable infer for `SubagentStop` when the generic lifecycle infer flag is off. |
 | `POWERMEM_INFER_TASK_COMPLETED` | No | Set `1` to enable infer for `TaskCompleted` when the generic lifecycle infer flag is off. |
+
+The hook scrubber runs before `SessionEnd`, `PostCompact`, workspace-file writes, prompt search, and the `PostCompact` detached-worker environment handoff. Write metadata includes a `privacy` object with the active level, path mode, action, and redaction counts; original matched values are not recorded there.
 
 **SessionEnd timeout:** Claude Code defaults to a short timeout for `SessionEnd` hooks. The hook **returns immediately** and uploads in a **detached worker process**, so large transcripts still upload without blocking exit. If you ever switch to a synchronous upload inside the hook, raise `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` (see [Claude Code hooks – SessionEnd](https://code.claude.com/docs/en/hooks#sessionend)).
 

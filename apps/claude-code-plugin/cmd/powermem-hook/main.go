@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,6 +22,17 @@ import (
 
 // Default REST base when POWERMEM_BASE_URL is unset (matches .mcp.json local server).
 const defaultPowerMemBaseURL = "http://localhost:8848"
+
+const workerPayloadPathEnv = "POWERMEM_WORKER_PAYLOAD_PATH"
+const preparedParentScrubReportKey = "_powermem_parent_scrub_report"
+
+type workerHandoffPayload struct {
+	TranscriptPath    string `json:"transcript_path,omitempty"`
+	SessionID         string `json:"session_id,omitempty"`
+	CWD               string `json:"cwd,omitempty"`
+	Reason            string `json:"reason,omitempty"`
+	ParentScrubReport string `json:"parent_scrub_report,omitempty"`
+}
 
 func main() {
 	if len(os.Args) >= 2 {
@@ -61,68 +71,6 @@ func baseURL() string {
 	return strings.TrimRight(s, "/")
 }
 
-var hookScrubEnabledAtStartup = parseHookScrubEnabled(os.Getenv("POWERMEM_HOOK_SCRUB"))
-
-func parseHookScrubEnabled(raw string) bool {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "0", "false", "no", "off":
-		return false
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return true
-	}
-}
-
-func hookScrubEnabled() bool {
-	return hookScrubEnabledAtStartup
-}
-
-var scrubPatterns = []struct {
-	re   *regexp.Regexp
-	repl string
-}{
-	{regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/\-=]{8,}`), "Bearer <redacted>"},
-	{regexp.MustCompile(`(?i)\b(sk-|ghp_|github_pat_|xox[baprs]-|ya29\.)[A-Za-z0-9._\-]{8,}`), "${1}<redacted>"},
-	{regexp.MustCompile(`(?i)\b(api[_-]?key|auth[_-]?token|token|secret|password)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;]+)`), "${1}${2}<redacted>"},
-	{regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`), "AKIA<redacted>"},
-}
-
-func scrubText(s string) string {
-	if !hookScrubEnabled() || s == "" {
-		return s
-	}
-	out := s
-	for _, pattern := range scrubPatterns {
-		out = pattern.re.ReplaceAllString(out, pattern.repl)
-	}
-	return out
-}
-
-func scrubValue(v any) any {
-	if !hookScrubEnabled() {
-		return v
-	}
-	switch x := v.(type) {
-	case string:
-		return scrubText(x)
-	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, v := range x {
-			out[k] = scrubValue(v)
-		}
-		return out
-	case []any:
-		out := make([]any, len(x))
-		for i, v := range x {
-			out[i] = scrubValue(v)
-		}
-		return out
-	default:
-		return v
-	}
-}
-
 func spawnWorker(mode string, envExtra map[string]string) bool {
 	self, err := os.Executable()
 	if err != nil {
@@ -141,35 +89,70 @@ func spawnWorker(mode string, envExtra map[string]string) bool {
 	return cmd.Start() == nil
 }
 
-func spawnPayloadWorker(mode string, payload map[string]any) {
+func writeWorkerPayloadFile(payload any) (string, bool) {
 	f, err := os.CreateTemp("", "powermem-hook-payload-*.json")
 	if err != nil {
-		return
+		return "", false
 	}
 	name := f.Name()
 	encErr := json.NewEncoder(f).Encode(payload)
 	closeErr := f.Close()
 	if encErr != nil || closeErr != nil {
 		_ = os.Remove(name)
+		return "", false
+	}
+	return name, true
+}
+
+func spawnPayloadWorker(mode string, payload workerHandoffPayload) {
+	path, ok := writeWorkerPayloadFile(payload)
+	if !ok {
 		return
 	}
-	if !spawnWorker(mode, map[string]string{"POWERMEM_WORKER_PAYLOAD_PATH": name}) {
-		_ = os.Remove(name)
+	if !spawnWorker(mode, map[string]string{workerPayloadPathEnv: path}) {
+		_ = os.Remove(path)
 	}
 }
 
-func readWorkerPayload() map[string]any {
-	path := strings.TrimSpace(os.Getenv("POWERMEM_WORKER_PAYLOAD_PATH"))
+func spawnMapPayloadWorker(mode string, payload map[string]any) {
+	path, ok := writeWorkerPayloadFile(payload)
+	if !ok {
+		return
+	}
+	if !spawnWorker(mode, map[string]string{workerPayloadPathEnv: path}) {
+		_ = os.Remove(path)
+	}
+}
+
+func readWorkerPayload() (workerHandoffPayload, bool) {
+	path := strings.TrimSpace(os.Getenv(workerPayloadPathEnv))
+	if path == "" {
+		return workerHandoffPayload{}, false
+	}
+	b, err := os.ReadFile(path)
+	_ = os.Remove(path)
+	if err != nil {
+		return workerHandoffPayload{}, false
+	}
+	var payload workerHandoffPayload
+	if json.Unmarshal(b, &payload) != nil {
+		return workerHandoffPayload{}, false
+	}
+	return payload, true
+}
+
+func readMapWorkerPayload() map[string]any {
+	path := strings.TrimSpace(os.Getenv(workerPayloadPathEnv))
 	if path == "" {
 		return nil
 	}
-	defer os.Remove(path)
-	data, err := os.ReadFile(path)
+	b, err := os.ReadFile(path)
+	_ = os.Remove(path)
 	if err != nil {
 		return nil
 	}
 	var payload map[string]any
-	if json.Unmarshal(data, &payload) != nil {
+	if json.Unmarshal(b, &payload) != nil {
 		return nil
 	}
 	return payload
@@ -203,11 +186,21 @@ func stdinHook() {
 			return
 		}
 		reason, _ := payload["reason"].(string)
-		spawnWorker("worker-transcript", map[string]string{
-			"POWERMEM_WORKER_TRANSCRIPT_PATH": tp,
-			"POWERMEM_WORKER_SESSION_ID":      sid,
-			"POWERMEM_WORKER_CWD":             cwd,
-			"POWERMEM_WORKER_REASON":          reason,
+		cfg := loadHookPrivacyConfig()
+		cwd, report, ok := scrubCWDForWorker(cwd, cfg)
+		if !ok {
+			return
+		}
+		parentReportRaw := ""
+		if encoded := encodeScrubReport(report); encoded != "" {
+			parentReportRaw = encoded
+		}
+		spawnPayloadWorker("worker-transcript", workerHandoffPayload{
+			TranscriptPath:    tp,
+			SessionID:         sid,
+			CWD:               cwd,
+			Reason:            reason,
+			ParentScrubReport: parentReportRaw,
 		})
 	case "PostCompact":
 		summary, _ := payload["compact_summary"].(string)
@@ -218,12 +211,21 @@ func stdinHook() {
 			summary = summary[:900000] + "\n…"
 		}
 		trigger, _ := payload["trigger"].(string)
-		spawnWorker("worker-compact", map[string]string{
+		cfg := loadHookPrivacyConfig()
+		summary, cwd, report, ok := scrubCompactForWorker(summary, cwd, cfg)
+		if !ok {
+			return
+		}
+		env := map[string]string{
 			"POWERMEM_WORKER_COMPACT_SUMMARY": summary,
 			"POWERMEM_WORKER_SESSION_ID":      sid,
 			"POWERMEM_WORKER_CWD":             cwd,
 			"POWERMEM_WORKER_TRIGGER":         trigger,
-		})
+		}
+		if encoded := encodeScrubReport(report); encoded != "" {
+			env[parentScrubReportEnv] = encoded
+		}
+		spawnWorker("worker-compact", env)
 	case "PreCompact":
 		if !capturePreCompact() {
 			return
@@ -239,12 +241,17 @@ func stdinHook() {
 		if err != nil || strings.TrimSpace(snapshot.Text) == "" {
 			return
 		}
-		payload["_powermem_precompact_text"] = scrubText(snapshot.Text)
+		cfg := loadHookPrivacyConfig()
+		scrubbedText, report := scrubText(snapshot.Text, cfg)
+		if shouldBlockWrite(cfg, report) || strings.TrimSpace(scrubbedText) == "" {
+			return
+		}
+		payload["_powermem_precompact_text"] = scrubbedText
 		payload["_powermem_precompact_start_byte"] = snapshot.StartByte
 		payload["_powermem_precompact_end_byte"] = snapshot.EndByte
 		payload["_powermem_precompact_max_chars"] = maxPreCompactChars()
 		payload["_powermem_precompact_max_lines"] = maxPreCompactLines()
-		spawnPayloadWorker("worker-precompact", payload)
+		spawnMapPayloadWorker("worker-precompact", payload)
 	case "PostToolUse":
 		if !captureToolSuccess() {
 			return
@@ -256,7 +263,7 @@ func stdinHook() {
 		if handoff == nil {
 			return
 		}
-		spawnPayloadWorker("worker-tool-event", handoff)
+		spawnMapPayloadWorker("worker-tool-event", handoff)
 	case "PostToolUseFailure":
 		if !captureToolFailures() {
 			return
@@ -268,7 +275,7 @@ func stdinHook() {
 		if handoff == nil {
 			return
 		}
-		spawnPayloadWorker("worker-tool-event", handoff)
+		spawnMapPayloadWorker("worker-tool-event", handoff)
 	case "Stop":
 		if !captureStopRollup() || boolField(payload, "stop_hook_active", false) {
 			return
@@ -277,32 +284,17 @@ func stdinHook() {
 		if handoff == nil {
 			return
 		}
-		spawnPayloadWorker("worker-tool-event", handoff)
+		spawnMapPayloadWorker("worker-tool-event", handoff)
 	case "SubagentStart", "SubagentStop":
 		if !captureSubagents() {
 			return
 		}
-		spawnPayloadWorker("worker-lifecycle", payload)
+		spawnMapPayloadWorker("worker-lifecycle", payload)
 	case "TaskCreated", "TaskCompleted":
 		if !captureTasks() {
 			return
 		}
-		spawnPayloadWorker("worker-lifecycle", payload)
-	}
-}
-
-func envBool(name string, def bool) bool {
-	s := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
-	if s == "" {
-		return def
-	}
-	switch s {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	default:
-		return def
+		spawnMapPayloadWorker("worker-lifecycle", payload)
 	}
 }
 
@@ -485,13 +477,7 @@ func promptSearchEnabled() bool {
 }
 
 func searchBodyUserID() string {
-	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
-		return u
-	}
-	if u := os.Getenv("USER"); u != "" {
-		return u
-	}
-	return os.Getenv("USERNAME")
+	return memoryUserID()
 }
 
 func searchBodyAgentID() string {
@@ -557,9 +543,22 @@ func handleSessionStart(payload map[string]any) {
 	if query == "" {
 		return
 	}
+	cfg := loadHookPrivacyConfig()
+	var ok bool
+	query, ok = scrubPromptForSearch(query, cfg)
+	if !ok {
+		return
+	}
 	ctx, err := searchMemories(query, sessionStartLimit())
 	if err != nil || strings.TrimSpace(ctx) == "" {
 		return
+	}
+	if cfg.Enabled {
+		var report scrubReport
+		ctx, report = scrubText(ctx, cfg)
+		if shouldBlockWrite(cfg, report) || strings.TrimSpace(ctx) == "" {
+			return
+		}
 	}
 	maxC := sessionStartMaxContextChars()
 	if len(ctx) > maxC {
@@ -587,9 +586,22 @@ func handleUserPromptSubmit(payload map[string]any) {
 	if len(prompt) < 2 {
 		return
 	}
+	cfg := loadHookPrivacyConfig()
+	var ok bool
+	prompt, ok = scrubPromptForSearch(prompt, cfg)
+	if !ok {
+		return
+	}
 	ctx, err := searchMemoriesForPrompt(prompt)
 	if err != nil || strings.TrimSpace(ctx) == "" {
 		return
+	}
+	if cfg.Enabled {
+		var report scrubReport
+		ctx, report = scrubText(ctx, cfg)
+		if shouldBlockWrite(cfg, report) || strings.TrimSpace(ctx) == "" {
+			return
+		}
 	}
 	maxC := promptSearchMaxContextChars()
 	if len(ctx) > maxC {
@@ -615,14 +627,28 @@ func searchMemoriesForPrompt(query string) (string, error) {
 func searchMemories(query string, limit int) (string, error) {
 	base := baseURL()
 	body := map[string]any{
-		"query": scrubText(query),
+		"query": query,
 		"limit": limit,
 	}
-	if u := searchBodyUserID(); u != "" {
-		body["user_id"] = scrubText(u)
+	userID := searchBodyUserID()
+	agentID := searchBodyAgentID()
+	cfg := loadHookPrivacyConfig()
+	if cfg.Enabled {
+		var report scrubReport
+		userID, report = scrubSearchIdentifier(userID, cfg)
+		if cfg.SearchSecretPolicy == "skip" && report.SecretRedactions > 0 {
+			return "", nil
+		}
+		agentID, report = scrubSearchIdentifier(agentID, cfg)
+		if cfg.SearchSecretPolicy == "skip" && report.SecretRedactions > 0 {
+			return "", nil
+		}
 	}
-	if a := searchBodyAgentID(); a != "" {
-		body["agent_id"] = scrubText(a)
+	if u := userID; u != "" {
+		body["user_id"] = u
+	}
+	if a := agentID; a != "" {
+		body["agent_id"] = a
 	}
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -693,25 +719,69 @@ func formatSearchResults(respBody []byte) (string, error) {
 	return s, nil
 }
 
+func scrubSearchIdentifier(value string, cfg hookPrivacyConfig) (string, scrubReport) {
+	if cfg.SearchSecretPolicy == "off" {
+		return scrubTextWithoutPromptSecretPolicy(value, cfg)
+	}
+	return scrubMetadataString("search_id", value, cfg)
+}
+
 func postMemory(content string, meta map[string]any, runID *string, infer bool) error {
+	return postMemoryWithScrubReport(content, meta, runID, infer, scrubReport{})
+}
+
+func postMemoryWithScrubReport(content string, meta map[string]any, runID *string, infer bool, parentReport scrubReport) error {
+	cfg := loadHookPrivacyConfig()
+	userID := memoryUserID()
+	agentID := strings.TrimSpace(os.Getenv("POWERMEM_AGENT_ID"))
+	runIDValue := ""
+	if runID != nil {
+		runIDValue = *runID
+	}
+	if cfg.Enabled {
+		var report scrubReport
+		userID, report = scrubMetadataString("user_id", userID, cfg)
+		parentReport.merge(report)
+		agentID, report = scrubMetadataString("agent_id", agentID, cfg)
+		parentReport.merge(report)
+		runIDValue, report = scrubMetadataString("run_id", runIDValue, cfg)
+		parentReport.merge(report)
+		if shouldBlockWrite(cfg, parentReport) {
+			return nil
+		}
+	}
+	content, meta, blocked := scrubMemoryPayload(content, meta, cfg, parentReport)
+	if blocked {
+		return nil
+	}
+	return postMemoryRaw(content, meta, userID, agentID, runIDValue, infer)
+}
+
+func memoryUserID() string {
+	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
+		return u
+	}
+	if u := os.Getenv("USER"); u != "" {
+		return u
+	}
+	return os.Getenv("USERNAME")
+}
+
+func postMemoryRaw(content string, meta map[string]any, userID string, agentID string, runID string, infer bool) error {
 	base := baseURL()
 	body := map[string]any{
-		"content":  scrubText(content),
+		"content":  content,
 		"infer":    infer,
-		"metadata": scrubValue(meta),
+		"metadata": meta,
 	}
-	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
-		body["user_id"] = scrubText(u)
-	} else if u := os.Getenv("USER"); u != "" {
-		body["user_id"] = scrubText(u)
-	} else if u := os.Getenv("USERNAME"); u != "" {
-		body["user_id"] = scrubText(u)
+	if userID != "" {
+		body["user_id"] = userID
 	}
-	if a := strings.TrimSpace(os.Getenv("POWERMEM_AGENT_ID")); a != "" {
-		body["agent_id"] = scrubText(a)
+	if agentID != "" {
+		body["agent_id"] = agentID
 	}
-	if runID != nil && *runID != "" {
-		body["run_id"] = scrubText(*runID)
+	if runID != "" {
+		body["run_id"] = runID
 	}
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -740,6 +810,27 @@ func postMemory(content string, meta map[string]any, runID *string, infer bool) 
 
 func workerTranscript() {
 	path := os.Getenv("POWERMEM_WORKER_TRANSCRIPT_PATH")
+	sid := os.Getenv("POWERMEM_WORKER_SESSION_ID")
+	cwd := os.Getenv("POWERMEM_WORKER_CWD")
+	reason := os.Getenv("POWERMEM_WORKER_REASON")
+	parentReportRaw := os.Getenv(parentScrubReportEnv)
+	if payload, ok := readWorkerPayload(); ok {
+		if payload.TranscriptPath != "" {
+			path = payload.TranscriptPath
+		}
+		if payload.SessionID != "" {
+			sid = payload.SessionID
+		}
+		if payload.CWD != "" {
+			cwd = payload.CWD
+		}
+		if payload.Reason != "" {
+			reason = payload.Reason
+		}
+		if payload.ParentScrubReport != "" {
+			parentReportRaw = payload.ParentScrubReport
+		}
+	}
 	if path == "" {
 		return
 	}
@@ -747,19 +838,16 @@ func workerTranscript() {
 	if err != nil || strings.TrimSpace(text) == "" {
 		return
 	}
-	sid := os.Getenv("POWERMEM_WORKER_SESSION_ID")
-	cwd := os.Getenv("POWERMEM_WORKER_CWD")
-	reason := os.Getenv("POWERMEM_WORKER_REASON")
 	header := fmt.Sprintf("Claude Code session transcript (session_id=%s, cwd=%s, reason=%s)\n\n", sid, cwd, reason)
 	runID := sid
-	if err := postMemory(header+text, map[string]any{
+	if err := postMemoryWithScrubReport(header+text, map[string]any{
 		"source":             "claude-code-hook",
 		"kind":               "session-end-transcript",
 		"transcript_path":    path,
 		"session_id":         sid,
 		"cwd":                cwd,
 		"session_end_reason": reason,
-	}, &runID, inferTranscript()); err != nil {
+	}, &runID, inferTranscript(), decodeScrubReport(parentReportRaw)); err != nil {
 		os.Exit(1)
 	}
 }
@@ -774,13 +862,14 @@ func workerCompact() {
 	trigger := os.Getenv("POWERMEM_WORKER_TRIGGER")
 	runID := sid
 	content := fmt.Sprintf("Claude Code context compact summary (session_id=%s, cwd=%s, trigger=%s)\n\n%s", sid, cwd, trigger, summary)
-	if err := postMemory(content, map[string]any{
+	parentReport := decodeScrubReport(os.Getenv(parentScrubReportEnv))
+	if err := postMemoryWithScrubReport(content, map[string]any{
 		"source":          "claude-code-hook",
 		"kind":            "post-compact-summary",
 		"session_id":      sid,
 		"cwd":             cwd,
 		"compact_trigger": trigger,
-	}, &runID, inferCompact()); err != nil {
+	}, &runID, inferCompact(), parentReport); err != nil {
 		os.Exit(1)
 	}
 }
@@ -864,7 +953,7 @@ func readTranscriptTail(path string, maxChars int, maxLines int) (transcriptTail
 }
 
 func workerPreCompact() {
-	payload := readWorkerPayload()
+	payload := readMapWorkerPayload()
 	if payload == nil {
 		return
 	}
@@ -911,44 +1000,77 @@ func workerPreCompact() {
 }
 
 func prepareToolEventHandoff(payload map[string]any) map[string]any {
+	parentReport, ok := scrubPayloadReportForHandoff(payload)
+	if !ok {
+		return nil
+	}
 	content, meta, runID, infer, ok := buildToolEventPost(payload)
 	if !ok {
 		return nil
 	}
-	return map[string]any{
-		"_powermem_content":  scrubText(content),
-		"_powermem_metadata": scrubValue(meta),
-		"_powermem_run_id":   scrubText(runID),
-		"_powermem_infer":    infer,
-	}
+	return prepareMemoryPostHandoffWithReport(content, meta, runID, infer, parentReport)
 }
 
 func prepareMemoryPostHandoff(content string, meta map[string]any, runID string, infer bool) map[string]any {
+	return prepareMemoryPostHandoffWithReport(content, meta, runID, infer, scrubReport{})
+}
+
+func prepareMemoryPostHandoffWithReport(content string, meta map[string]any, runID string, infer bool, parentReport scrubReport) map[string]any {
 	if strings.TrimSpace(content) == "" || meta == nil {
 		return nil
 	}
-	return map[string]any{
-		"_powermem_content":  scrubText(content),
-		"_powermem_metadata": scrubValue(meta),
-		"_powermem_run_id":   scrubText(runID),
+	if shouldBlockWrite(loadHookPrivacyConfig(), parentReport) {
+		return nil
+	}
+	scrubbedContent, contentReport, ok := scrubTextForHandoffWithReport(content)
+	if !ok || strings.TrimSpace(scrubbedContent) == "" {
+		return nil
+	}
+	parentReport.merge(contentReport)
+	scrubbedRunID, runIDReport, ok := scrubTextForHandoffWithReport(runID)
+	if !ok {
+		return nil
+	}
+	parentReport.merge(runIDReport)
+	scrubbedMeta, metaReport, ok := scrubValueForHandoffWithReport(meta)
+	if !ok {
+		return nil
+	}
+	parentReport.merge(metaReport)
+	handoff := map[string]any{
+		"_powermem_content":  scrubbedContent,
+		"_powermem_metadata": scrubbedMeta,
+		"_powermem_run_id":   scrubbedRunID,
 		"_powermem_infer":    infer,
 	}
+	if encoded := encodeScrubReport(parentReport); encoded != "" {
+		handoff[preparedParentScrubReportKey] = encoded
+	}
+	return handoff
 }
 
 func prepareToolFailureHandoff(payload map[string]any) map[string]any {
+	parentReport, ok := scrubPayloadReportForHandoff(payload)
+	if !ok {
+		return nil
+	}
 	content, meta, runID, infer, ok := buildToolFailurePost(payload)
 	if !ok {
 		return nil
 	}
-	return prepareMemoryPostHandoff(content, meta, runID, infer)
+	return prepareMemoryPostHandoffWithReport(content, meta, runID, infer, parentReport)
 }
 
 func prepareStopRollupHandoff(payload map[string]any) map[string]any {
+	parentReport, ok := scrubPayloadReportForHandoff(payload)
+	if !ok {
+		return nil
+	}
 	content, meta, runID, infer, ok := buildStopRollupPost(payload)
 	if !ok {
 		return nil
 	}
-	return prepareMemoryPostHandoff(content, meta, runID, infer)
+	return prepareMemoryPostHandoffWithReport(content, meta, runID, infer, parentReport)
 }
 
 func preparedToolEventPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
@@ -987,6 +1109,10 @@ func boolField(m map[string]any, key string, def bool) bool {
 	}
 }
 
+func envBool(name string, def bool) bool {
+	return envBoolValue(os.Getenv(name), def)
+}
+
 func envBoolValue(raw string, def bool) bool {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "1", "true", "yes", "on":
@@ -996,6 +1122,59 @@ func envBoolValue(raw string, def bool) bool {
 	default:
 		return def
 	}
+}
+
+func hookScrubEnabled() bool {
+	return loadHookPrivacyConfig().Enabled
+}
+
+func scrubTextForHandoff(s string) (string, bool) {
+	out, _, ok := scrubTextForHandoffWithReport(s)
+	return out, ok
+}
+
+func scrubTextForHandoffWithReport(s string) (string, scrubReport, bool) {
+	cfg := loadHookPrivacyConfig()
+	if !cfg.Enabled {
+		return s, scrubReport{}, true
+	}
+	out, report := scrubText(s, cfg)
+	if shouldBlockWrite(cfg, report) {
+		return "", report, false
+	}
+	return out, report, true
+}
+
+func scrubValueForHandoff(v any) any {
+	out, _, ok := scrubValueForHandoffWithReport(v)
+	if !ok {
+		return nil
+	}
+	return out
+}
+
+func scrubValueForHandoffWithReport(v any) (any, scrubReport, bool) {
+	cfg := loadHookPrivacyConfig()
+	if !cfg.Enabled {
+		return v, scrubReport{}, true
+	}
+	scrubbed, report := scrubMetadataValue("payload", v, cfg)
+	if shouldBlockWrite(cfg, report) {
+		return nil, report, false
+	}
+	return scrubbed, report, true
+}
+
+func scrubPayloadReportForHandoff(v any) (scrubReport, bool) {
+	cfg := loadHookPrivacyConfig()
+	if !cfg.Enabled {
+		return scrubReport{}, true
+	}
+	_, report := scrubMetadataValue("payload", v, cfg)
+	if shouldBlockWrite(cfg, report) {
+		return report, false
+	}
+	return report, true
 }
 
 func buildToolEventPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
@@ -1055,7 +1234,7 @@ func buildToolEventPost(payload map[string]any) (string, map[string]any, string,
 			copyStringMeta(meta, responseMap, "agent_type", "agentType", "agent_type", "subagent_type", "subagentType")
 			copyStringMeta(meta, responseMap, "agent_status", "status")
 			if usage := firstAny(responseMap, "token_usage", "tokenUsage", "usage"); usage != nil {
-				meta["token_usage"] = scrubValue(usage)
+				meta["token_usage"] = scrubValueForHandoff(usage)
 			}
 		}
 	}
@@ -1170,19 +1349,20 @@ func buildStopRollupPost(payload map[string]any) (string, map[string]any, string
 		"infer_mode":       inferStop(),
 	}
 	if changed != nil {
-		meta["changed_files"] = scrubValue(changed)
+		meta["changed_files"] = scrubValueForHandoff(changed)
 	}
 	if background != nil {
-		meta["background_tasks"] = scrubValue(background)
+		meta["background_tasks"] = scrubValueForHandoff(background)
 	}
 	return content, meta, runID, inferStop(), true
 }
 
 func workerToolEvent() {
-	payload := readWorkerPayload()
+	payload := readMapWorkerPayload()
 	if payload == nil {
 		return
 	}
+	parentReport := decodeScrubReport(stringField(payload, preparedParentScrubReportKey))
 	content, meta, runID, infer, ok := preparedToolEventPost(payload)
 	if !ok {
 		content, meta, runID, infer, ok = buildToolEventPost(payload)
@@ -1190,13 +1370,13 @@ func workerToolEvent() {
 	if !ok {
 		return
 	}
-	if err := postMemory(content, meta, &runID, infer); err != nil {
+	if err := postMemoryWithScrubReport(content, meta, &runID, infer, parentReport); err != nil {
 		os.Exit(1)
 	}
 }
 
 func workerLifecycleEvent() {
-	payload := readWorkerPayload()
+	payload := readMapWorkerPayload()
 	if payload == nil {
 		return
 	}
@@ -1210,6 +1390,12 @@ func workerLifecycleEvent() {
 	kind := eventKind(eventName)
 	content := lifecycleContent(eventName, sid, cwd, payload)
 	infer := inferLifecycleEvent(eventName)
+	parentReport := scrubReport{}
+	rawPayload, report, ok := scrubValueForHandoffWithReport(payload)
+	if !ok {
+		return
+	}
+	parentReport.merge(report)
 	meta := map[string]any{
 		"source":         "claude-code-hook",
 		"kind":           kind,
@@ -1219,7 +1405,7 @@ func workerLifecycleEvent() {
 		"schema_version": 1,
 		"scrub_mode":     hookScrubEnabled(),
 		"infer_mode":     infer,
-		"raw_payload":    scrubValue(payload),
+		"raw_payload":    rawPayload,
 	}
 	copyStringMeta(meta, payload, "agent_id", "agent_id", "agentId", "subagent_id", "subagentId")
 	copyStringMeta(meta, payload, "agent_type", "agent_type", "agentType", "subagent_type", "subagentType")
@@ -1227,9 +1413,14 @@ func workerLifecycleEvent() {
 	copyStringMeta(meta, payload, "tool_use_id", "tool_use_id", "toolUseID", "toolUseId")
 	copyStringMeta(meta, payload, "status", "status")
 	if usage := firstAny(payload, "token_usage", "tokenUsage", "usage"); usage != nil {
-		meta["token_usage"] = scrubValue(usage)
+		scrubbedUsage, usageReport, ok := scrubValueForHandoffWithReport(usage)
+		if !ok {
+			return
+		}
+		parentReport.merge(usageReport)
+		meta["token_usage"] = scrubbedUsage
 	}
-	if err := postMemory(content, meta, &runID, infer); err != nil {
+	if err := postMemoryWithScrubReport(content, meta, &runID, infer, parentReport); err != nil {
 		os.Exit(1)
 	}
 }
@@ -1374,7 +1565,11 @@ func valueShape(v any) string {
 }
 
 func truncateText(s string, max int) string {
-	s = strings.TrimSpace(scrubText(s))
+	scrubbed, ok := scrubTextForHandoff(s)
+	if !ok {
+		return ""
+	}
+	s = strings.TrimSpace(scrubbed)
 	if max > 0 && len(s) > max {
 		return s[:max] + "\n..."
 	}
@@ -1546,7 +1741,10 @@ func extractPaths(v any, limit int) []string {
 				if lower == "path" || lower == "file_path" || lower == "filepath" || lower == "notebook_path" {
 					if s := strings.TrimSpace(stringFromAny(val)); s != "" && !seen[s] {
 						seen[s] = true
-						out = append(out, scrubText(s))
+						scrubbed, ok := scrubTextForHandoff(s)
+						if ok {
+							out = append(out, scrubbed)
+						}
 						if len(out) >= limit {
 							return
 						}

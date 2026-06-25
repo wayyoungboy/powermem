@@ -12,11 +12,11 @@ const unitSecret = "Bearer unitsecret123"
 
 func setHookScrubForTest(t *testing.T, enabled bool) {
 	t.Helper()
-	old := hookScrubEnabledAtStartup
-	hookScrubEnabledAtStartup = enabled
-	t.Cleanup(func() {
-		hookScrubEnabledAtStartup = old
-	})
+	if enabled {
+		t.Setenv("POWERMEM_HOOK_SCRUB", "1")
+	} else {
+		t.Setenv("POWERMEM_HOOK_SCRUB", "0")
+	}
 }
 
 func requireNoUnitSecret(t *testing.T, v any) {
@@ -30,22 +30,30 @@ func requireNoUnitSecret(t *testing.T, v any) {
 	}
 }
 
-func TestParseHookScrubEnabledDefaultsOn(t *testing.T) {
-	if !parseHookScrubEnabled("") {
+func TestHookScrubConfigDefaultsOn(t *testing.T) {
+	t.Setenv("POWERMEM_HOOK_SCRUB", "")
+	if !loadHookPrivacyConfig().Enabled {
 		t.Fatal("empty scrub setting should default to enabled")
 	}
-	if !parseHookScrubEnabled("unexpected") {
+	t.Setenv("POWERMEM_HOOK_SCRUB", "unexpected")
+	if !loadHookPrivacyConfig().Enabled {
 		t.Fatal("unknown scrub setting should default to enabled")
 	}
 	for _, raw := range []string{"0", "false", "no", "off", " OFF "} {
-		if parseHookScrubEnabled(raw) {
-			t.Fatalf("scrub setting %q should disable scrubbing", raw)
-		}
+		t.Run("disable_"+strings.TrimSpace(raw), func(t *testing.T) {
+			t.Setenv("POWERMEM_HOOK_SCRUB", raw)
+			if loadHookPrivacyConfig().Enabled {
+				t.Fatalf("scrub setting %q should disable scrubbing", raw)
+			}
+		})
 	}
 	for _, raw := range []string{"1", "true", "yes", "on", " YES "} {
-		if !parseHookScrubEnabled(raw) {
-			t.Fatalf("scrub setting %q should enable scrubbing", raw)
-		}
+		t.Run("enable_"+strings.TrimSpace(raw), func(t *testing.T) {
+			t.Setenv("POWERMEM_HOOK_SCRUB", raw)
+			if !loadHookPrivacyConfig().Enabled {
+				t.Fatalf("scrub setting %q should enable scrubbing", raw)
+			}
+		})
 	}
 }
 
@@ -139,6 +147,31 @@ func TestPrepareToolEventHandoffScrubsAndDropsRawPayload(t *testing.T) {
 	requireNoUnitSecret(t, meta)
 }
 
+func TestPrepareToolEventHandoffBlocksRawPayloadSecret(t *testing.T) {
+	setHookScrubForTest(t, true)
+	t.Setenv("POWERMEM_HOOK_SECRET_ACTION", "block")
+	t.Setenv("POWERMEM_TOOL_SUCCESS_INCLUDE", "")
+	t.Setenv("POWERMEM_TOOL_SUCCESS_EXCLUDE", "")
+
+	handoff := prepareToolEventHandoff(map[string]any{
+		"hook_event_name": "PostToolUse",
+		"session_id":      "session-block",
+		"cwd":             "/workspace/project",
+		"tool_name":       "Bash",
+		"tool_use_id":     "tool-block-unit",
+		"tool_input": map[string]any{
+			"command": "pytest tests/unit --token " + unitSecret,
+		},
+		"tool_response": map[string]any{
+			"exit_code": float64(0),
+			"stdout":    "ok",
+		},
+	})
+	if handoff != nil {
+		t.Fatalf("secret_action=block should skip handoff with raw payload secret: %#v", handoff)
+	}
+}
+
 func TestBuildToolEventPostCapturesAgentResponseLink(t *testing.T) {
 	setHookScrubForTest(t, true)
 	t.Setenv("POWERMEM_TOOL_SUCCESS_INCLUDE", "")
@@ -212,6 +245,26 @@ func TestBuildSessionStartQueryUsesBoundedMetadata(t *testing.T) {
 	}
 	if strings.Contains(query, "ignored") {
 		t.Fatalf("query included unexpected metadata: %q", query)
+	}
+}
+
+func TestSessionStartQueryScrubsPathBeforeSearch(t *testing.T) {
+	setHookScrubForTest(t, true)
+	query := buildSessionStartQuery(map[string]any{
+		"session_title": "No-LLM hook work",
+		"source":        "startup",
+		"agent_type":    "coder",
+		"cwd":           "/workspace/project",
+	})
+	scrubbed, ok := scrubPromptForSearch(query, loadHookPrivacyConfig())
+	if !ok {
+		t.Fatal("session start metadata without secrets should remain searchable")
+	}
+	if strings.Contains(scrubbed, "/workspace/project") {
+		t.Fatalf("scrubbed query leaked absolute path: %q", scrubbed)
+	}
+	if !strings.Contains(scrubbed, "cwd: project") {
+		t.Fatalf("scrubbed query did not keep a useful cwd basename: %q", scrubbed)
 	}
 }
 

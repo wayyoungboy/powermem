@@ -337,7 +337,8 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
         self.assertEqual(request.body["agent_id"], "hook-agent")
         self.assertEqual(request.body["limit"], 6)
         self.assertIn("session_title: Hook session bootstrap", request.body["query"])
-        self.assertIn("cwd: /workspace/powermem", request.body["query"])
+        self.assertIn("cwd: powermem", request.body["query"])
+        self.assertNotIn("/workspace/powermem", request.body["query"])
 
         output = json.loads(result.stdout)
         hook_output = output["hookSpecificOutput"]
@@ -710,8 +711,9 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
             self.assertNotIn("tool_use_id", metadata)
             self.assertEqual(
                 metadata["raw_payload"]["agent_transcript_path"],
-                payload["agent_transcript_path"],
+                Path(payload["agent_transcript_path"]).name,
             )
+            self.assertNotIn("/workspace/project", metadata["raw_payload"]["agent_transcript_path"])
             self.assertIn("SubagentStop", request.body["content"])
             self.assert_no_sentinel(request.body, result.stdout, result.stderr)
 
