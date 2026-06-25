@@ -513,3 +513,57 @@ func TestLifecycleContentCapturesTaskSchemaFields(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildLifecycleEventPostUsesBoundedAllowlistedMetadata(t *testing.T) {
+	setHookScrubForTest(t, true)
+	longMessage := strings.Repeat("assistant-details-", 400) + unitSecret
+	longDescription := strings.Repeat("task-description-", 300) + unitSecret
+
+	content, meta, runID, infer, _, ok := buildLifecycleEventPost(map[string]any{
+		"hook_event_name":        "SubagentStop",
+		"session_id":             "session-lifecycle",
+		"cwd":                    "/workspace/project",
+		"task_id":                "task-001",
+		"task_description":       longDescription,
+		"last_assistant_message": longMessage,
+		"background_tasks":       []any{longMessage},
+		"token_usage": map[string]any{
+			"input_tokens": float64(12),
+			"raw_text":     longMessage,
+		},
+	}, scrubReport{})
+	if !ok {
+		t.Fatal("expected lifecycle event post")
+	}
+	if infer {
+		t.Fatal("lifecycle infer should default to false")
+	}
+	if runID != "session-lifecycle" {
+		t.Fatalf("unexpected run id: %q", runID)
+	}
+	if _, ok := meta["raw_payload"]; ok {
+		t.Fatalf("lifecycle metadata should not include raw_payload: %#v", meta["raw_payload"])
+	}
+	if _, ok := meta["last_assistant_message"]; ok {
+		t.Fatal("lifecycle metadata should not copy assistant message fields")
+	}
+	desc, ok := meta["task_description"].(string)
+	if !ok || desc == "" {
+		t.Fatalf("expected bounded task_description, got %#v", meta["task_description"])
+	}
+	if len(desc) > lifecycleDescriptionMaxChars+4 {
+		t.Fatalf("task_description was not bounded: len=%d", len(desc))
+	}
+	usage, ok := meta["token_usage"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected token usage map, got %#v", meta["token_usage"])
+	}
+	if usage["input_tokens"] != int64(12) {
+		t.Fatalf("unexpected token usage: %#v", usage)
+	}
+	if _, ok := usage["raw_text"]; ok {
+		t.Fatalf("token usage should only keep numeric token fields: %#v", usage)
+	}
+	requireNoUnitSecret(t, content)
+	requireNoUnitSecret(t, meta)
+}

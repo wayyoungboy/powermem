@@ -33,14 +33,14 @@ Prefer to wire it by hand? The full plugin reference below covers every option.
 |--------|----------------|-------|
 | Claude Code | No | |
 | MCP tools | No | **Off by default** (HTTP mode). Run `apply-connection-mode.sh mcp` to enable. |
-| **Hooks** (transcript / compact → HTTP API) | **No** | Release plugin zips include native binaries under `hooks/bin/` + `run-hook.sh` (macOS/Linux) or PowerShell on Windows. Source checkouts build them locally. **`POWERMEM_BASE_URL` defaults to `http://localhost:8848`.** |
+| **Hooks** (event-driven writes/search → HTTP API) | **No** | Git/marketplace installs and release plugin zips include native binaries under `hooks/bin/` + `run-hook.sh` (macOS/Linux) or PowerShell on Windows. **`POWERMEM_BASE_URL` defaults to `http://localhost:8848`.** |
 | Optional **file poller** | No | Same binary: `sh hooks/run-hook.sh poll` — see [watcher/README.md](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/watcher/README.md). |
 
 **macOS / Linux:** default `hooks/hooks.json` runs `sh …/run-hook.sh`. POSIX `sh` is always present.
 
-**Windows (native, no Git Bash):** if `sh` is missing, merge the commands from [`hooks/hooks.windows.example.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.windows.example.json) into your Claude `settings.json` so hooks call `powershell.exe -File …/run-hook.ps1`. The release zip includes `hooks/bin/powermem-hook-windows-amd64.exe`; source checkouts should run the build script first (add `windows/arm64` to the build script if you need it).
+**Windows (native, no Git Bash):** if `sh` is missing, merge the commands from [`hooks/hooks.windows.example.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.windows.example.json) into your Claude `settings.json` so hooks call `powershell.exe -File …/run-hook.ps1`. Git/marketplace installs and release zips include `hooks/bin/powermem-hook-windows-amd64.exe` (add `windows/arm64` to the build script if you need it).
 
-**Rebuilding binaries** (developers / CI): Go **1.22+**, then `make build-claude-hook` or `bash apps/claude-code-plugin/scripts/build-hook-binaries.sh` from the repo root. The generated `hooks/bin/` directory is a local build artifact and is not tracked by git. `make package-claude-plugin` builds the binaries automatically before zipping, and release plugin assets carry the generated binaries.
+**Rebuilding binaries** (developers / CI): Go **1.22+**, then `make build-claude-hook` or `bash apps/claude-code-plugin/scripts/build-hook-binaries.sh` from the repo root. Commit refreshed `hooks/bin/powermem-hook-*` binaries when hook code changes so Git/marketplace installs remain runnable. `make package-claude-plugin` also rebuilds them automatically before zipping.
 
 ## Prerequisites
 
@@ -50,7 +50,7 @@ Prefer to wire it by hand? The full plugin reference below covers every option.
 
 ## Manual Installation
 
-Set up the integration **from source** — this is **HTTP mode** (the default): hooks push transcripts to the REST API and inject search results per turn, with no in-chat tools.
+Set up the integration **from source** — this is **HTTP mode** (the default): hooks send event-driven writes/search to the REST API and inject search results per turn, with no in-chat tools.
 
 ### Step 1 — Download the source
 
@@ -102,18 +102,20 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 uv --version
 ```
 
-### Step 4 — Install PowerMem and build the hook binaries
+### Step 4 — Install PowerMem
 
 `uv pip install -e '.[server,extras]'` provides the `powermem-server` and
 `pmem` commands plus the zero-config local SQLite path and local embedder.
-`make build-claude-hook` compiles the native Go hook binaries (requires
-**Go 1.22+**):
+Git/marketplace installs include native hook binaries under
+`apps/claude-code-plugin/hooks/bin/`, so Go is only needed when refreshing those
+binaries from hook source changes:
 
 ```bash
 uv venv venv --python python3.11
 source venv/bin/activate
 uv pip install --python "$VIRTUAL_ENV/bin/python" -e '.[server,extras]'
-make build-claude-hook        # outputs apps/claude-code-plugin/hooks/bin/
+# Optional after hook source changes:
+# make build-claude-hook      # refreshes apps/claude-code-plugin/hooks/bin/
 ```
 
 ### Step 5 — Start the HTTP API server
@@ -230,7 +232,7 @@ How you remove the plugin depends on how you enabled it:
 | **Zip / copied folder** | Delete the unzipped directory. Stop using `--plugin-dir` pointing at it. |
 | **Git clone / repo path** | Stop using `--plugin-dir` for that path; remove the clone if you no longer need it. |
 | **Marketplace / built-in plugin UI** | Run `/plugin uninstall memory-powermem@powermem`, then `/reload-plugins`. To remove the marketplace entry as well, run `/plugin marketplace remove powermem`. |
-| **You merged [`hooks/hooks.windows.example.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.windows.example.json) into `settings.json`** | Edit `~/.claude/settings.json` or `.claude/settings.json` in the project and remove the `UserPromptSubmit` / `SessionEnd` / `PostCompact` hook entries that call `run-hook.ps1` (or restore a backup). Otherwise hooks keep running even after the plugin folder is deleted. |
+| **You merged [`hooks/hooks.windows.example.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.windows.example.json) into `settings.json`** | Edit `~/.claude/settings.json` or `.claude/settings.json` in the project and remove every PowerMem hook entry that calls `run-hook.ps1` (or restore a backup). Otherwise hooks keep running even after the plugin folder is deleted. |
 
 The hook binary only **writes** to your PowerMem server; it does not install a system daemon. No separate “service uninstall” is required.
 
@@ -299,11 +301,11 @@ Ensure PowerMem is installed (`uv pip install --python "$VIRTUAL_ENV/bin/python"
 
 ### HTTP mode: REST only (standard)
 
-This is the **default** root `.mcp.json`. Claude has **no** PowerMem MCP tools; skills that reference those tools have nothing to call. **Hooks** still send transcripts / compact summaries to `POST /api/v1/memories`. To reset after trying MCP: `bash scripts/apply-connection-mode.sh http`.
+This is the **default** root `.mcp.json`. Claude has **no** PowerMem MCP tools; skills that reference those tools have nothing to call. **Hooks** still send event-driven writes such as session transcripts, compact snapshots, tool outcomes, and lifecycle events to `POST /api/v1/memories`. To reset after trying MCP: `bash scripts/apply-connection-mode.sh http`.
 
 ### Seamless recording (hooks + HTTP API)
 
-The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.json) and [`hooks/run-hook.sh`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/run-hook.sh). Release zips also include **native** `hooks/bin/powermem-hook-*` binaries built from [`cmd/powermem-hook`](https://github.com/oceanbase/powermem/tree/main/apps/claude-code-plugin/cmd/powermem-hook/); source checkouts build that ignored `hooks/bin/` directory locally. When the plugin is enabled, Claude Code merges these hooks:
+The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/hooks.json), [`hooks/run-hook.sh`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/hooks/run-hook.sh), and **native** `hooks/bin/powermem-hook-*` binaries built from [`cmd/powermem-hook`](https://github.com/oceanbase/powermem/tree/main/apps/claude-code-plugin/cmd/powermem-hook/). When the plugin is enabled, Claude Code merges these hooks:
 
 | Hook | What happens |
 |------|----------------|
@@ -315,7 +317,7 @@ The plugin ships [`hooks/hooks.json`](https://github.com/oceanbase/powermem/blob
 | `PostToolUse` | Structured summaries for high-signal successful tools (`Write`, `Edit`, `MultiEdit`, `Bash`, `Agent`, `ExitPlanMode` by default) → **`POST …/api/v1/memories`**. Content and metadata are scrubbed, and deterministic event IDs are included when `session_id` and `tool_use_id` are available. |
 | `PostToolUseFailure` | Structured summaries for failed tools → **`POST …/api/v1/memories`** with `success=false`, error metadata, bounded scrubbed summaries, and interrupts skipped by default. |
 | `Stop` | Optional lightweight per-turn rollup after the main agent finishes responding → **`POST …/api/v1/memories`**. Disabled by default because it can run frequently; set **`POWERMEM_CAPTURE_STOP_ROLLUP=1`** to enable. |
-| `SubagentStart` / `SubagentStop` | Lifecycle observations keyed by the hook event name, not by `transcript_path`; raw scrubbed payload is preserved in metadata for later linking. |
+| `SubagentStart` / `SubagentStop` | Lifecycle observations keyed by the hook event name, not by `transcript_path`; metadata keeps bounded allowlisted link fields, not the full raw lifecycle payload. |
 | `TaskCreated` / `TaskCompleted` | Task lifecycle observations keyed by the hook event name, with link fields such as `session_id`, `task_id`, and `tool_use_id` when present. |
 
 **Write** hooks use `POST {POWERMEM_BASE_URL}/api/v1/memories`. **Prompt and session-start search** use `POST {POWERMEM_BASE_URL}/api/v1/memories/search`. Neither path requires MCP.
@@ -364,7 +366,7 @@ Optional environment variables (where you launch Claude Code):
 | `POWERMEM_INFER_SUBAGENT_STOP` | No | Set `1` to enable infer for `SubagentStop` when the generic lifecycle infer flag is off. |
 | `POWERMEM_INFER_TASK_COMPLETED` | No | Set `1` to enable infer for `TaskCompleted` when the generic lifecycle infer flag is off. |
 
-The hook scrubber runs before `SessionEnd`, `PostCompact`, workspace-file writes, prompt search, and the `PostCompact` detached-worker environment handoff. Write metadata includes a `privacy` object with the active level, path mode, action, and redaction counts; original matched values are not recorded there.
+The hook scrubber runs before hook writes/searches, including session, compact, tool, stop, lifecycle, prompt-search, workspace-file, and detached-worker handoff paths. Write metadata includes a `privacy` object with the active level, path mode, action, and redaction counts; original matched values are not recorded there.
 
 **SessionEnd timeout:** Claude Code defaults to a short timeout for `SessionEnd` hooks. The hook **returns immediately** and uploads in a **detached worker process**, so large transcripts still upload without blocking exit. If you ever switch to a synchronous upload inside the hook, raise `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` (see [Claude Code hooks – SessionEnd](https://code.claude.com/docs/en/hooks#sessionend)).
 
@@ -372,15 +374,16 @@ The hook scrubber runs before `SessionEnd`, `PostCompact`, workspace-file writes
 
 What you see is often **expected**:
 
-1. **Default HTTP mode** — There are **no** PowerMem MCP tools during chat, so Claude does **not** call `/mcp` on each message. **`POST /api/v1/memories`** (writes) still come from **`SessionEnd`** / **`PostCompact`**, not every reply. By default, **`POST /api/v1/memories/search`** runs **on each user message** via `UserPromptSubmit`; set **`POWERMEM_PROMPT_SEARCH=0`** to turn that off.
-2. **Not every hook is per-turn** — `SessionEnd` runs when the **session ends** (quit, `/clear`, `/resume` switch, etc.). `PostCompact` runs after **manual or auto compact**, not after every reply.
+1. **Default HTTP mode** — There are **no** PowerMem MCP tools during chat, so Claude does **not** call `/mcp` on each message. **`POST /api/v1/memories/search`** runs on each user message via `UserPromptSubmit` by default; set **`POWERMEM_PROMPT_SEARCH=0`** to turn that off.
+2. **Write hooks are event-driven** — **`POST /api/v1/memories`** writes can come from `SessionEnd`, `PostCompact`, `PreCompact`, default-on tool success/failure captures, and default-on subagent/task lifecycle events. They still do not run after every assistant reply unless you opt into `Stop` rollups with **`POWERMEM_CAPTURE_STOP_ROLLUP=1`**.
 3. **Those GETs** (`/system/status`, `/memories/stats`, …) usually come from another client (e.g. **PowerMem VS Code extension** dashboard), not from Claude Code hooks.
 
 **How to verify hooks:**
 
-- **End the Claude Code session** (exit the CLI session that used `--plugin-dir`), then check server logs for **`POST /api/v1/memories`** (the worker runs shortly after exit).
-- Or trigger **`/compact`** (or wait for auto-compact) and look for a compact-summary write.
-- In Claude Code, type **`/hooks`** and confirm `UserPromptSubmit` (if present) / `SessionEnd` / `PostCompact` list this plugin’s command (see [hooks menu](https://code.claude.com/docs/en/hooks#the-hooks-menu)).
+- **End the Claude Code session** (exit the CLI session that used `--plugin-dir`), then check server logs for a `SessionEnd` **`POST /api/v1/memories`** write (the worker runs shortly after exit).
+- Or trigger **`/compact`** (or wait for auto-compact) and look for `PreCompact` / `PostCompact` writes.
+- Run a high-signal tool such as `Bash`, `Write`, or `Edit` and look for `PostToolUse` or `PostToolUseFailure` writes.
+- In Claude Code, type **`/hooks`** and confirm the hook events in the table above list this plugin’s command (see [hooks menu](https://code.claude.com/docs/en/hooks#the-hooks-menu)).
 
 **If you want traffic during the conversation:**
 
@@ -405,7 +408,7 @@ See [watcher/README.md](https://github.com/oceanbase/powermem/blob/main/apps/cla
 
 - **Default (HTTP mode):** Hooks capture to REST automatically; no PowerMem tools in chat. **Per-prompt semantic retrieval is on by default** (see [Seamless recording](#seamless-recording-hooks--http-api)); set **`POWERMEM_PROMPT_SEARCH=0`** to disable.
 - **MCP mode:** Run `apply-connection-mode.sh mcp`, then PowerMem tools appear; use **/memory-powermem:remember** / **recall** with real tool backing. Per-prompt injection stays **on by default**; set **`POWERMEM_PROMPT_SEARCH=0`** if you only want explicit MCP tool use.
-- In **both** modes, transcript/compact hooks write to REST (`POWERMEM_BASE_URL`, default `http://localhost:8848`) without the model calling tools.
+- In **both** modes, event-driven write hooks send session, compact, tool, and lifecycle memories to REST (`POWERMEM_BASE_URL`, default `http://localhost:8848`) without the model calling tools.
 
 ## Links
 

@@ -1,4 +1,4 @@
-// powermem-hook: Claude Code hook — stdin JSON (SessionEnd / PostCompact) → background HTTP POST to PowerMem.
+// powermem-hook: Claude Code hook stdin JSON -> PowerMem HTTP API.
 // Cross-platform; zero runtime deps beyond the single binary.
 package main
 
@@ -25,6 +25,8 @@ const defaultPowerMemBaseURL = "http://localhost:8848"
 
 const workerPayloadPathEnv = "POWERMEM_WORKER_PAYLOAD_PATH"
 const preparedParentScrubReportKey = "_powermem_parent_scrub_report"
+const lifecycleMetaMaxChars = 512
+const lifecycleDescriptionMaxChars = 2000
 
 type workerHandoffPayload struct {
 	TranscriptPath    string `json:"transcript_path,omitempty"`
@@ -1418,9 +1420,19 @@ func workerLifecycleEvent() {
 	}
 	parentReport := decodeScrubReport(stringField(payload, preparedParentScrubReportKey))
 	delete(payload, preparedParentScrubReportKey)
+	content, meta, runID, infer, parentReport, ok := buildLifecycleEventPost(payload, parentReport)
+	if !ok {
+		return
+	}
+	if err := postMemoryWithScrubReport(content, meta, &runID, infer, parentReport); err != nil {
+		os.Exit(1)
+	}
+}
+
+func buildLifecycleEventPost(payload map[string]any, parentReport scrubReport) (string, map[string]any, string, bool, scrubReport, bool) {
 	eventName := stringField(payload, "hook_event_name")
 	if eventName == "" {
-		return
+		return "", nil, "", false, parentReport, false
 	}
 	sid := stringField(payload, "session_id")
 	cwd := stringField(payload, "cwd")
@@ -1428,11 +1440,6 @@ func workerLifecycleEvent() {
 	kind := eventKind(eventName)
 	content := lifecycleContent(eventName, sid, cwd, payload)
 	infer := inferLifecycleEvent(eventName)
-	rawPayload, report, ok := scrubValueForHandoffWithReport(payload)
-	if !ok {
-		return
-	}
-	parentReport.merge(report)
 	meta := map[string]any{
 		"source":         "claude-code-hook",
 		"kind":           kind,
@@ -1442,28 +1449,22 @@ func workerLifecycleEvent() {
 		"schema_version": 1,
 		"scrub_mode":     hookScrubEnabled(),
 		"infer_mode":     infer,
-		"raw_payload":    rawPayload,
 	}
-	copyStringMeta(meta, payload, "agent_id", "agent_id", "agentId", "subagent_id", "subagentId")
-	copyStringMeta(meta, payload, "agent_type", "agent_type", "agentType", "subagent_type", "subagentType")
-	copyStringMeta(meta, payload, "task_id", "task_id", "taskId")
-	copyStringMeta(meta, payload, "task_subject", "task_subject", "taskSubject")
-	copyStringMeta(meta, payload, "task_description", "task_description", "taskDescription")
-	copyStringMeta(meta, payload, "teammate_name", "teammate_name", "teammateName")
-	copyStringMeta(meta, payload, "team_name", "team_name", "teamName")
-	copyStringMeta(meta, payload, "tool_use_id", "tool_use_id", "toolUseID", "toolUseId")
-	copyStringMeta(meta, payload, "status", "status")
-	if usage := firstAny(payload, "token_usage", "tokenUsage", "usage"); usage != nil {
-		scrubbedUsage, usageReport, ok := scrubValueForHandoffWithReport(usage)
-		if !ok {
-			return
-		}
-		parentReport.merge(usageReport)
-		meta["token_usage"] = scrubbedUsage
+	copyBoundedStringMeta(meta, payload, "agent_id", lifecycleMetaMaxChars, "agent_id", "agentId", "subagent_id", "subagentId")
+	copyBoundedStringMeta(meta, payload, "agent_type", lifecycleMetaMaxChars, "agent_type", "agentType", "subagent_type", "subagentType")
+	copyBoundedStringMeta(meta, payload, "task_id", lifecycleMetaMaxChars, "task_id", "taskId")
+	copyBoundedStringMeta(meta, payload, "task_subject", lifecycleMetaMaxChars, "task_subject", "taskSubject")
+	copyBoundedStringMeta(meta, payload, "task_description", lifecycleDescriptionMaxChars, "task_description", "taskDescription")
+	copyBoundedStringMeta(meta, payload, "teammate_name", lifecycleMetaMaxChars, "teammate_name", "teammateName")
+	copyBoundedStringMeta(meta, payload, "team_name", lifecycleMetaMaxChars, "team_name", "teamName")
+	copyBoundedStringMeta(meta, payload, "tool_use_id", lifecycleMetaMaxChars, "tool_use_id", "toolUseID", "toolUseId")
+	copyBoundedStringMeta(meta, payload, "status", lifecycleMetaMaxChars, "status")
+	copyBoundedStringMeta(meta, payload, "transcript_path", lifecycleMetaMaxChars, "transcript_path", "transcriptPath")
+	copyBoundedStringMeta(meta, payload, "agent_transcript_path", lifecycleMetaMaxChars, "agent_transcript_path", "agentTranscriptPath")
+	if usage := lifecycleTokenUsage(firstAny(payload, "token_usage", "tokenUsage", "usage")); len(usage) > 0 {
+		meta["token_usage"] = usage
 	}
-	if err := postMemoryWithScrubReport(content, meta, &runID, infer, parentReport); err != nil {
-		os.Exit(1)
-	}
+	return content, meta, runID, infer, parentReport, true
 }
 
 func stringFromAny(v any) string {
@@ -1853,6 +1854,38 @@ func copyStringMeta(meta map[string]any, payload map[string]any, metaKey string,
 	if value := firstString(payload, sourceKeys...); value != "" {
 		meta[metaKey] = value
 	}
+}
+
+func copyBoundedStringMeta(meta map[string]any, payload map[string]any, metaKey string, maxChars int, sourceKeys ...string) {
+	if value := firstString(payload, sourceKeys...); value != "" {
+		value = truncateText(value, maxChars)
+		if value != "" {
+			meta[metaKey] = value
+		}
+	}
+}
+
+func lifecycleTokenUsage(v any) map[string]any {
+	m := nestedMap(v)
+	if m == nil {
+		return nil
+	}
+	out := map[string]any{}
+	for _, key := range []string{
+		"input_tokens",
+		"output_tokens",
+		"cache_creation_input_tokens",
+		"cache_read_input_tokens",
+		"total_tokens",
+	} {
+		if value, ok := numericField(m, key); ok {
+			out[key] = value
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func maxFileChars() int {

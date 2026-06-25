@@ -709,11 +709,14 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
             self.assertEqual(metadata["agent_id"], "agent-1045")
             self.assertEqual(metadata["agent_type"], "reviewer")
             self.assertNotIn("tool_use_id", metadata)
+            self.assertNotIn("raw_payload", metadata)
+            self.assertNotIn("payload_fields", metadata)
+            self.assertNotIn("payload_summary", metadata)
             self.assertEqual(
-                metadata["raw_payload"]["agent_transcript_path"],
+                metadata["agent_transcript_path"],
                 Path(payload["agent_transcript_path"]).name,
             )
-            self.assertNotIn("/workspace/project", metadata["raw_payload"]["agent_transcript_path"])
+            self.assertNotIn("/workspace/project", metadata["agent_transcript_path"])
             self.assertIn("SubagentStop", request.body["content"])
             self.assert_no_sentinel(request.body, result.stdout, result.stderr)
 
@@ -743,7 +746,10 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
             self.assertIn("Review Claude hook lifecycle capture", request.body["content"])
             self.assertIn("task_description", request.body["content"])
             self.assertIn("Verify task lifecycle fields", request.body["content"])
-            self.assertNotIn("/workspace/project", str(metadata["raw_payload"]))
+            self.assertNotIn("raw_payload", metadata)
+            self.assertNotIn("payload_fields", metadata)
+            self.assertNotIn("payload_summary", metadata)
+            self.assertNotIn("/workspace/project", str(metadata))
             self.assert_no_sentinel(request.body, result.stdout, result.stderr)
 
 
