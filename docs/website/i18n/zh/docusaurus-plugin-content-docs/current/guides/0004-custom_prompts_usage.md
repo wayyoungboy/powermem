@@ -424,9 +424,9 @@ memory.add(
     agent_id="agent1"
 )
 ```
-## 提示占位符 {#prompt-placeholders}
+## prompt 占位符 {#prompt-placeholders}
 
-不同的提示支持不同的占位符：
+不同的 prompt 支持不同的占位符：
 
 ### Fact Extraction Prompt {#fact-extraction-prompt}
 - 不需要特定的占位符，系统会自动添加对话内容
@@ -451,7 +451,7 @@ memory.add(
 ### 删除关系 Prompt {#delete-relations-prompt}
 - `USER_ID` - 将被替换为实际的用户 ID
 
-## 提示编写指南 {#prompt-writing-guidelines}
+## prompt 编写指南 {#prompt-writing-guidelines}
 
 ### 1. 清晰性 {#1-clarity}
 - 使用清晰、具体的指令
@@ -516,17 +516,17 @@ memory_cn.add(
 ```
 ## 最佳实践 {#best-practices}
 
-1. **测试提示词**：在生产使用前，使用小型数据集测试提示词的有效性
-2. **迭代优化**：根据结果持续优化提示词
-3. **版本控制**：将提示词保存在配置文件中以进行版本管理
+1. **测试 prompt**：在生产使用前，使用小型数据集测试 prompt 的有效性
+2. **迭代优化**：根据结果持续优化 prompt
+3. **版本控制**：将 prompt 保存在配置文件中以进行版本管理
 4. **文档记录**：记录每个自定义 prompt 的用途和特殊规则
-5. **性能考量**：简洁的提示词可以减少 token 消耗并提高速度
+5. **性能考量**：简洁的 prompt 可以减少 token 消耗并提高速度
 
 ## 重要说明 {#important-notes}
 
 1. **向后兼容性**：如果未提供自定义 prompt，系统将使用默认 prompt
 2. **格式要求**：确保自定义 prompt 包含必要的占位符
-3. **LLM 兼容性**：某些提示词格式可能对特定的 LLM 更有效
+3. **LLM 兼容性**：某些 prompt 格式可能对特定的 LLM 更有效
 4. **配置优先级**：
    - `custom_extract_relations_prompt` > `custom_prompt` > 默认 prompt
    - 顶层配置将合并到子配置中
@@ -536,15 +536,15 @@ memory_cn.add(
 ### 问题：自定义 prompt 未生效 {#issue-custom-prompts-not-taking-effect}
 - 检查配置是否正确传递
 - 验证字段名称拼写是否正确
-- 检查日志以确认提示词是否被读取
+- 检查日志以确认 prompt 是否被读取
 
-### 问题：提示词格式错误 {#issue-prompt-format-errors}
+### 问题：prompt 格式错误 {#issue-prompt-format-errors}
 - 确保包含必要的占位符
 - 检查 JSON 格式是否正确
 - 验证字符串转义是否正确
 
 ### 问题：LLM 响应不符合预期 {#issue-llm-responses-dont-match-expectations}
-- 调整提示词的清晰度
+- 调整 prompt 的清晰度
 - 添加更多示例
 - 检查 LLM 响应格式设置
 

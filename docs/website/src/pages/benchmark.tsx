@@ -76,7 +76,7 @@ const translations: Record<string, Record<string, string>> = {
     'benchmark.scores.description': '描述',
     'benchmark.scores.viewDetails': '了解如何运行压测',
     'benchmark.tokens.title': '评估期间 Token 使用情况',
-    'benchmark.tokens.prompt': '提示词 Token',
+    'benchmark.tokens.prompt': 'Prompt Token',
     'benchmark.tokens.completion': '完成 Token',
     'benchmark.tokens.total': '总 Token',
     'benchmark.tokens.cached': '缓存 Token',

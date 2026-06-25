@@ -444,7 +444,7 @@ results = memory.search("programming preferences", user_id="user123")
 ```
 ### MCP Server {#mcp-server}
 
-Model Context Protocol (MCP) 服务器提供标准化访问：
+MCP Server 提供标准化访问：
 
 - RESTful API 端点
 - JSON-RPC 协议支持

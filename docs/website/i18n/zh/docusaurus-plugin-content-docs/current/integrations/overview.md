@@ -24,5 +24,5 @@
 ## 另见 {#see-also}
 
 - [快速开始](../guides/0001-getting_started.md) — 安装、`.env`、首次 `Memory` 使用
-- [MCP API](../api/0004-mcp.md) — 模型上下文协议服务器
+- [MCP API](../api/0004-mcp.md) — MCP Server
 - [HTTP API 服务器](../api/0005-api_server.md) — 集成使用的 REST 端点
