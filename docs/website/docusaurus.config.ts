@@ -97,7 +97,7 @@ const config: Config = {
           position: 'left',
         },
         {
-          type: 'localeDropdown',
+          type: 'custom-localeSwitch',
           position: 'right',
         },
         {

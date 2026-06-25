@@ -1,0 +1,47 @@
+.localeSwitch {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  min-width: 2.5rem !important;
+  padding: 0 !important;
+  margin-left: 0.5rem;
+  background: rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 8px !important;
+  transition: all 0.3s ease !important;
+}
+
+.localeSwitch:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+  transform: translateY(-2px) !important;
+}
+
+.icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #e5e7eb;
+  flex-shrink: 0;
+  transition: color 0.3s ease;
+}
+
+.localeSwitch:hover .icon {
+  color: #60a5fa;
+}
+
+@media (max-width: 768px) {
+  .localeSwitch {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    min-width: 2.25rem !important;
+    margin-left: 0.25rem;
+  }
+
+  .icon {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
