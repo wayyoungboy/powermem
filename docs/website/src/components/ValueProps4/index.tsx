@@ -18,6 +18,7 @@ const getComparisonData = (isZh: boolean) => ({
     fullContext: 52.9,
     powermem: 87.79,
     unit: '%',
+    prefix: '',
     improvement: '+65.9%',
     label: isZh ? 'LLM 评分' : 'LLM Score',
   },
@@ -25,6 +26,7 @@ const getComparisonData = (isZh: boolean) => ({
     fullContext: 17.12,
     powermem: 1.44,
     unit: 's',
+    prefix: '',
     improvement: '-91.6%',
     label: isZh ? 'Retrieval P95' : 'Retrieval P95',
   },
@@ -32,6 +34,7 @@ const getComparisonData = (isZh: boolean) => ({
     fullContext: 26,
     powermem: 0.9,
     unit: 'k',
+    prefix: '~',
     improvement: '-96.5%',
     label: isZh ? 'Token 使用量' : 'Token Usage',
   },
@@ -147,7 +150,7 @@ export default function ValueProps4() {
                     <div className={`${styles.dashboardItem} ${styles.dashboardPowerMem}`}>
                       <div className={styles.dashboardLabel}>PowerMem</div>
                       <div className={styles.dashboardValue}>
-                        {activeComparison.powermem}
+                        {activeComparison.prefix}{activeComparison.powermem}
                         <span className={styles.dashboardUnit}>{activeComparison.unit}</span>
                       </div>
                       <div className={styles.dashboardImprovement}>
@@ -164,7 +167,7 @@ export default function ValueProps4() {
                     <div className={`${styles.dashboardItem} ${styles.dashboardFullContext}`}>
                       <div className={styles.dashboardLabel}>Full-Context</div>
                       <div className={styles.dashboardValue}>
-                        {activeComparison.fullContext}
+                        {activeComparison.prefix}{activeComparison.fullContext}
                         <span className={styles.dashboardUnit}>{activeComparison.unit}</span>
                       </div>
                     </div>

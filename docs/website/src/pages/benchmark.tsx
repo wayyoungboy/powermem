@@ -40,7 +40,7 @@ const translations: Record<string, Record<string, string>> = {
     'benchmark.tokens.cached': 'Cached Tokens',
     'category.1.name': 'Single-Hop',
     'category.1.desc': 'Questions asking for specific facts directly mentioned in a single conversation.',
-    'category.2.name': 'Temporal Reasoning',
+    'category.2.name': 'Temporal',
     'category.2.desc': 'Questions can be answered through temporal reasoning and capturing time-related data cues within the conversation.',
     'category.3.name': 'Multi-Hop',
     'category.3.desc': 'Questions that require synthesizing information from multiple sessions.',

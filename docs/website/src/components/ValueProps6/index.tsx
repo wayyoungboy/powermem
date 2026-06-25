@@ -18,6 +18,7 @@ const getComparisonData = (isZh: boolean) => ({
     fullContext: 52.9,
     powermem: 87.79,
     unit: '%',
+    prefix: '',
     improvement: '+65.9%',
     label: isZh ? 'LLM 评分' : 'LLM Score',
   },
@@ -25,6 +26,7 @@ const getComparisonData = (isZh: boolean) => ({
     fullContext: 17.12,
     powermem: 1.44,
     unit: 's',
+    prefix: '',
     improvement: '-91.6%',
     label: isZh ? 'Retrieval P95' : 'Retrieval P95',
   },
@@ -32,6 +34,7 @@ const getComparisonData = (isZh: boolean) => ({
     fullContext: 26,
     powermem: 0.9,
     unit: 'k',
+    prefix: '~',
     improvement: '-96.5%',
     label: isZh ? 'Token 使用量' : 'Token Usage',
   },
@@ -157,7 +160,7 @@ export default function ValueProps6() {
                             style={{ height: `${getBarHeight(activeComparison.powermem, maxValue)}%` }}
                           >
                             <div className={styles.barValue}>
-                              {activeComparison.powermem}
+                              {activeComparison.prefix}{activeComparison.powermem}
                               <span className={styles.barUnit}>{activeComparison.unit}</span>
                             </div>
                           </div>
@@ -183,7 +186,7 @@ export default function ValueProps6() {
                             style={{ height: `${getBarHeight(activeComparison.fullContext, maxValue)}%` }}
                           >
                             <div className={styles.barValue}>
-                              {activeComparison.fullContext}
+                              {activeComparison.prefix}{activeComparison.fullContext}
                               <span className={styles.barUnit}>{activeComparison.unit}</span>
                             </div>
                           </div>
