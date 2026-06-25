@@ -1,3 +1,8 @@
+---
+title: 艾宾浩斯遗忘曲线指南
+sidebar_label: 艾宾浩斯遗忘曲线
+---
+
 ## 前置条件 {#prerequisites}
 
 - Python 3.11+
@@ -27,7 +32,7 @@
 ```python
 from powermem import Memory
 
-# Define configuration as a dictionary (JSON-like format)
+# 将配置定义为字典（类似 JSON 的格式）
 config = {
     'llm': {
         'provider': 'qwen',
@@ -62,7 +67,7 @@ config = {
     }
 }
 
-# Create memory instance with dictionary config
+# 使用字典配置创建 Memory 实例
 memory = Memory(config=config)
 
 print("✓ Memory initialized with JSON config!")
@@ -158,37 +163,37 @@ from datetime import datetime, timedelta
 
 def calculate_retention(time_elapsed_hours, decay_rate=0.5):
     """
-    Calculate memory retention based on Ebbinghaus forgetting curve.
+    根据艾宾浩斯遗忘曲线计算记忆保持率。
 
-    Args:
-        time_elapsed_hours: Hours since memory was created/accessed
-        decay_rate: Decay rate (default 0.5 for Ebbinghaus curve)
+    参数：
+        time_elapsed_hours：记忆创建/访问后经过的小时数
+        decay_rate：衰减率（艾宾浩斯曲线默认 0.5）
 
-    Returns:
-        Retention score between 0 and 1
+    返回：
+        0 到 1 之间的保持率分数
     """
-    # Ebbinghaus formula: R = e^(-t/S)
-    # where R is retention, t is time, S is strength
-    # Using a simplified exponential decay model
+    # 艾宾浩斯公式：R = e^(-t/S)
+    # 其中 R 为保持率，t 为时间，S 为记忆强度
+    # 使用简化的指数衰减模型
     if time_elapsed_hours <= 0:
         return 1.0
 
-    # Base retention after 1 hour (approximately 44%)
+    # 1 小时后的基础保持率（约 44%）
     base_retention_1h = 0.44
 
-    # Calculate decay constant
+    # 计算衰减常数
     decay_constant = -log(base_retention_1h)
 
-    # Calculate retention
+    # 计算保持率
     retention = math.exp(-decay_constant * time_elapsed_hours)
 
-    # Ensure retention doesn't go below a minimum threshold (e.g., 20%)
+    # 确保保持率不低于最小阈值（例如 20%）
     return max(retention, 0.2)
 
-# Test the function
+# 测试函数
 print("Ebbinghaus Forgetting Curve - Retention Over Time:")
 print("=" * 60)
-time_points = [0, 0.33, 1, 9, 24, 48, 144, 744]  # hours
+time_points = [0, 0.33, 1, 9, 24, 48, 144, 744]  # 小时
 time_labels = ["0h", "20min", "1h", "9h", "1d", "2d", "6d", "31d"]
 
 for hours, label in zip(time_points, time_labels):
@@ -233,35 +238,35 @@ from datetime import datetime, timedelta
 memory = Memory(config=auto_config())
 user_id = "student_001"
 
-# Add memories with timestamps in metadata
+# 添加带 metadata 时间戳的记忆
 memories_data = [
     {
         "content": "Python is a high-level programming language",
-        "created_at": datetime.now() - timedelta(days=31),  # 31 days ago
+        "created_at": datetime.now() - timedelta(days=31),  # 31 天前
     },
     {
         "content": "Lists in Python are mutable sequences",
-        "created_at": datetime.now() - timedelta(days=6),  # 6 days ago
+        "created_at": datetime.now() - timedelta(days=6),  # 6 天前
     },
     {
         "content": "Dictionaries use key-value pairs",
-        "created_at": datetime.now() - timedelta(days=2),  # 2 days ago
+        "created_at": datetime.now() - timedelta(days=2),  # 2 天前
     },
     {
         "content": "Functions are defined with the 'def' keyword",
-        "created_at": datetime.now() - timedelta(hours=9),  # 9 hours ago
+        "created_at": datetime.now() - timedelta(hours=9),  # 9 小时前
     },
     {
         "content": "Classes are blueprints for creating objects",
-        "created_at": datetime.now() - timedelta(hours=1),  # 1 hour ago
+        "created_at": datetime.now() - timedelta(hours=1),  # 1 小时前
     },
     {
         "content": "Decorators modify function behavior",
-        "created_at": datetime.now() - timedelta(minutes=20),  # 20 minutes ago
+        "created_at": datetime.now() - timedelta(minutes=20),  # 20 分钟前
     },
 ]
 
-print("Adding memories with timestamps...")
+print("正在添加带时间戳的记忆...")
 memory_ids = []
 for mem_data in memories_data:
     result = memory.add(
@@ -325,7 +330,7 @@ import math
 from math import log
 
 def calculate_retention(time_elapsed_hours):
-    """Calculate retention based on Ebbinghaus curve."""
+    """根据艾宾浩斯曲线计算保持率。"""
     if time_elapsed_hours <= 0:
         return 1.0
     base_retention_1h = 0.44
@@ -336,7 +341,7 @@ def calculate_retention(time_elapsed_hours):
 memory = Memory(config=auto_config())
 user_id = "student_001"
 
-# Get all memories
+# 获取所有记忆
 all_memories = memory.get_all(user_id=user_id)
 memories = all_memories.get('results', [])
 
@@ -360,7 +365,7 @@ for mem in memories:
 
         retention = calculate_retention(hours_elapsed)
 
-        # Format age
+        # 格式化记忆年龄
         if hours_elapsed < 24:
             age_str = f"{hours_elapsed:.1f}h"
         else:
@@ -430,7 +435,7 @@ import math
 from math import log
 
 def calculate_retention(time_elapsed_hours):
-    """Calculate retention based on Ebbinghaus curve."""
+    """根据艾宾浩斯曲线计算保持率。"""
     if time_elapsed_hours <= 0:
         return 1.0
     base_retention_1h = 0.44
@@ -440,21 +445,21 @@ def calculate_retention(time_elapsed_hours):
 
 def search_with_retention_weighting(memory, query, user_id, limit=10):
     """
-    Search memories and apply retention-based weighting.
+    搜索记忆并应用基于保持率的加权。
 
-    Returns results sorted by combined score (similarity * retention).
+    返回按综合分数（相似度 * 保持率）排序的结果。
     """
-    # Perform standard search
+    # 执行标准搜索
     results = memory.search(query=query, user_id=user_id, limit=limit * 2)
 
     now = datetime.now()
     weighted_results = []
 
     for mem in results.get('results', []):
-        # Get similarity score
+        # 获取相似度分数
         similarity_score = mem.get('score', 0.0)
 
-        # Get creation time from metadata
+        # 从 metadata 中获取创建时间
         metadata = mem.get('metadata', {})
         created_at_str = metadata.get('created_at', '')
 
@@ -464,11 +469,11 @@ def search_with_retention_weighting(memory, query, user_id, limit=10):
             hours_elapsed = time_elapsed.total_seconds() / 3600
             retention = calculate_retention(hours_elapsed)
         else:
-            # If no timestamp, assume recent (high retention)
+            # 如果没有时间戳，则假设为近期记忆（保持率高）
             retention = 0.9
             hours_elapsed = 0
 
-        # Combined score: similarity * retention
+        # 综合分数：相似度 * 保持率
         combined_score = similarity_score * retention
 
         weighted_results.append({
@@ -480,12 +485,12 @@ def search_with_retention_weighting(memory, query, user_id, limit=10):
             'metadata': metadata
         })
 
-    # Sort by combined score (descending)
+    # 按综合分数降序排序
     weighted_results.sort(key=lambda x: x['combined_score'], reverse=True)
 
     return weighted_results[:limit]
 
-# Example usage
+# 使用示例
 memory = Memory(config=auto_config())
 user_id = "student_001"
 
@@ -551,7 +556,7 @@ import os
 from datetime import datetime, timedelta
 
 def calculate_retention(time_elapsed_hours):
-    """Calculate retention based on Ebbinghaus curve."""
+    """根据艾宾浩斯曲线计算保持率。"""
     if time_elapsed_hours <= 0:
         return 1.0
     base_retention_1h = 0.44
@@ -559,16 +564,16 @@ def calculate_retention(time_elapsed_hours):
     retention = math.exp(-decay_constant * time_elapsed_hours)
     return max(retention, 0.2)
 
-# Generate time points (0 to 31 days in hours)
-hours = np.linspace(0, 744, 1000)  # 31 days = 744 hours
+# 生成时间点（0 到 31 天，单位小时）
+hours = np.linspace(0, 744, 1000)  # 31 天 = 744 小时
 retentions = [calculate_retention(h) for h in hours]
 
-# Create the plot with improved styling
+# 使用改进样式创建图表
 plt.figure(figsize=(12, 6))
 plt.plot(hours / 24, [r * 100 for r in retentions], 'b-', linewidth=2.5,
          label='Ebbinghaus Forgetting Curve', color='#2E86AB')
 
-# Mark key points with annotations
+# 标注关键时间点
 key_points = [
     (0, "Immediate"),
     (0.33, "20 min"),
@@ -601,12 +606,12 @@ plt.legend(loc='upper right', fontsize=11, framealpha=0.9)
 plt.xlim(0, 31)
 plt.ylim(0, 105)
 
-# Add a subtle background color
+# 添加柔和背景色
 plt.gca().set_facecolor('#F8F9FA')
 
 plt.tight_layout()
 
-# Save the figure (optional: save to docs/examples/data directory if it exists)
+# 保存图片（可选：如果 docs/examples/data 目录存在则保存到该目录）
 save_path = 'ebbinghaus_curve.png'
 data_dir = 'data'
 if os.path.exists(data_dir):
@@ -684,7 +689,7 @@ import math
 from math import log
 
 def calculate_retention(time_elapsed_hours):
-    """Calculate retention based on Ebbinghaus curve."""
+    """根据艾宾浩斯曲线计算保持率。"""
     if time_elapsed_hours <= 0:
         return 1.0
     base_retention_1h = 0.44
@@ -694,9 +699,9 @@ def calculate_retention(time_elapsed_hours):
 
 def get_review_schedule(retention_threshold=0.5):
     """
-    Get optimal review intervals based on forgetting curve.
+    根据遗忘曲线获取最佳复习间隔。
 
-    Returns list of (hours, description) tuples.
+    返回 (hours, description) 元组列表。
     """
     intervals = [
         (0.33, "20 minutes"),
@@ -712,14 +717,14 @@ def get_review_schedule(retention_threshold=0.5):
 
 def get_next_review_time(memory, retention_threshold=0.5):
     """
-    Calculate when a memory should be reviewed next.
+    计算记忆下一次应复习的时间。
 
-    Args:
-        memory: Memory dict with metadata
-        retention_threshold: Minimum retention before review needed
+    参数：
+        memory：包含 metadata 的记忆字典
+        retention_threshold：需要复习前的最低保持率
 
-    Returns:
-        Tuple of (hours_until_review, review_needed_now)
+    返回：
+        元组 (hours_until_review, review_needed_now)
     """
     metadata = memory.get('metadata', {})
     created_at_str = metadata.get('created_at', '')
@@ -728,7 +733,7 @@ def get_next_review_time(memory, retention_threshold=0.5):
     if not created_at_str:
         return None, False
 
-    # Use last_reviewed if available, otherwise use created_at
+    # 优先使用 last_reviewed，否则使用 created_at
     if last_reviewed_str:
         reference_time = datetime.fromisoformat(last_reviewed_str)
     else:
@@ -741,19 +746,19 @@ def get_next_review_time(memory, retention_threshold=0.5):
     current_retention = calculate_retention(hours_elapsed)
 
     if current_retention < retention_threshold:
-        return 0, True  # Review needed now
+        return 0, True  # 现在需要复习
 
-    # Find next optimal review time
+    # 查找下一次最佳复习时间
     schedule = get_review_schedule()
     for hours, _ in schedule:
         if hours > hours_elapsed:
             hours_until = hours - hours_elapsed
             return hours_until, False
 
-    # If past all scheduled reviews, suggest immediate review
+    # 如果已超过所有计划复习时间，则建议立即复习
     return 0, True
 
-# Example: Get review recommendations
+# 示例：获取复习建议
 memory = Memory(config=auto_config())
 user_id = "student_001"
 

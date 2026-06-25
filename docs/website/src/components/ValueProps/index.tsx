@@ -5,6 +5,7 @@ import Heading from '@theme/Heading';
 import AgileIcon from './icons/AgileIcon';
 import AffordableIcon from './icons/AffordableIcon';
 import AccurateIcon from './icons/AccurateIcon';
+import {localizedPath} from '../../utils/localizedPath';
 import styles from './styles.module.css';
 
 // Order: accurate, agile, affordable
@@ -207,7 +208,7 @@ export default function ValueProps() {
 
         <div className={styles.footer}>
           <Link
-            to="/benchmark"
+            to={localizedPath('/benchmark', isZh)}
             className="button button--secondary"
           >
             {t('valueProps.viewBenchmark')} →

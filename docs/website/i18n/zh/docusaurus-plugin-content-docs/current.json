@@ -24,7 +24,7 @@
     "description": "The label for category 'Architecture' in sidebar 'docsSidebar'"
   },
   "sidebar.docsSidebar.category.Benchmark": {
-    "message": "Benchmark",
+    "message": "压测",
     "description": "The label for category 'Benchmark' in sidebar 'docsSidebar'"
   }
 }

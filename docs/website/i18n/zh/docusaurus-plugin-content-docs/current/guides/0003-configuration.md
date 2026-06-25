@@ -15,10 +15,10 @@ PowerMem 支持两种配置方法：
 ```python
 from powermem import Memory, auto_config
 
-# Load configuration (auto-loads from .env or uses defaults)
+# 加载配置（自动从 .env 加载或使用默认值）
 config = auto_config()
 
-# Create memory instance
+# 创建 Memory 实例
 memory = Memory(config=config)
 ```
 ### 方法 2：JSON/字典配置 {#method-2-jsondictionary-configuration}
@@ -63,7 +63,7 @@ import json
 from json import dump, dumps
 from powermem import Memory
 
-# Load from JSON file
+# 从 JSON 文件加载
 with open('config.json', 'r') as f:
     config = json.load(f)
 
@@ -877,16 +877,16 @@ config = {
 
 **环境变量：**
 ```env
-# Required: Database
+# 必需：数据库
 DATABASE_PROVIDER=sqlite
 SQLITE_PATH=./data/powermem_dev.db
 
-# Required: LLM
+# 必需：LLM
 LLM_PROVIDER=qwen
 LLM_API_KEY=your_api_key_here
 LLM_MODEL=qwen-plus
 
-# Required: Embedding
+# 必需：Embedding
 EMBEDDING_PROVIDER=qwen
 EMBEDDING_API_KEY=your_api_key_here
 EMBEDDING_MODEL=text-embedding-v4
@@ -951,7 +951,7 @@ memory = Memory(config=config)
 
 **环境变量：**
 ```env
-# Database
+# 数据库
 DATABASE_PROVIDER=oceanbase
 OCEANBASE_HOST=prod-db.example.com
 OCEANBASE_PORT=2881
@@ -960,18 +960,18 @@ OCEANBASE_PASSWORD=secure_password
 OCEANBASE_DATABASE=powermem_prod
 OCEANBASE_EMBEDDING_MODEL_DIMS=1536
 
-# LLM
+# LLM 配置
 LLM_PROVIDER=qwen
 LLM_API_KEY=production_key
 LLM_MODEL=qwen-plus
 
-# Embedding
+# Embedding 配置
 EMBEDDING_PROVIDER=qwen
 EMBEDDING_API_KEY=production_key
 EMBEDDING_MODEL=text-embedding-v4
 EMBEDDING_DIMS=1536
 
-# Optional: Enable intelligent memory and audit
+# 可选：启用智能记忆和审计
 INTELLIGENT_MEMORY_ENABLED=true
 AUDIT_ENABLED=true
 ```
@@ -1149,11 +1149,11 @@ import json
 from json import dump, dumps
 from powermem import Memory
 
-# Load configuration from JSON file
+# 从 JSON 文件加载配置
 with open('config.json', 'r') as f:
     config = json.load(f)
 
-# Create memory instance
+# 创建 Memory 实例
 memory = Memory(config=config)
 ```
 ---
@@ -1176,7 +1176,7 @@ POWERMEM_CUSTOM_FACT_EXTRACTION_PROMPT=You are an information extraction expert.
 ```python
 from powermem import create_memory
 
-# Prompts are loaded automatically from env vars
+# 从环境变量自动加载 Prompt
 memory = create_memory()
 ```
 如果未设置环境变量，系统将回退到内置的默认提示。有关详细的提示示例和指南，请参阅[自定义提示使用指南](0004-custom_prompts_usage.md)。

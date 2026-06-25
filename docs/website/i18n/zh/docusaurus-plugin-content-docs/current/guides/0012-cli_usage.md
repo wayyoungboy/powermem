@@ -23,10 +23,10 @@
 - **`pmem`** – 主要入口点（当作为控制台脚本安装时）
 - **`powermem-cli`** – 备用入口点
 ```bash
-# Ensure PowerMem is installed
+# 确保已安装 PowerMem
 pip install powermem
 
-# Check version and help
+# 查看版本和帮助
 pmem --version
 pmem --help
 ```
@@ -514,7 +514,7 @@ powermem> exit
 ```bash
 # Bash
 pmem --install-completion bash
-# Then source your ~/.bashrc or open a new terminal.
+# 然后 source ~/.bashrc 或打开新的终端。
 
 # Zsh
 pmem --install-completion zsh
@@ -524,7 +524,7 @@ pmem --install-completion fish
 
 # PowerShell
 pmem --install-completion powershell
-# Add the printed script to your $PROFILE to persist.
+# 将打印出的脚本添加到 $PROFILE 以持久化。
 ```
 Bash/Zsh 脚本存储在 `~/.config/powermem/` 下，如果您确认，将在您的 `~/.bashrc` 或 `~/.zshrc` 中添加一行 source 命令。Fish 自动补全脚本安装在 `~/.config/fish/completions/pmem.fish` 下。PowerShell 的相关指令会打印出来供您添加到配置文件中。
 

@@ -182,13 +182,13 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-            # Add memory
+            # 添加记忆
             await async_memory.add(
                 messages="User prefers async operations",
                 user_id="user123"
             )
 
-            # Search
+            # 搜索
             results = await async_memory.search(
                 query="user preferences",
                 user_id="user123"
@@ -208,7 +208,7 @@ async def add_multiple_memories():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add multiple memories concurrently
+    # 并发添加多条记忆
     tasks = [
         async_memory.add(messages=f"Memory {i}", user_id="user123")
         for i in range(10)
@@ -234,7 +234,7 @@ async def batch_process():
         for i in range(100)
     ]
 
-    # Process in batches
+    # 分批处理
     batch_size = 10
     for i in range(0, len(messages_list), batch_size):
         batch = messages_list[i:i+batch_size]
@@ -253,11 +253,11 @@ asyncio.run(batch_process())
 
 **`AsyncMemory` 不能与嵌入式 seekdb 一起使用。** 请改用同步的 `Memory` 类。
 ```python
-# ❌ Not supported with embedded seekdb
+# ❌ embedded seekdb 不支持
 from powermem import AsyncMemory
-async_memory = AsyncMemory(config=embedded_seekdb_config)  # crashes
+async_memory = AsyncMemory(config=embedded_seekdb_config)  # 会崩溃
 
-# ✓ Use the synchronous interface with embedded seekdb
+# ✓ embedded seekdb 请使用同步接口
 from powermem import Memory
 memory = Memory(config=embedded_seekdb_config)
 ```

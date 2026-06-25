@@ -25,7 +25,7 @@ memory = Memory(config=config)
 ```python
 from powermem import Memory, auto_config
 
-# Auto-load from .env
+# 从 .env 自动加载
 config = auto_config()
 memory = Memory(config=config, agent_id="my_agent")
 ```
@@ -55,23 +55,23 @@ memory = Memory(config=config, agent_id="my_agent")
 
 **示例:**
 ```python
-# Simple text memory
+# 简单文本记忆
 result = memory.add(
     messages="User likes Python programming",
     user_id="user123"
 )
 
-# With intelligent processing (default)
+# 使用智能处理（默认）
 result = memory.add(
     messages=[
         {"role": "user", "content": "I'm Alice, a software engineer"},
         {"role": "assistant", "content": "Nice to meet you!"}
     ],
     user_id="user123"
-    # infer=True by default - enables intelligent fact extraction
+    # 默认 infer=True，启用智能事实提取
 )
 
-# Single message dict
+# 单条消息字典
 result = memory.add(
     messages={"role": "user", "content": "I prefer dark mode"},
     user_id="user123"
@@ -103,7 +103,7 @@ result = memory.add(
               ...
           }
       ],
-      "relations": [...]  # If graph store is enabled
+      "relations": [...]  # 如果启用了图存储
   }
   ```
 **示例:**
@@ -112,7 +112,7 @@ results = memory.search(
     query="user preferences",
     user_id="user123",
     limit=5,
-    threshold=0.7  # Only return results with similarity >= 0.7
+    threshold=0.7  # 只返回相似度 >= 0.7 的结果
 )
 
 for result in results.get('results', []):
@@ -127,33 +127,33 @@ for result in results.get('results', []):
 
 **精确匹配：**
 ```python
-# Filter by exact value
+# 按精确值过滤
 filters = {"category": "food"}
 filters = {"priority": "high"}
 filters = {"status": "active"}
 ```
 **列出值（IN 操作符）：**
 ```python
-# Filter where field value is in a list
+# 过滤字段值在列表中的记录
 filters = {"category": ["food", "drink", "dessert"]}
 filters = {"tag": ["important", "urgent"]}
 ```
 **None/Null 检查：**
 ```python
-# Filter where field is None
+# 过滤字段为 None 的记录
 filters = {"deleted_at": None}
 ```
 #### 比较运算符 {#comparison-operators}
 
 使用比较运算符进行数字或日期比较：
 ```python
-# Single comparison operator
+# 单个比较运算符
 filters = {"rating": {"gte": 4.0}}  # rating >= 4.0
 filters = {"price": {"lt": 100}}     # price < 100
 filters = {"age": {"gt": 18}}        # age > 18
 filters = {"score": {"lte": 0.8}}    # score <= 0.8
 
-# Multiple operators on same field (AND logic)
+# 同一字段上的多个运算符（AND 逻辑）
 filters = {"rating": {"gte": 4.0, "lte": 5.0}}  # 4.0 <= rating <= 5.0
 filters = {"price": {"gt": 10, "lt": 100}}      # 10 < price < 100
 ```
@@ -169,11 +169,11 @@ filters = {"price": {"gt": 10, "lt": 100}}      # 10 < price < 100
 
 **IN 和 NOT IN：**
 ```python
-# Field value is in list
+# 字段值在列表中
 filters = {"category": {"in": ["food", "drink"]}}
 filters = {"user_id": {"in": ["user1", "user2", "user3"]}}
 
-# Field value is NOT in list
+# 字段值不在列表中
 filters = {"status": {"nin": ["deleted", "archived"]}}
 filters = {"tag": {"nin": ["deprecated"]}}
 ```
@@ -181,13 +181,13 @@ filters = {"tag": {"nin": ["deprecated"]}}
 
 **LIKE 和 ILIKE：**
 ```python
-# Case-sensitive pattern matching (LIKE)
-filters = {"name": {"like": "%python%"}}      # Contains "python"
-filters = {"email": {"like": "%@example.com"}} # Ends with "@example.com"
+# 区分大小写的模式匹配（LIKE）
+filters = {"name": {"like": "%python%"}}      # 包含 "python"
+filters = {"email": {"like": "%@example.com"}} # 以 "@example.com" 结尾
 
-# Case-insensitive pattern matching (ILIKE)
-filters = {"title": {"ilike": "%tutorial%"}}  # Contains "tutorial" (case-insensitive)
-filters = {"description": {"ilike": "how to%"}} # Starts with "how to" (case-insensitive)
+# 不区分大小写的模式匹配（ILIKE）
+filters = {"title": {"ilike": "%tutorial%"}}  # 包含 "tutorial"（不区分大小写）
+filters = {"description": {"ilike": "how to%"}} # 以 "how to" 开头（不区分大小写）
 ```
 **注意：** 使用 `%` 作为模式匹配的通配符。
 
@@ -197,7 +197,7 @@ filters = {"description": {"ilike": "how to%"}} # Starts with "how to" (case-ins
 
 **AND 逻辑：**
 ```python
-# All conditions must be true
+# 所有条件都必须为真
 filters = {
     "AND": [
         {"user_id": "alice"},
@@ -208,7 +208,7 @@ filters = {
 ```
 **或逻辑 (OR Logic):**
 ```python
-# At least one condition must be true
+# 至少一个条件为真
 filters = {
     "OR": [
         {"rating": {"gte": 4.0}},
@@ -218,7 +218,7 @@ filters = {
 ```
 **嵌套逻辑：**
 ```python
-# Complex nested conditions
+# 复杂嵌套条件
 filters = {
     "AND": [
         {"user_id": "alice"},
@@ -249,7 +249,7 @@ filters = {
 **自定义元数据字段：**
 在添加记忆时存储于 `metadata` 字典中的任何字段也可以进行筛选：
 ```python
-# When adding memory with custom metadata
+# 添加带自定义 metadata 的记忆时
 memory.add(
     messages="User likes Python",
     user_id="user123",
@@ -261,7 +261,7 @@ memory.add(
     }
 )
 
-# Filter by custom metadata fields
+# 按自定义 metadata 字段过滤
 filters = {"tags": {"in": ["programming"]}}
 filters = {"priority": "high"}
 filters = {"rating": {"gte": 4.0}}
@@ -294,7 +294,7 @@ results = memory.search(
 ```python
 from datetime import datetime, timedelta
 
-# Memories created in the last 7 days
+# 最近 7 天创建的记忆
 week_ago = (datetime.now() - timedelta(days=7)).isoformat()
 filters = {"created_at": {"gte": week_ago}}
 
@@ -323,7 +323,7 @@ results = memory.search(
 ```
 **示例 6: 按自定义元数据筛选**
 ```python
-# Search for memories with specific custom tags
+# 搜索包含特定自定义标签的记忆
 results = memory.search(
     query="project updates",
     filters={
@@ -337,7 +337,7 @@ results = memory.search(
 ```
 **示例 7: 模式匹配**
 ```python
-# Find memories with email addresses from specific domain
+# 查找来自特定域名邮箱地址的记忆
 results = memory.search(
     query="contact information",
     filters={"email": {"ilike": "%@company.com"}}
@@ -454,17 +454,17 @@ print(f"Deleted {result.get('count', 0)} memories")
               ...
           }
       ],
-      "relations": [...]  # If graph store is enabled
+      "relations": [...]  # 如果启用了图存储
   }
   ```
 **示例:**
 ```python
-# Simple retrieval
+# 简单检索
 all_memories = memory.get_all(user_id="user123", limit=50, offset=0)
 for mem in all_memories.get('results', []):
     print(f"- {mem.get('memory', '')}")
 
-# With advanced filters
+# 使用高级过滤
 all_memories = memory.get_all(
     user_id="user123",
     filters={

@@ -32,7 +32,7 @@ config = {
             'embedding_dims': 1536
         }
     },
-    # Sparse vector embedding configuration
+    # 稀疏向量 Embedding 配置
     'sparse_embedder': {
         'provider': 'qwen',
         'config': {
@@ -45,7 +45,7 @@ config = {
         'config': {
             'collection_name': 'sparse_demo',
             'embedding_model_dims': 1536,
-            'include_sparse': True,  # Enable sparse vector
+            'include_sparse': True,  # 启用稀疏向量
             'connection_args': {
                 'host': 'localhost',
                 'port': 2881,
@@ -74,9 +74,9 @@ python sparse_vector_example.py
 # sparse_vector_example.py
 from powermem import Memory
 
-# ... configuration code (same as Step 1)
+# ... 配置代码（同第 1 步）
 
-# Create Memory instance
+# 创建 Memory 实例
 memory = Memory(config=config)
 
 print("✓ Memory initialized successfully")
@@ -94,9 +94,9 @@ print(f"  - sparse_embedder: {memory.sparse_embedder is not None}")
 # sparse_vector_example.py
 from powermem import Memory
 
-# ... initialization code (same as Step 2)
+# ... 初始化代码（同第 2 步）
 
-# Add test memories
+# 添加测试记忆
 test_memories = [
     "Machine learning is a branch of artificial intelligence, focusing on algorithms and statistical models",
     "Natural language processing is an interdisciplinary field of computer science and artificial intelligence",
@@ -110,7 +110,7 @@ for content in test_memories:
     memory.add(
         messages=content,
         user_id="user123",
-        infer=False  # Do not use intelligent inference, store directly
+        infer=False  # 不使用智能推理，直接存储
     )
 
 print(f"✓ Successfully added {len(test_memories)} memories")
@@ -127,9 +127,9 @@ Adding test memories...
 # sparse_vector_example.py
 from powermem import Memory
 
-# ... add memory code (same as Step 3)
+# ... 添加记忆代码（同第 3 步）
 
-# Execute search
+# 执行搜索
 query = "AI algorithms"
 print(f"\nSearch query: '{query}'")
 
@@ -139,7 +139,7 @@ results = memory.search(
     limit=5
 )
 
-# Display search results
+# 显示搜索结果
 print(f"Found {len(results.get('results', []))} results:\n")
 for i, result in enumerate(results.get('results', []), 1):
     print(f"{i}. Score: {result['score']:.4f}")
@@ -166,10 +166,10 @@ for i, result in enumerate(results.get('results', []), 1):
 from powermem import auto_config
 from script import ScriptManager
 
-# Load configuration
+# 加载配置
 config = auto_config()
 
-# Run upgrade script
+# 运行升级脚本
 ScriptManager.run('upgrade-sparse-vector', config)
 ```
 ## 完整示例代码 {#complete-example-code}
@@ -179,19 +179,19 @@ ScriptManager.run('upgrade-sparse-vector', config)
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Complete Sparse Vector Example
-Demonstrates how to use sparse vector functionality
+完整稀疏向量示例
+演示如何使用稀疏向量功能
 """
 from powermem import Memory, auto_config
 
 def main():
-    # Load configuration (with sparse vector enabled)
+    # 加载配置（已启用稀疏向量）
     config = auto_config()
 
-    # Create Memory instance
+    # 创建 Memory 实例
     memory = Memory(config=config)
 
-    # Add test memories (automatically generates sparse vectors)
+    # 添加测试记忆（自动生成稀疏向量）
     test_memories = [
         "Machine learning is a branch of artificial intelligence, focusing on algorithms and statistical models",
         "Natural language processing is an interdisciplinary field of computer science and artificial intelligence",
@@ -206,7 +206,7 @@ def main():
             infer=False
         )
 
-    # Search (automatically uses sparse vector for hybrid search)
+    # 搜索（自动使用稀疏向量进行混合搜索）
     print("\nSearching...")
     results = memory.search(
         query="AI technology",
@@ -214,7 +214,7 @@ def main():
         limit=5
     )
 
-    # Display results
+    # 显示结果
     print(f"\nFound {len(results.get('results', []))} results:")
     for i, result in enumerate(results.get('results', []), 1):
         print(f"{i}. Score: {result['score']:.4f}")

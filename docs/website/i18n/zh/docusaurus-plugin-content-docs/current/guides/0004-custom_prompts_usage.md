@@ -17,9 +17,9 @@ powermem 支持在多个层面上自定义提示，包括：
 ```python
 from powermem import Memory, MemoryConfig, GraphStoreConfig, LlmConfig, EmbedderConfig, VectorStoreConfig, IntelligentMemoryConfig
 
-# Create configuration object
+# 创建配置对象
 config = MemoryConfig(
-    # Custom prompt for fact extraction
+    # 自定义事实提取 Prompt
     custom_fact_extraction_prompt="""
 You are an information extraction expert. Extract user preferences, important facts, and plans from conversations.
 
@@ -31,7 +31,7 @@ Rules:
 Output JSON format: {"facts": ["fact1", "fact2"]}
 """,
 
-    # Custom prompt for memory update
+    # 自定义记忆更新 Prompt
     custom_update_memory_prompt="""
 You are a memory manager. Compare new facts with existing memories and decide: ADD (new), UPDATE (update), DELETE (delete), or NONE (no change).
 
@@ -41,7 +41,7 @@ Important rules:
 - If information is the same, then NONE
 """,
 
-    # Custom prompt for importance evaluation
+    # 自定义重要性评估 Prompt
     custom_importance_evaluation_prompt="""
 Evaluate the importance of memory content on a scale from 0.0 to 1.0.
 
@@ -64,11 +64,11 @@ Return JSON format:
 }
 """,
 
-    # Graph memory configuration (optional)
+    # 图记忆配置（可选）
     graph_store=GraphStoreConfig(
         enabled=True,
 
-        # Custom prompt for relation extraction
+        # 自定义关系提取 Prompt
         custom_extract_relations_prompt="""
 Extract entities and relationships from text to build a knowledge graph.
 
@@ -81,7 +81,7 @@ Extracted relationships should follow this format:
 source -- relationship -- destination
 """,
 
-        # Custom prompt for graph update
+        # 自定义图更新 Prompt
         custom_update_graph_prompt="""
 Analyze existing graph memories and new information, update relationships.
 
@@ -97,7 +97,7 @@ Rules:
 3. Maintain graph structure consistency
 """,
 
-        # Custom prompt for deleting relations
+        # 自定义删除关系 Prompt
         custom_delete_relations_prompt="""
 Analyze existing relationships and determine which should be deleted.
 
@@ -112,17 +112,17 @@ New Information: Alice also loves to eat burger
 Result: Do not delete (Alice can love both pizza and burger)
 """,
 
-        # Or use generic prompt (for relation extraction)
-        # custom_prompt="Your custom prompt..."
+        # 或使用通用 Prompt（用于关系提取）
+        # custom_prompt="您的自定义 Prompt..."
     ),
 
-    # Other configurations...
+    # 其他配置...
     llm=LlmConfig(provider="openai", config={"api_key": "..."}),
     embedder=EmbedderConfig(provider="openai", config={"api_key": "..."}),
     vector_store=VectorStoreConfig(provider="chroma", config={})
 )
 
-# Create Memory instance
+# 创建 Memory 实例
 memory = Memory(config=config)
 ```
 ### 方法 2：使用环境变量 {#method-2-using-environment-variables}
@@ -140,7 +140,7 @@ POWERMEM_CUSTOM_IMPORTANCE_EVALUATION_PROMPT=Evaluate the importance of memory c
 ```python
 from powermem import create_memory
 
-# Prompts are loaded automatically from env vars
+# 从环境变量自动加载 Prompt
 memory = create_memory()
 ```
 > **注意：** 在 `.env` 文件中使用多行提示时，请使用单行格式或以编程方式加载值。环境变量配置最适合用于短的单行提示覆盖，或在配置文件不方便的部署环境中使用。
@@ -149,37 +149,37 @@ memory = create_memory()
 ```python
 from powermem import Memory
 
-# Dictionary configuration (no need to import config classes)
+# 字典配置（无需导入配置类）
 
 config = {
-    # Custom prompt for fact extraction
+    # 自定义事实提取 Prompt
     "custom_fact_extraction_prompt": """
 You are an information extraction expert. Extract user preferences, important facts, and plans from conversations.
 Output JSON format: {"facts": ["fact1", "fact2"]}
 """,
 
-    # Custom prompt for memory update
+    # 自定义记忆更新 Prompt
     "custom_update_memory_prompt": """
 You are a memory manager. Compare new facts with existing memories and decide: ADD, UPDATE, DELETE, or NONE.
 """,
 
-    # Custom prompt for importance evaluation
+    # 自定义重要性评估 Prompt
     "custom_importance_evaluation_prompt": """
 Evaluate the importance of memory content on a scale from 0.0 to 1.0.
 Return JSON format containing importance_score and reasoning.
 """,
 
-    # Graph memory configuration
+    # 图记忆配置
     "graph_store": {
         "enabled": True,
         "custom_extract_relations_prompt": "Extract entities and relationships from text...",
         "custom_update_graph_prompt": "Update graph memories...",
         "custom_delete_relations_prompt": "Delete relationships...",
-        # Or
+        # 或者
         "custom_prompt": "Generic prompt (for relation extraction)"
     },
 
-    # Other configurations...
+    # 其他配置...
     "llm": {
         "provider": "openai",
         "config": {"api_key": "..."}
@@ -202,7 +202,7 @@ memory = Memory(config=config)
 ```python
 from powermem import Memory, MemoryConfig, LlmConfig, EmbedderConfig, VectorStoreConfig
 
-# Create a prompt focused on extracting preferences and interests
+# 创建用于提取偏好和兴趣的 Prompt
 config = MemoryConfig(
     custom_fact_extraction_prompt="""
 You are a preferences and interests extraction expert.
@@ -226,14 +226,14 @@ Conversation content:
 
 memory = Memory(config=config)
 
-# Add memory, system will use custom fact extraction prompt
+# 添加记忆，系统将使用自定义事实提取 Prompt
 result = memory.add(
     messages=[
         {"role": "user", "content": "I like latte coffee, I need a cup every morning."},
         {"role": "assistant", "content": "Got it, I've remembered your coffee preference."}
     ],
     user_id="user123",
-    infer=True  # Enable intelligent extraction
+    infer=True  # 启用智能提取
 )
 
 print(result)
@@ -242,7 +242,7 @@ print(result)
 ```python
 from powermem import Memory, MemoryConfig, LlmConfig, EmbedderConfig, VectorStoreConfig
 
-# Create a more conservative update strategy
+# 创建更保守的更新策略
 config = MemoryConfig(
     custom_update_memory_prompt="""
 You are a memory manager with a conservative update strategy.
@@ -273,15 +273,15 @@ New facts:
 
 memory = Memory(config=config)
 
-# System will use custom update strategy
+# 系统将使用自定义更新策略
 memory.add(messages="I like Python programming", user_id="user123")
-memory.add(messages="I love Python and JavaScript programming", user_id="user123")  # Will update instead of add new
+memory.add(messages="I love Python and JavaScript programming", user_id="user123")  # 将更新现有记忆，而不是新增一条
 ```
 ### 示例 3：自定义重要性评估 {#example-3-custom-importance-evaluation}
 ```python
 from powermem import Memory, MemoryConfig, IntelligentMemoryConfig, LlmConfig, EmbedderConfig, VectorStoreConfig
 
-# Create an evaluation prompt that emphasizes emotional value and practicality
+# 创建强调情感价值和实用性的评估 Prompt
 config = MemoryConfig(
     custom_importance_evaluation_prompt="""
 Evaluate the importance of memory content, focusing on emotional value and practicality.
@@ -323,7 +323,7 @@ Return JSON:
 
 memory = Memory(config=config)
 
-# System will use custom importance evaluation
+# 系统将使用自定义重要性评估
 memory.add(
     messages="I have diabetes and need to monitor blood sugar control",
     user_id="user123",
@@ -339,7 +339,7 @@ config = MemoryConfig(
         enabled=True,
         provider="oceanbase",
 
-        # Relation extraction: Focus on extracting person relationships
+        # 关系提取：关注人物关系抽取
         custom_extract_relations_prompt="""
 Extract entities and relationships from text, with special focus on person relationships.
 
@@ -357,7 +357,7 @@ Relationship type examples:
 Text: {text}
 """,
 
-        # Graph update: Intelligent relationship merging
+        # 图更新：智能合并关系
         custom_update_graph_prompt="""
 Update knowledge graph, intelligently merge and update relationships.
 
@@ -374,7 +374,7 @@ Update strategy:
 4. Avoid duplicates and redundancy
 """,
 
-        # Delete relationships: Conservative strategy
+        # 删除关系：保守策略
         custom_delete_relations_prompt="""
 Determine relationships to delete using conservative strategy.
 
@@ -413,7 +413,7 @@ Only return relationships that need to be deleted.
 
 memory = Memory(config=config)
 
-# Add memory, system will use custom graph memory prompts
+# 添加记忆，系统将使用自定义图记忆 Prompt
 memory.add(
     messages="Alice is my friend, we work together at Google. She likes to drink coffee.",
     user_id="user123",
@@ -427,7 +427,7 @@ memory.add(
 ### Fact Extraction Prompt {#fact-extraction-prompt}
 - 不需要特定的占位符，系统会自动添加对话内容
 
-### Memory Update Prompt {#memory-update-prompt}
+### Memory 更新 Prompt {#memory-update-prompt}
 - `{old_memory}` 或从配置中获取现有记忆
 - `{new_facts}` 或从配置中获取新事实
 
@@ -444,7 +444,7 @@ memory.add(
 - `USER_ID` - 将被替换为实际的用户 ID
 - `CUSTOM_PROMPT` - 如果提供了 `custom_prompt`，此占位符将被替换
 
-### Delete Relations Prompt {#delete-relations-prompt}
+### 删除关系 Prompt {#delete-relations-prompt}
 - `USER_ID` - 将被替换为实际的用户 ID
 
 ## 提示编写指南 {#prompt-writing-guidelines}
@@ -473,7 +473,7 @@ memory.add(
 ```python
 from powermem import Memory, MemoryConfig, LlmConfig, EmbedderConfig, VectorStoreConfig
 
-# Chinese prompt configuration
+# 中文 Prompt 配置
 chinese_config = MemoryConfig(
     custom_fact_extraction_prompt="""
 You are a Chinese information extraction expert. Extract user information from Chinese conversations.
@@ -500,7 +500,7 @@ Important: Preserve natural Chinese expressions.
 
 memory_cn = Memory(config=chinese_config)
 
-# Use Chinese conversations
+# 使用中文对话
 memory_cn.add(
     messages=[
         {"role": "user", "content": "我昨天去了北京，参观了故宫。"},

@@ -72,30 +72,30 @@ class CustomLLM(LLMBase):
         self.base_url = config.get('base_url', 'https://api.example.com')
 
     def generate(self, prompt: str, **kwargs) -> str:
-        """Generate text using custom LLM"""
-        # Your custom LLM implementation
-        # This is a mock example
+        """使用自定义 LLM 生成文本"""
+        # 您的自定义 LLM 实现
+        # 这是一个模拟示例
         return f"Response to: {prompt}"
 
     def extract_facts(self, messages: List[Dict[str, str]]) -> List[str]:
-        """Extract facts from messages"""
-        # Custom fact extraction logic
+        """从消息中提取事实"""
+        # 自定义事实提取逻辑
         facts = []
         for msg in messages:
             if msg.get('role') == 'user':
                 content = msg.get('content', '')
-                # Simple extraction (replace with your logic)
+                # 简单提取（请替换为您的逻辑）
                 if 'name is' in content.lower():
                     facts.append(f"Name: {content.split('name is')[1].strip()}")
         return facts
 
-# Register custom LLM
+# 注册自定义 LLM
 from powermem.integrations.llm.factory import LLMFactory
 
-# Register your custom provider
+# 注册您的自定义 provider
 LLMFactory.register('custom', CustomLLM)
 
-# Use custom LLM
+# 使用自定义 LLM
 config = {
     'llm': {
         'provider': 'custom',
@@ -138,22 +138,22 @@ class CustomEmbedder(EmbedderBase):
         self.dims = config.get('dims', 768)
 
     def embed(self, text: str) -> List[float]:
-        """Generate embedding for text"""
-        # Your custom embedding implementation
-        # This is a mock example
-        # In real implementation, call your embedding API
+        """为文本生成 Embedding"""
+        # 您的自定义 Embedding 实现
+        # 这是一个模拟示例
+        # 实际实现中调用您的 Embedding API
         return np.random.rand(self.dims).tolist()
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for batch of texts"""
+        """为一批文本生成 Embedding"""
         return [self.embed(text) for text in texts]
 
-# Register custom embedder
+# 注册自定义 Embedder
 from powermem.integrations.embeddings.factory import EmbedderFactory
 
 EmbedderFactory.register('custom', CustomEmbedder)
 
-# Use custom embedder
+# 使用自定义 Embedder
 config = {
     'llm': {
         'provider': 'qwen',
@@ -187,55 +187,55 @@ class CustomVectorStore(VectorStoreBase):
     def __init__(self, config: Dict[str, Any]):
         self.connection_string = config.get('connection_string', '')
         self.collection_name = config.get('collection_name', 'memories')
-        # Initialize your custom storage connection
+        # 初始化您的自定义存储连接
         self._init_connection()
 
     def _init_connection(self):
-        """Initialize connection to your storage"""
-        # Your connection initialization logic
+        """初始化到您存储的连接"""
+        # 您的连接初始化逻辑
         pass
 
     def add(self, memory: str, embedding: List[float], metadata: Dict[str, Any]) -> str:
-        """Add memory to storage"""
+        """向存储添加记忆"""
         memory_id = f"mem_{hash(memory)}"
-        # Your storage implementation
-        # Store memory, embedding, and metadata
+        # 您的存储实现
+        # 存储记忆、Embedding 和 metadata
         return memory_id
 
     def search(self, query_embedding: List[float], limit: int = 10,
                filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Search similar memories"""
-        # Your search implementation
-        # Return list of memories with scores
+        """搜索相似记忆"""
+        # 您的搜索实现
+        # 返回带分数的记忆列表
         return []
 
     def get(self, memory_id: str) -> Optional[Dict[str, Any]]:
-        """Get memory by ID"""
-        # Your retrieval implementation
+        """按 ID 获取记忆"""
+        # 您的检索实现
         return None
 
     def update(self, memory_id: str, memory: Optional[str] = None,
                metadata: Optional[Dict[str, Any]] = None) -> bool:
-        """Update memory"""
-        # Your update implementation
+        """更新记忆"""
+        # 您的更新实现
         return True
 
     def delete(self, memory_id: str) -> bool:
-        """Delete memory"""
-        # Your deletion implementation
+        """删除记忆"""
+        # 您的删除实现
         return True
 
     def delete_all(self, filters: Optional[Dict[str, Any]] = None) -> int:
-        """Delete all matching memories"""
-        # Your bulk deletion implementation
+        """删除所有匹配的记忆"""
+        # 您的批量删除实现
         return 0
 
-# Register custom storage
+# 注册自定义存储
 from powermem.storage.factory import VectorStoreFactory
 
 VectorStoreFactory.register('custom', CustomVectorStore)
 
-# Use custom storage
+# 使用自定义存储
 config = {
     'llm': {
         'provider': 'qwen',
@@ -268,12 +268,12 @@ from langchain_openai import ChatOpenAI
 from powermem import Memory, auto_config
 from typing import List, Dict, Any
 
-# Create powermem instance
+# 创建 PowerMem 实例
 config = auto_config()
 powermem = Memory(config=config)
 
 class PowermemLangChainMemory:
-    """Custom memory class for LangChain 1.1.0+ integration."""
+    """用于 LangChain 1.1.0+ 集成的自定义记忆类。"""
 
     def __init__(self, powermem_instance, user_id: str):
         self.powermem = powermem_instance
@@ -281,15 +281,15 @@ class PowermemLangChainMemory:
         self.messages: List[BaseMessage] = []
 
     def add_message(self, message: BaseMessage):
-        """Add a message to conversation history."""
+        """向对话历史添加消息。"""
         self.messages.append(message)
 
     def get_messages(self) -> List[BaseMessage]:
-        """Get all conversation messages."""
+        """获取所有对话消息。"""
         return self.messages
 
     def save_to_powermem(self, user_input: str, assistant_output: str):
-        """Save conversation to powermem with intelligent processing."""
+        """使用智能处理将对话保存到 PowerMem。"""
         messages = [
             {"role": "user", "content": user_input},
             {"role": "assistant", "content": assistant_output}
@@ -297,11 +297,11 @@ class PowermemLangChainMemory:
         self.powermem.add(
             messages=messages,
             user_id=self.user_id,
-            infer=True  # Enable intelligent fact extraction
+            infer=True  # 启用智能事实提取
         )
 
     def get_context(self, query: str) -> str:
-        """Load relevant memories from powermem."""
+        """从 PowerMem 加载相关记忆。"""
         results = self.powermem.search(
             query=query,
             user_id=self.user_id,
@@ -312,20 +312,20 @@ class PowermemLangChainMemory:
             return "\n".join([mem.get('memory', '') for mem in memories])
         return "No previous context found."
 
-# Usage with LangChain 1.1.0+
+# 与 LangChain 1.1.0+ 一起使用
 llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
 memory = PowermemLangChainMemory(powermem, user_id="user123")
 
-# Create prompt template
+# 创建 Prompt 模板
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful assistant. Use the following context to provide personalized responses."),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{input}")
 ])
 
-# Build the chain with context retrieval
+# 构建带上下文检索的链
 def format_messages(input_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Retrieve context and format messages."""
+    """检索上下文并格式化消息。"""
     user_input = input_dict.get("input", "")
     context = memory.get_context(user_input)
     messages = memory.get_messages()
@@ -341,14 +341,14 @@ def format_messages(input_dict: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"history": formatted_history, "input": user_input}
 
-# Create the chain using LCEL (LangChain Expression Language)
+# 使用 LCEL（LangChain Expression Language）创建链
 chain = (
     RunnableLambda(format_messages)
     | prompt
     | llm
 )
 
-# Use the chain
+# 使用链
 user_input = "Hello, I'm Alice"
 memory.add_message(HumanMessage(content=user_input))
 
@@ -371,27 +371,27 @@ from langchain_openai import ChatOpenAI
 from powermem import Memory, auto_config
 from typing import TypedDict, Annotated, List
 
-# Create powermem instance
+# 创建 PowerMem 实例
 config = auto_config()
 powermem = Memory(config=config)
 
-# Define state schema
+# 定义状态 schema
 class ConversationState(TypedDict):
     messages: Annotated[List[BaseMessage], "Conversation messages"]
     user_id: str
     context: dict
 
-# Initialize LLM
+# 初始化 LLM
 llm = ChatOpenAI(model="gpt-3.5-turbo")
 
-# Define nodes
+# 定义节点
 def load_context(state: ConversationState) -> ConversationState:
-    """Load relevant context from powermem."""
+    """从 PowerMem 加载相关上下文。"""
     user_id = state["user_id"]
     last_message = state["messages"][-1] if state["messages"] else None
     query = last_message.content if last_message else ""
 
-    # Search powermem
+    # 搜索 powermem
     results = powermem.search(query=query, user_id=user_id, limit=5)
     state["context"] = {
         "memories": [mem.get('memory', '') for mem in results.get('results', [])]
@@ -399,7 +399,7 @@ def load_context(state: ConversationState) -> ConversationState:
     return state
 
 def generate_response(state: ConversationState) -> ConversationState:
-    """Generate response using LLM."""
+    """使用 LLM 生成响应。"""
     last_message = state["messages"][-1]
     context_str = "\n".join(state["context"].get("memories", []))
 
@@ -414,7 +414,7 @@ Assistant:"""
     return state
 
 def save_conversation(state: ConversationState) -> ConversationState:
-    """Save conversation to powermem."""
+    """将对话保存到 PowerMem。"""
     messages = state["messages"]
     if len(messages) >= 2:
         user_msg = messages[-2]
@@ -430,7 +430,7 @@ def save_conversation(state: ConversationState) -> ConversationState:
         )
     return state
 
-# Build the graph
+# 构建图
 workflow = StateGraph(ConversationState)
 workflow.add_node("load_context", load_context)
 workflow.add_node("generate_response", generate_response)
@@ -443,7 +443,7 @@ workflow.add_edge("save_conversation", END)
 
 app = workflow.compile()
 
-# Use the graph
+# 使用图
 initial_state = {
     "messages": [HumanMessage(content="Hello, I'm Alice")],
     "user_id": "user123",
@@ -485,10 +485,10 @@ class SearchRequest(BaseModel):
 
 @app.post("/memories")
 async def add_memory(request: MemoryRequest):
-    """Add a memory"""
+    """添加记忆"""
     try:
         result = await async_memory.add(
-            request.memory,  # messages as first positional argument
+            request.memory,  # messages 作为第一个位置参数
             user_id=request.user_id,
             metadata=request.metadata
         )
@@ -498,7 +498,7 @@ async def add_memory(request: MemoryRequest):
 
 @app.post("/memories/search")
 async def search_memories(request: SearchRequest):
-    """Search memories"""
+    """搜索记忆"""
     try:
         results = await async_memory.search(
             query=request.query,
@@ -511,7 +511,7 @@ async def search_memories(request: SearchRequest):
 
 @app.get("/memories/{user_id}")
 async def get_all_memories(user_id: str):
-    """Get all memories for a user"""
+    """获取用户的所有记忆"""
     try:
         results = await async_memory.get_all(user_id=user_id)
         return results
@@ -520,14 +520,14 @@ async def get_all_memories(user_id: str):
 
 @app.delete("/memories/{user_id}")
 async def delete_all_memories(user_id: str):
-    """Delete all memories for a user"""
+    """删除用户的所有记忆"""
     try:
         result = await async_memory.delete_all(user_id=user_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Run with: uvicorn fastapi_integration:app --reload
+# 运行方式：uvicorn fastapi_integration:app --reload
 ```
 ## 第六步：自定义智能插件 {#step-6-custom-intelligence-plugin}
 
@@ -545,28 +545,28 @@ class CustomIntelligencePlugin(IntelligentMemoryPlugin):
 
     def calculate_retention(self, memory: Dict[str, Any],
                            time_since_creation: float) -> float:
-        """Custom retention calculation"""
-        # Your custom retention logic
+        """自定义保持率计算"""
+        # 您的自定义保持率逻辑
         initial_retention = 1.0
         retention = initial_retention * (0.9 ** (time_since_creation / 86400))
         return max(0.0, min(1.0, retention))
 
     def score_importance(self, memory: Dict[str, Any]) -> float:
-        """Custom importance scoring"""
-        # Your custom importance logic
+        """自定义重要性评分"""
+        # 您的自定义重要性逻辑
         content = memory.get('memory', '')
         if 'important' in content.lower() or 'critical' in content.lower():
             return 0.9
         return 0.5
 
-# Use custom plugin
+# 使用自定义插件
 config = {
     'intelligent_memory': {
         'enabled': True,
         'plugin': 'custom',
         'decay_rate': 0.1
     },
-    # ... other config
+    # ... 其他配置
 }
 ```
 ## 完整示例 {#complete-example}
@@ -594,11 +594,11 @@ class SimpleLLM(LLMBase):
                     facts.append(content)
         return facts
 
-# Register
+# 注册
 from powermem.integrations.llm.factory import LLMFactory
 LLMFactory.register('simple', SimpleLLM)
 
-# Use
+# 使用
 config = {
     'llm': {
         'provider': 'simple',

@@ -4,6 +4,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Heading from '@theme/Heading';
 import CodeIcon from './icons/CodeIcon';
 import {Highlight, themes} from 'prism-react-renderer';
+import {localizedPath} from '../../utils/localizedPath';
 import styles from './styles.module.css';
 
 // GitHub Stars Hook
@@ -101,7 +102,7 @@ memories = memory.search("user preferences", user_id="user123")`;
           <div className={styles.heroButtons}>
             <Link
               className="button button--primary button--lg"
-              to="/docs/guides/getting_started"
+              to={localizedPath('/docs/guides/getting_started', isZh)}
             >
               {isZh ? '开始使用' : 'Get Started'}
               <span className={styles.buttonArrow}>→</span>

@@ -1,3 +1,8 @@
+---
+title: 多模态指南
+sidebar_label: 多模态指南
+---
+
 ## 前置条件 {#prerequisites}
 
 - Python 3.11+
@@ -14,15 +19,15 @@
    ```
 2. 编辑 `.env` 文件并配置多模态参数
 
-> **注意：** 多模态功能需要支持视觉的LLM模型，例如 `gpt-4o`、`gpt-4-vision-preview` 或 `qwen-vl-plus`。
+> **注意：** 多模态功能需要支持视觉的 LLM 模型，例如 `gpt-4o`、`gpt-4-vision-preview` 或 `qwen-vl-plus`。
 
 ## 什么是多模态能力？ {#what-is-multimodal-capability}
 
 多模态能力使 PowerMem 能够处理不仅限于文本的内容：
 - **图片**：从图片中提取信息并生成文本描述
-- **图片URL**：处理在线图片链接
+- **图片 URL**：处理在线图片链接
 - **音频**：处理音频文件并将语音转换为文本
-- **音频URL**：处理在线音频链接
+- **音频 URL**：处理在线音频链接
 - **混合内容**：处理包含文本、图片和音频的复合消息
 
 PowerMem 会自动将图片和音频内容转换为文本描述，并将其存储为记忆，使多媒体内容可被搜索和检索。
@@ -36,11 +41,11 @@ from powermem import Memory
 
 config = {
     "llm": {
-        "provider": "openai",  # Use OpenAI-compatible multimodal model
+        "provider": "openai",  # 使用 OpenAI 兼容的多模态模型
         "config": {
             "model": "qwen-vl-plus",
-            "enable_vision": True,  # Key: Enable vision processing
-            "vision_details": "auto",  # Image analysis precision: auto/low/high
+            "enable_vision": True,  # 关键：启用视觉处理
+            "vision_details": "auto",  # 图片分析精度：auto/low/high
             "api_key": "your-api-key-here",
             "openai_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         }
@@ -70,7 +75,7 @@ config = {
 
 memory = Memory(config=config)
 
-# OpenAI multimodal message format
+# OpenAI 多模态消息格式
 messages_multimodal = [
     {
         "role": "user",
@@ -83,14 +88,14 @@ messages_multimodal = [
                 "type": "image_url",
                 "image_url": {
                     "url": "https://example.com/workspace.jpg",
-                    "detail": "auto"  # Optional: auto/low/high
+                    "detail": "auto"  # 可选：auto/low/high
                 }
             },
         ]
     }
 ]
 
-# Add image memory
+# 添加图片记忆
 result = memory.add(
     messages=messages_multimodal,
     user_id="test_user",
@@ -109,7 +114,7 @@ from powermem import Memory
 
 memory = Memory(config=config)
 
-# Search for image-related memories
+# 搜索图片相关记忆
 query = "Bob's favorite working state"
 
 print(f"\nQuery: '{query}'")
@@ -121,7 +126,7 @@ if results.get("results"):
         print(f"    Similarity: {mem.get('score', 0):.4f}")
         print(f"    Metadata: {mem.get('metadata', {})}")
 else:
-    print("  No related memories found")
+    print("  未找到相关记忆")
 ```
 ## 使用 OpenAI 多模态格式添加音频记忆 {#add-audio-memory-using-openai-multimodal-format}
 
@@ -134,10 +139,10 @@ from powermem import Memory
 
 config = {
     "llm": {
-        "provider": "openai",  # Use OpenAI-compatible multimodal model
+        "provider": "openai",  # 使用 OpenAI 兼容的多模态模型
         "config": {
             "model": "qwen-vl-plus",
-            "enable_vision": True,  # Required: Must be True for audio processing
+            "enable_vision": True,  # 必填：音频处理必须设为 True
             "vision_details": "auto",
             "api_key": "your-api-key-here",
             "openai_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -175,10 +180,10 @@ config = {
 
 memory = Memory(config=config)
 
-# Audio URL (must be a URL, not a local file path)
+# 音频 URL（必须是 URL，不能是本地文件路径）
 audio_url = "https://example.com/example.wav"
 
-# OpenAI multimodal message format with audio
+# 包含音频的 OpenAI 多模态消息格式
 messages_multimodal = [
     {
         "role": "user",
@@ -190,14 +195,14 @@ messages_multimodal = [
             {
                 "type": "audio",
                 "content": {
-                    "audio": audio_url,  # Must be a URL
+                    "audio": audio_url,  # 必须是 URL
                 }
             },
         ]
     }
 ]
 
-# Add audio memory
+# 添加音频记忆
 result = memory.add(
     messages=messages_multimodal,
     user_id="test_user",
@@ -222,7 +227,7 @@ from powermem import Memory
 
 memory = Memory(config=config)
 
-# Search for audio-related memories
+# 搜索音频相关记忆
 query = "voice message from Alice"
 
 print(f"\nQuery: '{query}'")
@@ -234,7 +239,7 @@ if results.get("results"):
         print(f"    Similarity: {mem.get('score', 0):.4f}")
         print(f"    Metadata: {mem.get('metadata', {})}")
 else:
-    print("  No related memories found")
+    print("  未找到相关记忆")
 ```
 ## 配置选项 {#configuration-options}
 
@@ -244,12 +249,12 @@ config = {
     "llm": {
         "provider": "openai",
         "config": {
-            "model": "gpt-4o",  # Or gpt-4-vision-preview, qwen-vl-plus
-            "enable_vision": True,  # Required: Enable vision processing
-            "vision_details": "auto",  # Optional: Image analysis precision
-            # auto: Automatic selection (recommended)
-            # low: Lower precision, faster
-            # high: Higher precision, more detailed but slower
+            "model": "gpt-4o",  # 也可以使用 gpt-4-vision-preview、qwen-vl-plus
+            "enable_vision": True,  # 必填：启用视觉处理
+            "vision_details": "auto",  # 可选：图片分析精度
+            # auto：自动选择（推荐）
+            # low：较低精度，速度更快
+            # high：更高精度，细节更多但速度更慢
         }
     }
 }
@@ -261,15 +266,15 @@ config = {
         "provider": "openai",
         "config": {
             "model": "qwen-vl-plus",
-            "enable_vision": True,  # Required: Must be True for audio processing
+            "enable_vision": True,  # 必填：音频处理必须设为 True
             "api_key": "your-api-key",
             "openai_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         }
     },
     "audio_llm": {
-        "provider": "qwen_asr",  # Audio transcription provider
+        "provider": "qwen_asr",  # 音频转写提供商
         "config": {
-            "model": "qwen3-asr-flash",  # ASR model
+            "model": "qwen3-asr-flash",  # ASR 模型
             "api_key": "your-api-key",
         }
     }

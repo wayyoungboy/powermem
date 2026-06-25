@@ -25,7 +25,7 @@ from powermem import Memory, auto_config
 
 config = auto_config()
 
-# Create memory instances for different agents
+# 为不同 Agent 创建 Memory 实例
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
@@ -56,26 +56,26 @@ from powermem import Memory, auto_config
 config = auto_config()
 customer_id = "customer_12345"
 
-# Create agents
+# 创建 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
-# Support agent adds memory
+# Support Agent 添加记忆
 support_agent.add(
     "Customer prefers email support over phone calls",
     user_id=customer_id,
     metadata={"category": "communication_preference"}
 )
 
-# Sales agent adds memory
+# Sales Agent 添加记忆
 sales_agent.add(
     "Customer interested in AI-powered features and automation",
     user_id=customer_id,
     metadata={"category": "product_interest"}
 )
 
-# Technical agent adds memory
+# Technical Agent 添加记忆
 tech_agent.add(
     "Customer uses Python and PostgreSQL in their tech stack",
     user_id=customer_id,
@@ -102,11 +102,11 @@ from powermem import Memory, auto_config
 config = auto_config()
 customer_id = "customer_12345"
 
-# Create agents
+# 创建 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 
-# Add memories
+# 添加记忆
 support_agent.add(
     "Customer prefers email support",
     user_id=customer_id
@@ -116,7 +116,7 @@ sales_agent.add(
     user_id=customer_id
 )
 
-# Support agent searches their memories
+# Support Agent 搜索自己的记忆
 print("Support Agent Search:")
 support_results = support_agent.search(
     query="customer preferences",
@@ -126,7 +126,7 @@ support_results = support_agent.search(
 for result in support_results.get('results', []):
     print(f"  - {result['memory']}")
 
-# Sales agent searches their memories
+# Sales Agent 搜索自己的记忆
 print("\nSales Agent Search:")
 sales_results = sales_agent.search(
     query="customer interests",
@@ -158,22 +158,22 @@ from powermem import Memory, auto_config
 config = auto_config()
 customer_id = "customer_12345"
 
-# Create agents
+# 创建 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
-# Add memories for each agent
+# 为每个 Agent 添加记忆
 support_agent.add("Customer prefers email support", user_id=customer_id)
 sales_agent.add("Customer interested in AI features", user_id=customer_id)
 tech_agent.add("Customer uses Python and PostgreSQL", user_id=customer_id)
 
-# Cross-agent search (no agent_id filter)
+# 跨 Agent 搜索（不加 agent_id 过滤）
 print("Cross-Agent Search:")
 all_results = support_agent.search(
     query="customer information",
     user_id=customer_id
-    # No agent_id - searches all agents
+    # 不传 agent_id，搜索所有 Agent
 )
 
 print(f"Found {len(all_results.get('results', []))} memories across all agents:")
@@ -203,12 +203,12 @@ from powermem import Memory, auto_config
 config = auto_config()
 project_id = "project_ai_platform"
 
-# Create developer agents
+# 创建开发者 Agent
 alice_dev = Memory(config=config, agent_id="alice_dev")
 bob_dev = Memory(config=config, agent_id="bob_dev")
 charlie_qa = Memory(config=config, agent_id="charlie_qa")
 
-# Alice adds development memory
+# Alice 添加开发记忆
 alice_dev.add(
     "Implemented user authentication module with JWT tokens",
     user_id="alice",
@@ -216,7 +216,7 @@ alice_dev.add(
     metadata={"scope": "development", "module": "authentication"}
 )
 
-# Bob adds development memory
+# Bob 添加开发记忆
 bob_dev.add(
     "Created database schema for user profiles",
     user_id="bob",
@@ -224,7 +224,7 @@ bob_dev.add(
     metadata={"scope": "development", "module": "database"}
 )
 
-# Charlie adds QA memory
+# Charlie 添加 QA 记忆
 charlie_qa.add(
     "Found critical bug in user registration flow",
     user_id="charlie",
@@ -232,7 +232,7 @@ charlie_qa.add(
     metadata={"scope": "testing", "issue_type": "bug"}
 )
 
-# Search project-wide memories
+# 搜索项目级记忆
 print("Project Status Search:")
 project_results = alice_dev.search(
     query="project status and progress",
@@ -264,10 +264,10 @@ from powermem import Memory, auto_config
 
 config = auto_config()
 
-# Create agent
+# 创建 Agent
 agent = Memory(config=config, agent_id="demo_agent")
 
-# Add memories with different scopes
+# 添加不同 scope 的记忆
 agent.add(
     "Agent-specific memory",
     user_id="user123",
@@ -286,8 +286,8 @@ agent.add(
     metadata={"scope": "GROUP"}
 )
 
-# Search by scope using filters parameter
-# Note: For nested metadata fields, use the key path like "metadata.scope"
+# 使用 filters 参数按 scope 搜索
+# 注意：嵌套 metadata 字段需使用类似 "metadata.scope" 的 key path
 print("Agent-scoped memories:")
 results = agent.search(
     query="memories",
@@ -297,7 +297,7 @@ results = agent.search(
 for result in results.get('results', []):
     print(f"  - {result['memory']}")
 
-# Alternative: Search all memories and filter in Python
+# 替代方案：搜索所有记忆后在 Python 中过滤
 print("\nAll memories:")
 all_results = agent.search(
     query="memories",
@@ -326,23 +326,23 @@ from powermem import Memory, auto_config
 config = auto_config()
 user_id = "user123"
 
-# Create two agents
+# 创建两个 Agent
 agent1 = Memory(config=config, agent_id="agent1")
 agent2 = Memory(config=config, agent_id="agent2")
 
-# Agent1 adds memory
+# Agent1 添加记忆
 agent1.add("Agent1's memory", user_id=user_id)
 
-# Agent2 adds memory
+# Agent2 添加记忆
 agent2.add("Agent2's memory", user_id=user_id)
 
-# Agent1 searches (should only see their own)
+# Agent1 搜索（应只看到自己的记忆）
 print("Agent1 search:")
 results1 = agent1.search(query="memories", user_id=user_id, agent_id="agent1")
 for result in results1.get('results', []):
     print(f"  - {result['memory']}")
 
-# Agent2 searches (should only see their own)
+# Agent2 搜索（应只看到自己的记忆）
 print("\nAgent2 search:")
 results2 = agent2.search(query="memories", user_id=user_id, agent_id="agent2")
 for result in results2.get('results', []):
@@ -375,7 +375,7 @@ def main():
     print("Multi-Agent Memory Demo")
     print("=" * 80)
 
-    # Create agents
+    # 创建 Agent
     support_agent = Memory(config=config, agent_id="support_agent")
     sales_agent = Memory(config=config, agent_id="sales_agent")
     tech_agent = Memory(config=config, agent_id="tech_agent")
@@ -383,7 +383,7 @@ def main():
     print("\n[Step 1] Adding Agent-Specific Memories")
     print("-" * 60)
 
-    # Add memories for each agent
+    # 为每个 Agent 添加记忆
     support_agent.add(
         "Customer prefers email support over phone calls",
         user_id=customer_id,
@@ -407,7 +407,7 @@ def main():
     print("\n[Step 2] Agent-Specific Search")
     print("-" * 60)
 
-    # Support agent search
+    # Support Agent 搜索
     print("Support Agent:")
     support_results = support_agent.search(
         query="customer preferences",
@@ -420,7 +420,7 @@ def main():
     print("\n[Step 3] Cross-Agent Search")
     print("-" * 60)
 
-    # Cross-agent search
+    # 跨 Agent 搜索
     all_results = support_agent.search(
         query="customer information",
         user_id=customer_id
@@ -454,11 +454,11 @@ project_id = "project_xyz"
 dev1 = Memory(config=config, agent_id="dev1")
 dev2 = Memory(config=config, agent_id="dev2")
 
-# Each developer adds project memories
+# 每位开发者添加项目记忆
 dev1.add("Implemented feature X", run_id=project_id)
 dev2.add("Implemented feature Y", run_id=project_id)
 
-# Search project-wide
+# 搜索项目级记忆
 results = dev1.search("project progress", run_id=project_id)
 ```
 ### 练习 2：客户服务团队 {#exercise-2-customer-service-team}
@@ -471,11 +471,11 @@ customer_id = "customer_123"
 agent1 = Memory(config=config, agent_id="cs_agent_1")
 agent2 = Memory(config=config, agent_id="cs_agent_2")
 
-# Both agents work with same customer
+# 两个 Agent 处理同一个客户
 agent1.add("Customer reported issue A", user_id=customer_id)
 agent2.add("Customer issue resolved", user_id=customer_id)
 
-# Both can see customer history
+# 两个 Agent 都能看到客户历史
 history = agent1.search("customer issues", user_id=customer_id)
 ```
 ### 练习 3：记忆范围 {#exercise-3-memory-scopes}
@@ -484,12 +484,12 @@ history = agent1.search("customer issues", user_id=customer_id)
 ```python
 agent = Memory(config=config, agent_id="agent")
 
-# Add memories with different scopes
+# 添加不同 scope 的记忆
 agent.add("Private memory", metadata={"scope": "AGENT"})
 agent.add("Shared memory", metadata={"scope": "GROUP"})
 
-# Search by scope using filters parameter
-# Note: For nested metadata fields, use the key path like "metadata.scope"
+# 使用 filters 参数按 scope 搜索
+# 注意：嵌套 metadata 字段需使用类似 "metadata.scope" 的 key path
 private = agent.search("memory", filters={"metadata.scope": "AGENT"})
 for result in private.get('results', []):
     print(f"  - {result['memory']}")

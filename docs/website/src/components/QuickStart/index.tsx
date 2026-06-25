@@ -3,6 +3,7 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Heading from '@theme/Heading';
 import {Highlight, themes} from 'prism-react-renderer';
+import {localizedPath} from '../../utils/localizedPath';
 import styles from './styles.module.css';
 
 const codeExamples: Record<string, Record<string, string>> = {
@@ -186,7 +187,7 @@ export default function QuickStart() {
 
         <div className={styles.footer}>
           <Link
-            to="/docs"
+            to={localizedPath('/docs/guides/getting_started', isZh)}
             className="button button--primary button--lg"
           >
             {t('quickStart.viewDocs')} →

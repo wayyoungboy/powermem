@@ -447,7 +447,7 @@ basic_usage_example.py
 ✓ 已删除 x 条记忆，适用于 user123
 ```
 
-## Complete Example
+## 完整示例
 
 Here's a complete example combining all the steps:
 
@@ -524,7 +524,7 @@ if __name__ == "__main__":
 python complete_basic_example.py
 ```
 
-## Extension Exercises
+## 扩展练习
 
 ### Exercise 1: Multiple Users
 

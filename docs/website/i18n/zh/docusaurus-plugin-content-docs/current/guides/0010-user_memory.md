@@ -1,3 +1,8 @@
+---
+title: UserMemory 指南
+sidebar_label: UserMemory 指南
+---
+
 # UserMemory 指南 {#usermemory-guide}
 
 UserMemory 是 PowerMem 的高级用户档案管理模块。它能够自动从对话中提取并维护用户档案信息，同时管理对话事件记忆。
@@ -32,7 +37,7 @@ UserMemory 在 `Memory` 的基础上增加了用户档案管理功能：
 ```python
 from powermem import UserMemory, auto_config
 
-# Use auto configuration (loads from .env)
+# 使用自动配置（从 .env 加载）
 config = auto_config()
 user_memory = UserMemory(config=config)
 ```
@@ -140,32 +145,32 @@ def add(
 返回一个包含以下内容的字典：
 ```python
 {
-    # From Memory.add()
+    # 来自 Memory.add()
     "results": [
         {
-            "id": 123,                    # memory ID
-            "memory": "...",              # memory content
-            "event": "ADD",               # event type (ADD/UPDATE/DELETE)
-            "user_id": "user_001",        # user ID
-            "agent_id": "test_agent",     # agent ID
+            "id": 123,                    # 记忆 ID
+            "memory": "...",              # 记忆内容
+            "event": "ADD",               # 事件类型（ADD/UPDATE/DELETE）
+            "user_id": "user_001",        # 用户 ID
+            "agent_id": "test_agent",     # Agent ID
             "run_id": "run_001",          # run ID
-            "metadata": {...},              # metadata
-            "created_at": "2024-01-01T00:00:00",  # created time
-            "previous_memory": "..."      # previous memory (UPDATE only)
+            "metadata": {...},              # 元数据
+            "created_at": "2024-01-01T00:00:00",  # 创建时间
+            "previous_memory": "..."      # 上一条记忆（仅 UPDATE）
         },
         ...
     ],
-    "relations": {...},                   # graph relations (if graph storage enabled)
+    "relations": {...},                   # 图关系（如果启用图存储）
 
-    # New fields from UserMemory
-    "profile_extracted": True,            # whether profile was successfully extracted
-    "profile_content": "..."             # extracted profile content (if profile_type="content")
-    "topics": {...}                      # structured topics dictionary (if profile_type="topics")
+    # UserMemory 新增字段
+    "profile_extracted": True,            # 是否成功提取档案
+    "profile_content": "..."             # 提取的档案内容（profile_type="content" 时）
+    "topics": {...}                      # 结构化 topic 字典（profile_type="topics" 时）
 }
 ```
 #### 示例 {#examples}
 ```python
-# Example 1: add a conversation list
+# 示例 1：添加对话列表
 conversation = [
     {"role": "user", "content": "My name is Zhang. I'm a software engineer and I like Python."},
     {"role": "assistant", "content": "Nice to meet you, Zhang! Python is a great language."}
@@ -183,20 +188,20 @@ if result.get('profile_content'):
     print(f"User profile: {result['profile_content']}")
 print(f"Memory count: {len(result.get('results', []))}")
 
-# Example 2: add a single message
+# 示例 2：添加单条消息
 result = user_memory.add(
     messages={"role": "user", "content": "I also enjoy reading sci‑fi and watching movies."},
     user_id="user_001",
     agent_id="test_agent"
 )
 
-# Example 3: add a raw string
+# 示例 3：添加原始字符串
 result = user_memory.add(
     messages="The user mentioned they have been learning machine learning recently.",
     user_id="user_001"
 )
 
-# Example 4: extract structured topics
+# 示例 4：提取结构化 topic
 custom_topics = '''
 {
     "basic_information": {
@@ -226,19 +231,19 @@ result = user_memory.add(
 if result.get('topics'):
     print(f"Extracted topics: {result['topics']}")
 
-# Example 5: filter messages by roles
-# By default, only user messages are used for profile extraction (assistant messages are excluded)
-# You can customize this behavior:
+# 示例 5：按角色过滤消息
+# 默认仅使用 user 消息提取档案（排除 assistant 消息）
+# 您可以自定义此行为：
 
-# Include all roles (no filtering)
+# 包含所有角色（不过滤）
 result = user_memory.add(
     messages=conversation,
     user_id="user_001",
-    include_roles=None,  # or []
-    exclude_roles=None   # or []
+    include_roles=None,  # 或 []
+    exclude_roles=None   # 或 []
 )
 
-# Only include user and system messages, exclude tool messages
+# 仅包含 user 和 system 消息，排除 tool 消息
 result = user_memory.add(
     messages=conversation,
     user_id="user_001",
@@ -246,29 +251,29 @@ result = user_memory.add(
     exclude_roles=["tool"]
 )
 
-# Example 6: specify native language for profile extraction
-# User speaks English, but wants profile in Chinese
+# 示例 6：指定档案提取的母语
+# 用户说英语，但希望档案使用中文
 result = user_memory.add(
     messages="I am a software engineer working in Beijing. I love drinking tea.",
     user_id="user_002",
-    native_language="zh"  # Extract profile in Chinese
+    native_language="zh"  # 提取中文档案
 )
 
 if result.get('profile_content'):
     print(f"Profile (in Chinese): {result['profile_content']}")
-    # Output: "用户是一名在北京工作的软件工程师。喜欢喝茶。"
+    # 输出："用户是一名在北京工作的软件工程师。喜欢喝茶。"
 
-# Extract structured topics with native language
+# 使用母语提取结构化 topic
 result = user_memory.add(
     messages="I'm 28 years old, working at Google in California.",
     user_id="user_003",
     profile_type="topics",
-    native_language="zh"  # Topic values in Chinese, keys remain in English
+    native_language="zh"  # topic 值使用中文，key 保持英文
 )
 
 if result.get('topics'):
     print(f"Topics: {result['topics']}")
-    # Output: {"basic_information": {"user_age": "28"}, "employment": {"company": "谷歌", "location": "加利福尼亚"}}
+    # 输出：{"basic_information": {"user_age": "28"}, "employment": {"company": "谷歌", "location": "加利福尼亚"}}
 ```
 ### 2. search() — 搜索记忆（可选包含用户档案） {#2-search--search-memories-optionally-include-profile}
 
@@ -306,28 +311,28 @@ def search(
 {
     "results": [
         {
-            "memory": "...",              # memory content
-            "metadata": {...},              # metadata
-            "score": 0.85,                  # similarity score
-            "id": 123,                      # memory ID
-            "created_at": "2024-01-01T00:00:00",  # created time
-            "updated_at": "2024-01-01T00:00:00",  # updated time
-            "user_id": "user_001",         # user ID
-            "agent_id": "test_agent",      # agent ID
+            "memory": "...",              # 记忆内容
+            "metadata": {...},              # 元数据
+            "score": 0.85,                  # 相似度分数
+            "id": 123,                      # 记忆 ID
+            "created_at": "2024-01-01T00:00:00",  # 创建时间
+            "updated_at": "2024-01-01T00:00:00",  # 更新时间
+            "user_id": "user_001",         # 用户 ID
+            "agent_id": "test_agent",      # Agent ID
             "run_id": "run_001"            # run ID
         },
         ...
     ],
-    "relations": [...],                     # graph relations (if enabled)
+    "relations": [...],                     # 图关系（如果启用）
 
-    # If add_profile=True and user_id is provided
-    "profile_content": "..."               # user profile content (if available)
-    "topics": {...}                        # structured topics dictionary (if available)
+    # 如果 add_profile=True 且提供了 user_id
+    "profile_content": "..."               # 用户档案内容（如果可用）
+    "topics": {...}                        # 结构化 topic 字典（如果可用）
 }
 ```
 #### 示例 {#examples-1}
 ```python
-# Example 1: basic search
+# 示例 1：基础搜索
 results = user_memory.search(
     query="user's work and interests",
     user_id="user_001",
@@ -339,21 +344,21 @@ for result in results.get('results', []):
     print(f"Score: {result.get('score', 0)}")
     print("---")
 
-# Example 2: search and include profile
+# 示例 2：搜索并包含用户档案
 results = user_memory.search(
     query="user preferences",
     user_id="user_001",
     agent_id="test_agent",
     limit=5,
-    threshold=0.7,  # only return results with similarity >= 0.7
-    add_profile=True  # include user profile
+    threshold=0.7,  # 仅返回相似度 >= 0.7 的结果
+    add_profile=True  # 包含用户档案
 )
 
-# Check if profile is present
+# 检查是否返回用户档案
 if 'profile_content' in results:
     print(f"User profile: {results['profile_content']}")
 
-# Iterate results
+# 遍历结果
 for result in results.get('results', []):
     print(f"Memory: {result['memory']}")
     print(f"Score: {result.get('score', 0)}")
@@ -369,11 +374,11 @@ for result in results.get('results', []):
 示例配置：
 ```python
 config = {
-    # ... other config
+    # ... 其他配置
     "query_rewrite": {
         "enabled": True,
-        # Optional custom instructions for the rewrite prompt
-        # "prompt": "Rewrite queries to be specific and grounded in the user profile."
+        # 可选：重写 prompt 的自定义说明
+        # "prompt": "根据用户档案将查询重写得更具体、更有依据。"
     }
 }
 ```
@@ -406,19 +411,19 @@ def profile(
 如果找到用户档案，返回一个包含以下内容的字典：
 ```python
 {
-    "id": 1,                               # profile ID
-    "user_id": "user_001",                 # user ID
-    "profile_content": "...",              # profile content (text, if available)
-    "topics": {...},                       # structured topics dictionary (if available)
-    "created_at": "2024-01-01T00:00:00",   # created time (ISO format)
-    "updated_at": "2024-01-01T00:00:00"    # last updated time (ISO format)
+    "id": 1,                               # 档案 ID
+    "user_id": "user_001",                 # 用户 ID
+    "profile_content": "...",              # 档案内容（文本，可用时）
+    "topics": {...},                       # 结构化 topic 字典（如果可用）
+    "created_at": "2024-01-01T00:00:00",   # 创建时间（ISO 格式）
+    "updated_at": "2024-01-01T00:00:00"    # 最后更新时间（ISO 格式）
 }
 ```
 如果未找到配置文件，则返回一个空字典 `{}`。
 
 #### 示例 {#examples-2}
 ```python
-# Get user profile
+# 获取用户档案
 profile = user_memory.profile(
     user_id="user_001"
 )
@@ -465,12 +470,12 @@ def profile_list(
 ```python
 [
     {
-        "id": 1,                               # profile ID
-        "user_id": "user_001",                 # user ID
-        "profile_content": "...",              # profile content (text, if available)
-        "topics": {...},                       # structured topics dictionary (if available)
-        "created_at": "2024-01-01T00:00:00",   # created time (ISO format)
-        "updated_at": "2024-01-01T00:00:00"    # last updated time (ISO format)
+        "id": 1,                               # 档案 ID
+        "user_id": "user_001",                 # 用户 ID
+        "profile_content": "...",              # 档案内容（文本，可用时）
+        "topics": {...},                       # 结构化 topic 字典（如果可用）
+        "created_at": "2024-01-01T00:00:00",   # 创建时间（ISO 格式）
+        "updated_at": "2024-01-01T00:00:00"    # 最后更新时间（ISO 格式）
     },
     ...
 ]
@@ -479,16 +484,16 @@ def profile_list(
 
 #### 示例 {#examples-3}
 ```python
-# Get all profiles
+# 获取所有档案
 all_profiles = user_memory.profile_list()
 
-# Get profiles for a specific user
+# 获取指定用户的档案
 user_profiles = user_memory.profile_list(user_id="user_001")
 
-# Filter by main topic
+# 按主 topic 过滤
 profiles = user_memory.profile_list(main_topic=["basic_information", "professional"])
 
-# Filter by sub topic
+# 按子 topic 过滤
 profiles = user_memory.profile_list(sub_topic=["basic_information.user_name", "professional.occupation"])
 ```
 ### 5. delete_profile() — 删除用户档案 {#5-delete_profile--delete-user-profile}
@@ -512,7 +517,7 @@ def delete_profile(
 
 #### 示例 {#examples-4}
 ```python
-# Delete a user profile
+# 删除用户档案
 deleted = user_memory.delete_profile(user_id="user_001")
 
 if deleted:
@@ -526,11 +531,11 @@ else:
 ```python
 from powermem import UserMemory, auto_config
 
-# Initialize
+# 初始化
 config = auto_config()
 user_memory = UserMemory(config=config)
 
-# 1. Add initial conversation and extract profile
+# 1. 添加初始对话并提取档案
 conversation1 = [
     {"role": "user", "content": "Hello, I'm Li, a data scientist specializing in machine learning."},
     {"role": "assistant", "content": "Nice to meet you, Li! Machine learning is a promising field."}
@@ -546,7 +551,7 @@ print(f"Profile extracted: {result1.get('profile_extracted', False)}")
 if result1.get('profile_content'):
     print(f"Profile content: {result1['profile_content']}")
 
-# 2. Add more conversation, update profile
+# 2. 添加更多对话并更新档案
 conversation2 = [
     {"role": "user", "content": "I like reading tech blogs and often attend tech conferences."},
     {"role": "assistant", "content": "Sounds like you're passionate about learning new technologies!"}
@@ -562,7 +567,7 @@ print(f"Profile updated: {result2.get('profile_extracted', False)}")
 if result2.get('profile_content'):
     print(f"Updated profile: {result2['profile_content']}")
 
-# 3. Get the full user profile
+# 3. 获取完整用户档案
 profile = user_memory.profile(
     user_id="user_002",
 )
@@ -573,15 +578,15 @@ if profile:
     print(f"Profile content: {profile['profile_content']}")
     print(f"Last updated: {profile['updated_at']}")
 
-# 4. Search memories and include profile
+# 4. 搜索记忆并包含用户档案
 search_results = user_memory.search(
     query="user's work and interests",
     user_id="user_002",
     limit=5,
-    add_profile=True  # include user profile
+    add_profile=True  # 包含用户档案
 )
 
-print("\n=== Search results ===")
+print("\n=== 搜索结果 ===")
 if 'profile_content' in search_results:
     print(f"User profile: {search_results['profile_content']}\n")
 
@@ -616,4 +621,4 @@ for i, result in enumerate(search_results.get('results', []), 1):
 
 - [快速入门](0001-getting_started.md) — 学习 PowerMem 的基础知识
 - [配置指南](0003-configuration.md) — 详细的配置说明
-- [Multi-Agent 指南](0005-multi_agent.md) — 使用多个 Agents
+- [Multi-Agent 指南](0005-multi_agent.md) — 使用多个 Agent

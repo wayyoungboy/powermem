@@ -27,7 +27,7 @@ print(res)
 响应中包含一个 `memory_id`，例如 `653247040368672768`。然而，当在 JavaScript/TypeScript 中解析此 JSON 时：
 ```javascript
 const response = JSON.parse('{"id": 653247040368672768, ...}');
-console.info(response.id);  // Output: 653247040368672800 (precision lost!)
+console.info(response.id);  // 输出：653247040368672800（精度已丢失！）
 ```
 值 `653247040368672768` 因精度丢失变为 `653247040368672800`。
 
@@ -44,30 +44,30 @@ from powermem import Memory, auto_config
 config = auto_config()
 memory = Memory(config=config)
 
-# Get memory - memory_id is returned as int in Python
+# 获取记忆，memory_id 在 Python 中以 int 返回
 result = memory.get_all(user_id="user123")
-memory_id = result['results'][0]['id']  # int type
+memory_id = result['results'][0]['id']  # int 类型
 
-# When sending to JS/TS clients via JSON, convert to string
+# 发送给 JS/TS 客户端时，通过 JSON 传输前转换为字符串
 json_response = {
-    "id": str(memory_id),  # Convert to string for JSON
+    "id": str(memory_id),  # 转换为字符串以用于 JSON
     "memory": result['results'][0]['memory'],
     "user_id": result['results'][0]['user_id'],
-    # ... other fields
+    # ... 其他字段
 }
 
-# Or when using dumps with custom serializer
+# 使用带自定义序列化器的 dumps 时
 import json
 from json import dump, dumps
 
 def serialize_memory_id(obj):
-    """Custom JSON serializer for memory_id"""
+    """memory_id 的自定义 JSON 序列化器"""
     if isinstance(obj, dict) and 'id' in obj:
         obj = obj.copy()
         obj['id'] = str(obj['id'])
     return obj
 
-# Apply to all results
+# 应用于所有结果
 results = result.get('results', [])
 for item in results:
     item['id'] = str(item['id'])
@@ -78,7 +78,7 @@ json_string = dumps(results)
 
 在接收 JSON 响应时，确保将 `memory_id` 解析为字符串：
 ```typescript
-// Option 1: Use a custom JSON reviver
+// 选项 1：使用自定义 JSON reviver
 const response = JSON.parse(jsonString, (key, value) => {
   if (key === 'id' && typeof value === 'number' && value > Number.MAX_SAFE_INTEGER) {
     return String(value);
@@ -86,15 +86,15 @@ const response = JSON.parse(jsonString, (key, value) => {
   return value;
 });
 
-// Option 2: Convert after parsing (if already lost precision, this won't help)
-// Better to ensure the server sends it as a string
+// 选项 2：解析后转换（如果已经丢失精度，此方法无效）
+// 更好的做法是确保服务端以字符串发送
 const response = JSON.parse(jsonString);
 if (typeof response.id === 'number') {
   response.id = String(response.id);
 }
 
-// Option 3: Use a library that preserves big integers
-// For example, using json-bigint
+// 选项 3：使用保留大整数的库
+// 例如使用 json-bigint
 import JSONbig from 'json-bigint';
 const response = JSONbig.parse(jsonString);
 ```
@@ -115,7 +115,7 @@ memory = Memory(config=config)
 async def get_memories(user_id: str):
     result = memory.get_all(user_id=user_id)
 
-    # Convert memory_id to string for all results
+    # 将所有结果中的 memory_id 转换为字符串
     results = result.get('results', [])
     for item in results:
         item['id'] = str(item['id'])

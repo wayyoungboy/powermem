@@ -199,10 +199,26 @@
 }
 
 .scoresTable {
+  display: table !important;
   width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
   border-collapse: collapse;
   color: #e5e7eb;
   margin: 0;
+  overflow: visible;
+}
+
+.categoryColumn {
+  width: 22%;
+}
+
+.descriptionColumn {
+  width: 58%;
+}
+
+.scoreColumn {
+  width: 20%;
 }
 
 .scoresTable thead {
@@ -218,16 +234,7 @@
   border-bottom: 2px solid rgba(59, 130, 246, 0.3);
 }
 
-.scoresTable th:first-child {
-  width: 20%;
-}
-
-.scoresTable th:nth-child(2) {
-  width: 60%;
-}
-
 .scoresTable th:last-child {
-  width: 20%;
   text-align: center;
 }
 
@@ -583,4 +590,3 @@
     font-size: 1rem;
   }
 }
-

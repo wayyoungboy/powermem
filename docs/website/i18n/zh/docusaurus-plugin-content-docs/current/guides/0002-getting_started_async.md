@@ -1,3 +1,8 @@
+---
+title: 异步入门
+sidebar_label: 异步入门
+---
+
 ## 前置条件 {#prerequisites}
 
 - Python 3.11+
@@ -95,22 +100,22 @@ import asyncio
 from powermem import AsyncMemory, auto_config
 
 async def main():
-    # Load configuration from .env file
+    # 从 .env 文件加载配置
     config = auto_config()
 
-    # Create async memory instance
+    # 创建 AsyncMemory 实例
     async_memory = AsyncMemory(config=config)
 
-    # Initialize (required for async)
+    # 初始化（异步模式必需）
     await async_memory.initialize()
 
     print("✓ AsyncMemory initialized successfully!")
 
-    # Your async operations go here
-    # Don't forget to close when done (optional, but recommended)
+    # 在这里执行异步操作
+    # 完成后记得关闭（可选但推荐）
     # await async_memory.close()
 
-# Run async function
+# 运行异步函数
 asyncio.run(main())
 ```
 ### 使用 JSON/字典配置 {#using-jsondictionary-configuration}
@@ -126,7 +131,7 @@ import asyncio
 from powermem import AsyncMemory
 
 async def main():
-    # Define configuration as a dictionary (JSON-like format)
+    # 将配置定义为字典（类似 JSON 的格式）
     config = {
         'llm': {
             'provider': 'qwen',
@@ -161,18 +166,18 @@ async def main():
         }
     }
 
-    # Create async memory instance with dictionary config
+    # 使用字典配置创建 AsyncMemory 实例
     async_memory = AsyncMemory(config=config)
 
-    # Initialize (required for async)
+    # 初始化（异步模式必需）
     await async_memory.initialize()
 
     print("✓ AsyncMemory initialized with JSON config!")
 
-    # Your async operations go here
+    # 在这里执行异步操作
     # await async_memory.close()
 
-# Run async function
+# 运行异步函数
 asyncio.run(main())
 ```
 您还可以从 JSON 文件加载配置：
@@ -183,22 +188,22 @@ from json import dump, dumps
 from powermem import AsyncMemory
 
 async def main():
-    # Load configuration from JSON file
+    # 从 JSON 文件加载配置
     with open('config.json', 'r') as f:
         config = json.load(f)
 
-    # Create async memory instance
+    # 创建 AsyncMemory 实例
     async_memory = AsyncMemory(config=config)
 
-    # Initialize (required for async)
+    # 初始化（异步模式必需）
     await async_memory.initialize()
 
     print("✓ AsyncMemory initialized from JSON file!")
 
-    # Your async operations go here
+    # 在这里执行异步操作
     # await async_memory.close()
 
-# Run async function
+# 运行异步函数
 asyncio.run(main())
 ```
 > **注意：** 使用字典/JSON 配置时，请确保包含所有必需字段（`llm`、`embedder`、`vector_store`），以及它们各自的 `provider` 和 `config` 部分。有关更多配置选项，请参阅[配置指南](./0003-configuration.md)。
@@ -241,13 +246,13 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory asynchronously
+    # 异步添加记忆
     result = await async_memory.add(
-        "User likes Python programming",  # messages parameter (first positional argument)
+        "User likes Python programming",  # messages 参数（第一个位置参数）
         user_id="user123"
     )
 
-    # Handle result - check if results list is not empty
+    # 处理结果：检查结果列表是否非空
     results_list = result.get('results', [])
     if results_list:
         memory_id = results_list[0].get('id', 'N/A')
@@ -301,7 +306,7 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add multiple memories concurrently
+    # 并发添加多条记忆
     memories = [
         "User likes Python programming",
         "User prefers email support",
@@ -309,20 +314,20 @@ async def main():
         "User favorite color is blue"
     ]
 
-    # Create tasks for concurrent execution
-    # Note: We're creating coroutine objects, not awaiting them yet
+    # 创建用于并发执行的任务
+    # 注意：这里创建的是协程对象，暂不 await
     tasks = [
-        async_memory.add(mem, user_id="user123")  # messages as first positional argument
+        async_memory.add(mem, user_id="user123")  # messages 作为第一个位置参数
         for mem in memories
     ]
 
-    # Execute all tasks concurrently
-    # This runs all add operations in parallel
+    # 并发执行所有任务
+    # 这会并行运行所有 add 操作
     results = await asyncio.gather(*tasks)
 
     print(f"✓ Added {len(results)} memories concurrently")
 
-    # Process individual results if needed
+    # 按需处理单个结果
     for i, result in enumerate(results):
         results_list = result.get('results', [])
         if results_list:
@@ -368,11 +373,11 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add some memories first
+    # 先添加一些记忆
     await async_memory.add("User likes Python", user_id="user123")
     await async_memory.add("User prefers email", user_id="user123")
 
-    # Search asynchronously
+    # 异步搜索
     results = await async_memory.search(
         query="user preferences",
         user_id="user123",
@@ -436,13 +441,13 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Large list of memories
+    # 大量记忆列表
     memories = [
         f"Memory {i}: User preference {i}"
         for i in range(100)
     ]
 
-    # Process in batches
+    # 分批处理
     batch_size = 10
     total_batches = (len(memories) + batch_size - 1) // batch_size
 
@@ -450,13 +455,13 @@ async def main():
         batch = memories[i:i+batch_size]
         batch_num = i // batch_size + 1
 
-        # Create tasks for batch
+        # 为当前批次创建任务
         tasks = [
-            async_memory.add(mem, user_id="user123")  # messages as first positional argument
+            async_memory.add(mem, user_id="user123")  # messages 作为第一个位置参数
             for mem in batch
         ]
 
-        # Execute batch concurrently
+        # 并发执行当前批次
         try:
             results = await asyncio.gather(*tasks)
             print(f"✓ Processed batch {batch_num}/{total_batches} ({len(results)} memories)")
@@ -514,15 +519,15 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory with intelligent processing
-    # This will extract facts from the conversation automatically
+    # 使用智能处理添加记忆
+    # 这会自动从对话中提取事实
     result = await async_memory.add(
         messages=[
             {"role": "user", "content": "I'm Alice, a software engineer"},
             {"role": "assistant", "content": "Nice to meet you!"}
         ],
         user_id="user123",
-        infer=True  # Enable intelligent fact extraction
+        infer=True  # 启用智能事实提取
     )
 
     print(f"✓ Processed conversation, extracted {len(result.get('results', []))} memories:")
@@ -577,15 +582,15 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory (using infer=False to ensure it's added for demo purposes)
-    # In production, you might want infer=True for intelligent deduplication
+    # 添加记忆（演示时使用 infer=False 确保写入）
+    # 生产环境中可使用 infer=True 进行智能去重
     result = await async_memory.add(
-        "User likes Python",  # messages as first positional argument
+        "User likes Python",  # messages 作为第一个位置参数
         user_id="user123",
-        infer=False  # Disable intelligent deduplication for demo
+        infer=False  # 演示时禁用智能去重
     )
 
-    # Handle result - check if results list is not empty
+    # 处理结果：检查结果列表是否非空
     results_list = result.get('results', [])
     if not results_list:
         print("Error: No memory was added")
@@ -596,14 +601,14 @@ async def main():
         print("Error: Memory ID not found in result")
         raise ValueError("Cannot update/delete: memory ID not found")
 
-    # Update memory asynchronously
+    # 异步更新记忆
     updated = await async_memory.update(
         memory_id=memory_id,
         content="User loves Python programming"
     )
     print(f"✓ Updated memory: {updated.get('memory', 'N/A')}")
 
-    # Delete memory asynchronously
+    # 异步删除记忆
     success = await async_memory.delete(memory_id)
     if success:
         print(f"✓ Deleted memory {memory_id}")
@@ -616,7 +621,7 @@ asyncio.run(main())
 
 您还可以同时执行多个更新或删除操作：
 ```python
-# Example: Delete multiple memories concurrently
+# 示例：并发删除多条记忆
 memory_ids = ["id1", "id2", "id3"]
 tasks = [async_memory.delete(mid) for mid in memory_ids]
 results = await asyncio.gather(*tasks)

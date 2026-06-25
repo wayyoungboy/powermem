@@ -16,7 +16,7 @@
     "description": "Navbar item with label Features"
   },
   "item.label.Benchmark": {
-    "message": "Benchmark",
+    "message": "压测",
     "description": "Navbar item with label Benchmark"
   },
   "item.label.Community": {

@@ -21,7 +21,7 @@
 
 将以下配置添加到您的 `.env` 文件中：
 ```env
-# Database configuration
+# 数据库配置
 DATABASE_PROVIDER=oceanbase
 OCEANBASE_HOST=localhost
 OCEANBASE_PORT=2881
@@ -31,10 +31,10 @@ OCEANBASE_DATABASE=powermem
 OCEANBASE_COLLECTION=memories
 OCEANBASE_EMBEDDING_MODEL_DIMS=1536
 
-# Enable sparse vector
+# 启用稀疏向量
 SPARSE_VECTOR_ENABLE=true
 
-# Sparse vector embedding configuration
+# 稀疏向量 Embedding 配置
 SPARSE_EMBEDDER_PROVIDER=qwen
 SPARSE_EMBEDDER_API_KEY=your_api_key
 SPARSE_EMBEDDER_MODEL=text-embedding-v4
@@ -62,7 +62,7 @@ config = {
             'embedding_dims': 1536
         }
     },
-    # Sparse vector embedding configuration
+    # 稀疏向量 Embedding 配置
     'sparse_embedder': {
         'provider': 'qwen',
         'config': {
@@ -75,7 +75,7 @@ config = {
         'config': {
             'collection_name': 'memories',
             'embedding_model_dims': 1536,
-            'include_sparse': True,  # Enable sparse vector
+            'include_sparse': True,  # 启用稀疏向量
             'connection_args': {
                 'host': 'localhost',
                 'port': 2881,
@@ -83,7 +83,7 @@ config = {
                 'password': 'your_password',
                 'db_name': 'powermem'
             },
-            # Optional: Configure search weights
+            # 可选：配置搜索权重
             'vector_weight': 0.5,
             'fts_weight': 0.5,
             'sparse_weight': 0.25
@@ -113,17 +113,17 @@ memory = Memory(config=config)
 ```python
 from powermem import Memory, auto_config
 
-# Load configuration (automatically loads from .env)
+# 加载配置（自动从 .env 加载）
 config = auto_config()
 memory = Memory(config=config)
 
-# Add memory (automatically generates sparse vector)
+# 添加记忆（自动生成稀疏向量）
 memory.add(
     messages="Machine learning is a branch of artificial intelligence, I love machine learning",
     user_id="user123"
 )
 
-# Search (automatically uses sparse vector for hybrid search)
+# 搜索（自动使用稀疏向量进行混合搜索）
 results = memory.search(
     query="AI technology",
     user_id="user123",
@@ -161,13 +161,13 @@ results = memory.search(
 ```python
 from powermem import Memory, auto_config
 
-config = auto_config()  # Ensure include_sparse=True in configuration
+config = auto_config()  # 确保配置中 include_sparse=True
 memory = Memory(config=config)
 
-# Add memory (automatically generates sparse vector)
+# 添加记忆（自动生成稀疏向量）
 memory.add(messages="memory content", user_id="user123")
 
-# Search (automatically uses sparse vector)
+# 搜索（自动使用稀疏向量）
 results = memory.search(query="query content", user_id="user123")
 ```
 ### 现有表升级 {#existing-table-upgrade}

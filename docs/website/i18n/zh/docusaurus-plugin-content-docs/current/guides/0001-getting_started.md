@@ -1,3 +1,8 @@
+---
+title: 快速入门
+sidebar_label: 快速入门
+---
+
 ## 前置条件 {#prerequisites}
 
 - Python 3.11+
@@ -50,10 +55,10 @@
 ```python
 from powermem import Memory, auto_config
 
-# Load configuration (auto-loads from .env or uses defaults)
+# 加载配置（自动从 .env 加载或使用默认值）
 config = auto_config()
 
-# Create memory instance
+# 创建 Memory 实例
 memory = Memory(config=config)
 
 print("✓ Memory initialized successfully!")
@@ -69,7 +74,7 @@ print("✓ Memory initialized successfully!")
 ```python
 from powermem import Memory
 
-# Define configuration as a dictionary (JSON-like format)
+# 将配置定义为字典（类似 JSON 的格式）
 config = {
     'llm': {
         'provider': 'qwen',
@@ -104,7 +109,7 @@ config = {
     }
 }
 
-# Create memory instance with dictionary config
+# 使用字典配置创建 Memory 实例
 memory = Memory(config=config)
 
 print("✓ Memory initialized with JSON config!")
@@ -135,13 +140,13 @@ from powermem import Memory, auto_config
 config = auto_config()
 memory = Memory(config=config)
 
-# Add a memory
+# 添加一条记忆
 result = memory.add(
     messages="User likes Python programming",
     user_id="user123"
 )
 
-# Get memory ID from result
+# 从结果中获取 memory ID
 results_list = result.get('results', [])
 memory_id = results_list[0].get('id', 'N/A') if results_list else 'N/A'
 print(f"✓ Memory added! ID: {memory_id}")
@@ -168,7 +173,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add multiple memories
+# 添加多条记忆
 memories = [
     "User likes Python programming",
     "User prefers email support over phone calls",
@@ -215,12 +220,12 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add some memories first
+# 先添加一些记忆
 memory.add("User likes Python programming", user_id=user_id)
 memory.add("User prefers email support", user_id=user_id)
 memory.add("User works as a software engineer", user_id=user_id)
 
-# Search for memories
+# 搜索记忆
 print("Searching for 'user preferences'...")
 results = memory.search(
     query="user preferences",
@@ -264,7 +269,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add memories with metadata
+# 添加带元数据的记忆
 memory.add(
     messages="User likes Python programming",
     user_id=user_id,
@@ -321,7 +326,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add memories with metadata
+# 添加带元数据的记忆
 memory.add(
     messages="User likes Python programming",
     user_id=user_id,
@@ -334,8 +339,8 @@ memory.add(
     metadata={"category": "communication"}
 )
 
-# Search with metadata filter
-# Note: category is extracted from metadata and stored as a top-level field
+# 使用元数据过滤搜索
+# 注意：category 会从 metadata 中提取并作为顶层字段存储
 print("Searching with metadata filter...")
 results = memory.search(
     query="user preferences",
@@ -380,12 +385,12 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add some memories
+# 先添加一些记忆
 memory.add("User likes Python", user_id=user_id)
 memory.add("User prefers email", user_id=user_id)
 memory.add("User works as engineer", user_id=user_id)
 
-# Get all memories
+# 获取所有记忆
 all_memories = memory.get_all(user_id=user_id)
 
 print(f"\nTotal memories for {user_id}: {len(all_memories.get('results', []))}")
@@ -429,14 +434,14 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add a memory (using infer=False for predictable behavior)
+# 添加一条记忆（使用 infer=False 以获得可预测行为）
 result = memory.add(
     messages="User likes Python programming",
     user_id=user_id,
-    infer=False  # Disable intelligent mode for predictable behavior
+    infer=False  # 禁用智能模式以获得可预测行为
 )
 
-# Get memory ID from result
+# 从结果中获取 memory ID
 results_list = result.get('results', [])
 if not results_list:
     raise ValueError("No memory was added. Check the result: " + str(result))
@@ -444,7 +449,7 @@ memory_id = results_list[0].get('id')
 if not memory_id:
     raise ValueError("Memory ID not found in result")
 
-# Update the memory
+# 更新记忆
 updated = memory.update(
     memory_id=memory_id,
     content="User loves Python programming, especially for data science"
@@ -489,14 +494,14 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add a memory (using infer=False for predictable behavior)
+# 添加一条记忆（使用 infer=False 以获得可预测行为）
 result = memory.add(
     messages="User likes Python programming",
     user_id=user_id,
-    infer=False  # Disable intelligent mode for predictable behavior
+    infer=False  # 禁用智能模式以获得可预测行为
 )
 
-# Get memory ID from result
+# 从结果中获取 memory ID
 results_list = result.get('results', [])
 if not results_list:
     raise ValueError("No memory was added. Check the result: " + str(result))
@@ -504,7 +509,7 @@ memory_id = results_list[0].get('id')
 if not memory_id:
     raise ValueError("Memory ID not found in result")
 
-# Delete the memory
+# 删除记忆
 success = memory.delete(memory_id)
 
 if success:
@@ -550,16 +555,16 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user123"
 
-# Add some memories
+# 先添加一些记忆
 memory.add("Memory 1", user_id=user_id)
 memory.add("Memory 2", user_id=user_id)
 memory.add("Memory 3", user_id=user_id)
 
-# Get count before deletion
+# 删除前获取数量
 all_memories = memory.get_all(user_id=user_id)
 count_before = len(all_memories.get('results', []))
 
-# Delete all memories (returns True/False)
+# 删除所有记忆（返回 True/False）
 success = memory.delete_all(user_id=user_id)
 
 if success:

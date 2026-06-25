@@ -27,7 +27,7 @@ from powermem import Memory, auto_config
 config = auto_config()
 memory = Memory(config=config)
 
-# Add memory with intelligent processing (infer=True)
+# 使用智能处理添加记忆（infer=True）
 result = memory.add(
     messages=[
         {"role": "user", "content": "Hi, my name is Alice. I'm a software engineer at Google."},
@@ -35,7 +35,7 @@ result = memory.add(
         {"role": "user", "content": "I love Python programming and machine learning."}
     ],
     user_id="user_001",
-    infer=True  # Enable intelligent fact extraction
+    infer=True  # 启用智能事实提取
 )
 
 print(f"✓ Processed conversation, extracted {len(result.get('results', []))} memories:")
@@ -64,7 +64,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user_001"
 
-# First addition
+# 首次添加
 print("1. Adding initial memory...")
 result1 = memory.add(
     messages=[
@@ -76,7 +76,7 @@ result1 = memory.add(
 )
 print(f"   Added {len(result1.get('results', []))} memories")
 
-# Try to add duplicate
+# 尝试添加重复记忆
 print("\n2. Attempting to add duplicate...")
 result2 = memory.add(
     messages=[
@@ -120,7 +120,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user_001"
 
-# Initial information
+# 初始信息
 print("1. Adding initial information...")
 memory.add(
     messages=[
@@ -130,7 +130,7 @@ memory.add(
     infer=True
 )
 
-# Information update
+# 信息更新
 print("\n2. Updating information...")
 result = memory.add(
     messages=[
@@ -174,7 +174,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user_001"
 
-# Add existing memories
+# 添加已有记忆
 memory.add(
     messages=[
         {"role": "user", "content": "I'm Alice, a software engineer"}
@@ -183,7 +183,7 @@ memory.add(
     infer=True
 )
 
-# Add new information
+# 添加新信息
 print("Adding new information...")
 result = memory.add(
     messages=[
@@ -224,7 +224,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user_001"
 
-# Add initial preference
+# 添加初始偏好
 print("1. Adding initial preference...")
 memory.add(
     messages=[
@@ -234,7 +234,7 @@ memory.add(
     infer=True
 )
 
-# Contradictory information
+# 矛盾信息
 print("\n2. Adding contradictory information...")
 result = memory.add(
     messages=[
@@ -278,7 +278,7 @@ config = auto_config()
 memory = Memory(config=config)
 user_id = "user_001"
 
-# Initial memory
+# 初始记忆
 print("1. Adding initial memory...")
 memory.add(
     messages=[
@@ -288,7 +288,7 @@ memory.add(
     infer=True
 )
 
-# More detailed information
+# 更详细的信息
 print("\n2. Adding more detailed information...")
 result = memory.add(
     messages=[
@@ -337,7 +337,7 @@ def main():
     print("Intelligent Memory Demo")
     print("=" * 80)
 
-    # Scenario 1: Initial addition
+    # 场景 1：初始添加
     print("\n[Scenario 1] Initial Memory Addition")
     print("-" * 60)
     result = memory.add(
@@ -351,7 +351,7 @@ def main():
     )
     print(f"✓ Extracted {len(result.get('results', []))} memories")
 
-    # Scenario 2: Duplicate detection
+    # 场景 2：重复检测
     print("\n[Scenario 2] Duplicate Detection")
     print("-" * 60)
     result = memory.add(
@@ -365,7 +365,7 @@ def main():
         if result['results'][0].get('event') == 'NONE':
             print("✓ Duplicate detected, skipped")
 
-    # Scenario 3: Information update
+    # 场景 3：信息更新
     print("\n[Scenario 3] Information Update")
     print("-" * 60)
     result = memory.add(
@@ -379,7 +379,7 @@ def main():
         if mem.get('event') == 'UPDATE':
             print(f"✓ Updated: {mem.get('previous_memory')} → {mem.get('memory')}")
 
-    # Scenario 4: New information
+    # 场景 4：新信息
     print("\n[Scenario 4] Adding New Information")
     print("-" * 60)
     result = memory.add(
@@ -391,7 +391,7 @@ def main():
     )
     print(f"✓ Added {len(result.get('results', []))} new memories")
 
-    # Scenario 5: Conflict resolution
+    # 场景 5：冲突解决
     print("\n[Scenario 5] Conflict Resolution")
     print("-" * 60)
     result = memory.add(
@@ -408,7 +408,7 @@ def main():
         elif event == 'ADD':
             print(f"✓ Added new preference")
 
-    # Final summary
+    # 最终总结
     print("\n" + "=" * 80)
     print("Final Memory Summary")
     print("=" * 80)
@@ -439,12 +439,12 @@ from powermem import Memory, auto_config
 config = auto_config()
 memory = Memory(config=config)
 
-# Simple mode
+# 简单模式
 print("1. Simple mode (infer=False):")
 result1 = memory.add("User likes Python", user_id="user123", infer=False)
 print(f"   Added memory directly: {result1.get('results', [{}])[0].get('memory', 'N/A')}")
 
-# Intelligent mode
+# 智能模式
 print("\n2. Intelligent mode (infer=True):")
 result2 = memory.add(
     messages=[{"role": "user", "content": "I like Python programming"}],
@@ -469,7 +469,7 @@ from powermem import Memory, auto_config
 config = auto_config()
 memory = Memory(config=config)
 
-# Example: Add memory and check the event type
+# 示例：添加记忆并检查事件类型
 result = memory.add(
     messages=[
         {"role": "user", "content": "I love working with machine learning"}
@@ -499,7 +499,7 @@ from powermem import Memory, auto_config
 config = auto_config()
 memory = Memory(config=config)
 
-# Long conversation with multiple facts
+# 包含多个事实的长对话
 long_conversation = [
     {"role": "user", "content": "I'm Alice, a software engineer at Google."},
     {"role": "assistant", "content": "Nice to meet you!"},

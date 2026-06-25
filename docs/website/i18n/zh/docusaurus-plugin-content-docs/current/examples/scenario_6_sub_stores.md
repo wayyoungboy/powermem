@@ -29,7 +29,7 @@
 
 **在使用子存储之前，您必须至少为每个子存储调用一次 `migrate_to_sub_store()`，即使您没有数据需要迁移。** 这将初始化子存储并标记其为可用状态。
 ```python
-# Even with no data to migrate, you must activate each sub store:
+# 即使没有数据需要迁移，也必须激活每个子存储：
 memory.migrate_all_sub_stores(delete_source=False)
 ```
 激活后：
@@ -45,7 +45,7 @@ memory.migrate_all_sub_stores(delete_source=False)
 from powermem import Memory
 import os
 
-# Configure main storage and sub stores
+# 配置主存储和子存储
 config = {
     "database": {
         "provider": "oceanbase",
@@ -74,10 +74,10 @@ config = {
             "api_key": os.getenv("DASHSCOPE_API_KEY", "your-api-key"),
         }
     },
-    # Configure sub stores
+    # 配置子存储
     "sub_stores": [
         {
-            # Sub store 0: Working memory (short-term, low importance)
+            # 子存储 0：工作记忆（短期、低重要性）
             "collection_name": "working_memories",
             "routing_filter": {
                 "memory_type": "working"
@@ -85,7 +85,7 @@ config = {
             "embedding_model_dims": 1536,
         },
         {
-            # Sub store 1: Episodic memory (personal experiences)
+            # 子存储 1：情景记忆（个人经历）
             "collection_name": "episodic_memories",
             "routing_filter": {
                 "memory_type": "episodic"
@@ -95,12 +95,12 @@ config = {
     ]
 }
 
-# Initialize Memory
+# 初始化 Memory
 memory = Memory(config=config)
-print("✓ Memory initialized successfully with 2 sub stores")
-print("  - Main store: main_memories (for semantic memories)")
-print("  - Sub store 0: working_memories (for working memories)")
-print("  - Sub store 1: episodic_memories (for episodic memories)")
+print("✓ Memory 已成功初始化，并配置 2 个 Sub Store")
+print("  - 主存储：main_memories（用于语义记忆）")
+print("  - Sub Store 0：working_memories（用于工作记忆）")
+print("  - Sub Store 1：episodic_memories（用于情景记忆）")
 ```
 **运行代码：**
 ```bash
@@ -126,10 +126,10 @@ python sub_store_example.py
 
 通过以上步骤，您可以高效地管理和组织 Memory 数据。
 ```
-✓ Memory initialized successfully with 2 sub stores
-  - Main store: main_memories (for semantic memories)
-  - Sub store 0: working_memories (for working memories)
-  - Sub store 1: episodic_memories (for episodic memories)
+✓ Memory 已成功初始化，并配置 2 个 Sub Store
+  - 主存储：main_memories（用于语义记忆）
+  - Sub Store 0：working_memories（用于工作记忆）
+  - Sub Store 1：episodic_memories（用于情景记忆）
 ```
 ## 第2步：添加不同类型的记忆 {#step-2-add-different-types-of-memories}
 
@@ -141,9 +141,9 @@ from powermem import Memory
 memory = Memory(config=config)
 user_id = "demo_user"
 
-print("Adding different types of memories...\n")
+print("正在添加不同类型的记忆...\n")
 
-# Add semantic memories (long-term knowledge, stays in main store)
+# 添加语义记忆（长期知识，保留在主存储）
 semantic_memories = [
     {
         "messages": "Python is a high-level programming language known for its simplicity,I love Python!",
@@ -155,16 +155,16 @@ semantic_memories = [
     },
 ]
 
-print("1. Adding semantic memories (knowledge)...")
+print("1. 正在添加语义记忆（知识）...")
 for mem in semantic_memories:
     memory_id = memory.add(
         messages=mem["messages"],
         metadata=mem["metadata"],
         user_id=user_id
     )
-    print(f"   ✓ Added: {mem['messages'][:40]}...")
+    print(f"   ✓ 已添加：{mem['messages'][:40]}...")
 
-# Add working memories (short-term tasks, will migrate to sub store 0)
+# 添加工作记忆（短期任务，将迁移到子存储 0）
 working_memories = [
     {
         "messages": "Today's weather is sunny, good for outdoor activities",
@@ -180,16 +180,16 @@ working_memories = [
     },
 ]
 
-print("\n2. Adding working memories (tasks)...")
+print("\n2. 正在添加工作记忆（任务）...")
 for mem in working_memories:
     memory_id = memory.add(
         messages=mem["messages"],
         metadata=mem["metadata"],
         user_id=user_id
     )
-    print(f"   ✓ Added: {mem['messages'][:40]}...")
+    print(f"   ✓ 已添加：{mem['messages'][:40]}...")
 
-# Add episodic memories (personal experiences, will migrate to sub store 1)
+# 添加情景记忆（个人经历，将迁移到子存储 1）
 episodic_memories = [
     {
         "messages": "Last summer I visited Paris and saw the Eiffel Tower",
@@ -201,17 +201,17 @@ episodic_memories = [
     },
 ]
 
-print("\n3. Adding episodic memories (experiences)...")
+print("\n3. 正在添加情景记忆（经历）...")
 for mem in episodic_memories:
     memory_id = memory.add(
         messages=mem["messages"],
         metadata=mem["metadata"],
         user_id=user_id
     )
-    print(f"   ✓ Added: {mem['messages'][:40]}...")
+    print(f"   ✓ 已添加：{mem['messages'][:40]}...")
 
 total = len(semantic_memories) + len(working_memories) + len(episodic_memories)
-print(f"\n✓ Total memories added: {total} (currently all in main store)")
+print(f"\n✓ 共添加 {total} 条记忆（当前全部位于主存储）")
 ```
 **预期输出：**
 
@@ -226,22 +226,22 @@ print(f"\n✓ Total memories added: {total} (currently all in main store)")
 
 通过这种方式，您可以更高效地组织和管理复杂的记忆数据结构。
 ```
-Adding different types of memories...
+正在添加不同类型的记忆...
 
-1. Adding semantic memories (knowledge)...
-   ✓ Added: Python is a high-level programming langu...
-   ✓ Added: Machine learning is a subset of artifici...
+1. 正在添加语义记忆（知识）...
+   ✓ 已添加：Python is a high-level programming langu...
+   ✓ 已添加：Machine learning is a subset of artifici...
 
-2. Adding working memories (tasks)...
-   ✓ Added: Today's weather is sunny, good for outdo...
-   ✓ Added: Need to buy groceries after work...
-   ✓ Added: Meeting scheduled at 3 PM today...
+2. 正在添加工作记忆（任务）...
+   ✓ 已添加：Today's weather is sunny, good for outdo...
+   ✓ 已添加：Need to buy groceries after work...
+   ✓ 已添加：Meeting scheduled at 3 PM today...
 
-3. Adding episodic memories (experiences)...
-   ✓ Added: Last summer I visited Paris and saw the ...
-   ✓ Added: I learned to ride a bike when I was 7 ye...
+3. 正在添加情景记忆（经历）...
+   ✓ 已添加：Last summer I visited Paris and saw the ...
+   ✓ 已添加：I learned to ride a bike when I was 7 ye...
 
-✓ Total memories added: 7 (currently all in main store)
+✓ 共添加 7 条记忆（当前全部位于主存储）
 ```
 ## 第三步：迁移前查询 {#step-3-query-before-migration}
 
@@ -253,10 +253,10 @@ from powermem import Memory
 memory = Memory(config=config)
 user_id = "demo_user"
 
-print("Querying before migration (all in main store)\n")
+print("迁移前查询（全部在主存储中）\n")
 
-# Query working memories
-print("1. Querying working memories...")
+# 查询工作记忆
+print("1. 正在查询工作记忆...")
 results = memory.search(
     query="today's tasks",
     filters={"memory_type": "working"},
@@ -265,13 +265,13 @@ results = memory.search(
 )
 
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} results:")
+print(f"   找到 {len(results_list)} 条结果：")
 for i, result in enumerate(results_list, 1):
     source = result.get('_source_store', 'main')
     print(f"   {i}. [{source}] {result['memory'][:50]}")
 
-# Query episodic memories
-print("\n2. Querying episodic memories...")
+# 查询情景记忆
+print("\n2. 正在查询情景记忆...")
 results = memory.search(
     query="past experiences",
     filters={"memory_type": "episodic"},
@@ -280,23 +280,23 @@ results = memory.search(
 )
 
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} results:")
+print(f"   找到 {len(results_list)} 条结果：")
 for i, result in enumerate(results_list, 1):
     source = result.get('_source_store', 'main')
     print(f"   {i}. [{source}] {result['memory'][:50]}")
 ```
 **预期输出：**
 ```
-Querying before migration (all in main store)
+迁移前查询（全部在主存储中）
 
-1. Querying working memories...
-   Found 3 results:
+1. 正在查询工作记忆...
+   找到 3 条结果：
    1. [main] Meeting scheduled at 3 PM today
    2. [main] Need to buy groceries after work
    3. [main] Today's weather is sunny, good for outdoor activit
 
-2. Querying episodic memories...
-   Found 2 results:
+2. 正在查询情景记忆...
+   找到 2 条结果：
    1. [main] Last summer I visited Paris and saw the Eiffel Tow
    2. [main] I learned to ride a bike when I was 7 years old
 ```
@@ -309,32 +309,32 @@ from powermem import Memory
 
 memory = Memory(config=config)
 
-print("Starting data migration to sub stores...\n")
+print("正在开始向子存储迁移数据...\n")
 
-# Migrate working memories to sub store 0
-# ⚠️ IMPORTANT: This call is REQUIRED even if you have no data to migrate!
-# It activates the sub store and marks it as ready for use.
-print("1. Migrating working memories to sub store 0...")
+# 将工作记忆迁移到子存储 0
+# ⚠️ 重要：即使没有数据需要迁移，也必须调用此方法！
+# 它会激活子存储并标记为可用。
+print("1. 正在将工作记忆迁移到 Sub Store 0...")
 working_count = memory.migrate_to_sub_store(
     sub_store_index=0,
-    delete_source=True  # Delete from main store after migration
+    delete_source=True  # 迁移后从主存储删除
 )
-print(f"   ✓ Migrated {working_count} working memories")
-print(f"   ✓ Sub store 0 is now ACTIVE and ready for routing")
+print(f"   ✓ 已迁移 {working_count} 条工作记忆")
+print("   ✓ Sub Store 0 已 ACTIVE，可用于路由")
 
-# Migrate episodic memories to sub store 1
-print("\n2. Migrating episodic memories to sub store 1...")
+# 将情景记忆迁移到子存储 1
+print("\n2. 正在将情景记忆迁移到 Sub Store 1...")
 episodic_count = memory.migrate_to_sub_store(
     sub_store_index=1,
     delete_source=True
 )
-print(f"   ✓ Migrated {episodic_count} episodic memories")
-print(f"   ✓ Sub store 1 is now ACTIVE and ready for routing")
+print(f"   ✓ 已迁移 {episodic_count} 条情景记忆")
+print("   ✓ Sub Store 1 已 ACTIVE，可用于路由")
 
-print("\n✓ Migration completed! Current distribution:")
-print(f"   - Main store: semantic memories")
-print(f"   - Sub store 0: {working_count} working memories (ACTIVE)")
-print(f"   - Sub store 1: {episodic_count} episodic memories (ACTIVE)")
+print("\n✓ 迁移完成！当前分布：")
+print("   - 主存储：语义记忆")
+print(f"   - Sub Store 0：{working_count} 条工作记忆（ACTIVE）")
+print(f"   - Sub Store 1：{episodic_count} 条情景记忆（ACTIVE）")
 ```
 **预期输出：**
 
@@ -350,20 +350,20 @@ print(f"   - Sub store 1: {episodic_count} episodic memories (ACTIVE)")
 
 通过这种方法，您可以根据需求灵活地管理和扩展 Memory 的功能。
 ```
-Starting data migration to sub stores...
+正在开始向子存储迁移数据...
 
-1. Migrating working memories to sub store 0...
-   ✓ Migrated 3 working memories
-   ✓ Sub store 0 is now ACTIVE and ready for routing
+1. 正在将工作记忆迁移到 Sub Store 0...
+   ✓ 已迁移 3 条工作记忆
+   ✓ Sub Store 0 已 ACTIVE，可用于路由
 
-2. Migrating episodic memories to sub store 1...
-   ✓ Migrated 2 episodic memories
-   ✓ Sub store 1 is now ACTIVE and ready for routing
+2. 正在将情景记忆迁移到 Sub Store 1...
+   ✓ 已迁移 2 条情景记忆
+   ✓ Sub Store 1 已 ACTIVE，可用于路由
 
-✓ Migration completed! Current distribution:
-   - Main store: semantic memories
-   - Sub store 0: 3 working memories (ACTIVE)
-   - Sub store 1: 2 episodic memories (ACTIVE)
+✓ 迁移完成！当前分布：
+   - 主存储：语义记忆
+   - Sub Store 0：3 条工作记忆（ACTIVE）
+   - Sub Store 1：2 条情景记忆（ACTIVE）
 ```
 ### 💡 关于子存储激活的重要说明 {#-important-note-about-sub-store-activation}
 
@@ -396,10 +396,10 @@ from powermem import Memory
 memory = Memory(config=config)
 user_id = "demo_user"
 
-print("Querying after migration (automatic routing)\n")
+print("迁移后查询（自动路由）\n")
 
-# Query working memories (should route to sub store 0)
-print("1. Querying working memories (routes to sub store 0)...")
+# 查询工作记忆（应路由到 Sub Store 0）
+print("1. 正在查询工作记忆（路由到 Sub Store 0）...")
 results = memory.search(
     query="today's schedule",
     filters={"memory_type": "working"},
@@ -408,13 +408,13 @@ results = memory.search(
 )
 
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} results:")
+print(f"   找到 {len(results_list)} 条结果：")
 for i, result in enumerate(results_list, 1):
     source = result.get('_source_store', 'unknown')
     print(f"   {i}. [{source}] {result['memory'][:50]}")
 
-# Query episodic memories (should route to sub store 1)
-print("\n2. Querying episodic memories (routes to sub store 1)...")
+# 查询情景记忆（应路由到 Sub Store 1）
+print("\n2. 正在查询情景记忆（路由到 Sub Store 1）...")
 results = memory.search(
     query="past memories",
     filters={"memory_type": "episodic"},
@@ -423,13 +423,13 @@ results = memory.search(
 )
 
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} results:")
+print(f"   找到 {len(results_list)} 条结果：")
 for i, result in enumerate(results_list, 1):
     source = result.get('_source_store', 'unknown')
     print(f"   {i}. [{source}] {result['memory'][:50]}")
 
-# Query semantic memories (should query main store)
-print("\n3. Querying semantic memories (queries main store)...")
+# 查询语义记忆（应查询主存储）
+print("\n3. 正在查询语义记忆（查询主存储）...")
 results = memory.search(
     query="programming and AI",
     filters={"memory_type": "semantic"},
@@ -438,7 +438,7 @@ results = memory.search(
 )
 
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} results:")
+print(f"   找到 {len(results_list)} 条结果：")
 for i, result in enumerate(results_list, 1):
     source = result.get('_source_store', 'main')
     print(f"   {i}. [{source}] {result['memory'][:50]}")
@@ -454,21 +454,21 @@ for i, result in enumerate(results_list, 1):
 
 通过这种方式，您可以更高效地组织和管理复杂的记忆数据结构。
 ```
-Querying after migration (automatic routing)
+迁移后查询（自动路由）
 
-1. Querying working memories (routes to sub store 0)...
-   Found 3 results:
+1. 正在查询工作记忆（路由到 Sub Store 0）...
+   找到 3 条结果：
    1. [working_memories] Meeting scheduled at 3 PM today
    2. [working_memories] Need to buy groceries after work
    3. [working_memories] Today's weather is sunny, good for outdoor activit
 
-2. Querying episodic memories (routes to sub store 1)...
-   Found 2 results:
+2. 正在查询情景记忆（路由到 Sub Store 1）...
+   找到 2 条结果：
    1. [episodic_memories] Last summer I visited Paris and saw the Eiffel Tow
    2. [episodic_memories] I learned to ride a bike when I was 7 years old
 
-3. Querying semantic memories (queries main store)...
-   Found 2 results:
+3. 正在查询语义记忆（查询主存储）...
+   找到 2 条结果：
    1. [main] Python is a high-level programming language known
    2. [main] Machine learning is a subset of artificial intell
 ```
@@ -482,36 +482,36 @@ from powermem import Memory
 memory = Memory(config=config)
 user_id = "demo_user"
 
-print("Adding new memories (testing automatic routing)\n")
+print("正在添加新记忆（测试自动路由）\n")
 
-# Add new working memory (should route to sub store 0)
-print("1. Adding new working memory...")
+# 添加新的工作记忆（应路由到子存储 0）
+print("1. 正在添加新的工作记忆...")
 new_working_id = memory.add(
     messages="Remember to call the dentist tomorrow morning",
     metadata={"memory_type": "working", "importance": "high"},
     user_id=user_id
 )
-print(f"   ✓ Automatically routed to sub store 0")
+print("   ✓ 已自动路由到 Sub Store 0")
 
-# Add new episodic memory (should route to sub store 1)
-print("\n2. Adding new episodic memory...")
+# 添加新的情景记忆（应路由到子存储 1）
+print("\n2. 正在添加新的情景记忆...")
 new_episodic_id = memory.add(
     messages="I graduated from university in 2020",
     metadata={"memory_type": "episodic", "time": "2020"},
     user_id=user_id
 )
-print(f"   ✓ Automatically routed to sub store 1")
+print("   ✓ 已自动路由到 Sub Store 1")
 
-# Add new semantic memory (should stay in main store)
-print("\n3. Adding new semantic memory...")
+# 添加新的语义记忆（应保留在主存储）
+print("\n3. 正在添加新的语义记忆...")
 new_semantic_id = memory.add(
     messages="Docker is a platform for developing and deploying containerized applications,I love Docker!",
     metadata={"memory_type": "semantic", "topic": "technology"},
     user_id=user_id
 )
-print(f"   ✓ Automatically routed to main store")
+print("   ✓ 已自动路由到主存储")
 
-print("\n✓ All new memories correctly routed to their respective stores")
+print("\n✓ 所有新记忆都已正确路由到对应存储")
 ```
 **预期输出：**
 
@@ -526,18 +526,18 @@ print("\n✓ All new memories correctly routed to their respective stores")
 
 通过这种方法，您可以更灵活地组织和使用您的记忆数据。
 ```
-Adding new memories (testing automatic routing)
+正在添加新记忆（测试自动路由）
 
-1. Adding new working memory...
-   ✓ Automatically routed to sub store 0
+1. 正在添加新的工作记忆...
+   ✓ 已自动路由到 Sub Store 0
 
-2. Adding new episodic memory...
-   ✓ Automatically routed to sub store 1
+2. 正在添加新的情景记忆...
+   ✓ 已自动路由到 Sub Store 1
 
-3. Adding new semantic memory...
-   ✓ Automatically routed to main store
+3. 正在添加新的语义记忆...
+   ✓ 已自动路由到主存储
 
-✓ All new memories correctly routed to their respective stores
+✓ 所有新记忆都已正确路由到对应存储
 ```
 ## 第7步：验证路由正确性 {#step-7-verify-routing-correctness}
 
@@ -549,10 +549,10 @@ from powermem import Memory
 memory = Memory(config=config)
 user_id = "demo_user"
 
-print("Verifying routing correctness\n")
+print("正在验证路由正确性\n")
 
-# Verify working memories
-print("1. Verifying working memory count...")
+# 验证工作记忆
+print("1. 正在验证工作记忆数量...")
 results = memory.search(
     query="tasks and reminders",
     filters={"memory_type": "working"},
@@ -560,12 +560,12 @@ results = memory.search(
     limit=10
 )
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} working memories")
-print(f"   Expected: 4 (3 old + 1 new)")
+print(f"   找到 {len(results_list)} 条工作记忆")
+print("   预期：4（3 条旧记忆 + 1 条新记忆）")
 print(f"   {'✓ PASS' if len(results_list) == 4 else '✗ FAIL'}")
 
-# Verify episodic memories
-print("\n2. Verifying episodic memory count...")
+# 验证情景记忆
+print("\n2. 正在验证情景记忆数量...")
 results = memory.search(
     query="life experiences",
     filters={"memory_type": "episodic"},
@@ -573,12 +573,12 @@ results = memory.search(
     limit=10
 )
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} episodic memories")
-print(f"   Expected: 4 (3 old + 1 new)")
+print(f"   找到 {len(results_list)} 条情景记忆")
+print("   预期：4（3 条旧记忆 + 1 条新记忆）")
 print(f"   {'✓ PASS' if len(results_list) == 4 else '✗ FAIL'}")
 
-# Verify semantic memories
-print("\n3. Verifying semantic memory count...")
+# 验证语义记忆
+print("\n3. 正在验证语义记忆数量...")
 results = memory.search(
     query="knowledge and concepts",
     filters={"memory_type": "semantic"},
@@ -586,12 +586,12 @@ results = memory.search(
     limit=10
 )
 results_list = results.get("results", [])
-print(f"   Found {len(results_list)} semantic memories")
-expected_count = 5  # Original + 1 new
-print(f"   Expected: {expected_count}")
+print(f"   找到 {len(results_list)} 条语义记忆")
+expected_count = 5  # 原始数据 + 1 条新数据
+print(f"   预期：{expected_count}")
 print(f"   {'✓ PASS' if len(results_list) == expected_count else '✗ FAIL'}")
 
-print("\n✓ All verifications passed! Routing is working correctly")
+print("\n✓ 所有验证通过！路由工作正常")
 ```
 **预期输出：**
 
@@ -613,24 +613,24 @@ print("\n✓ All verifications passed! Routing is working correctly")
 
 通过这种方式，您可以根据记忆的类型和用途对其进行分类和管理。
 ```
-Verifying routing correctness
+正在验证路由正确性
 
-1. Verifying working memory count...
-   Found 4 working memories
-   Expected: 4 (3 old + 1 new)
+1. 正在验证工作记忆数量...
+   找到 4 条工作记忆
+   预期：4（3 条旧记忆 + 1 条新记忆）
    ✓ PASS
 
-2. Verifying episodic memory count...
-   Found 4 episodic memories
-   Expected: 4 (3 old + 1 new)
+2. 正在验证情景记忆数量...
+   找到 4 条情景记忆
+   预期：4（3 条旧记忆 + 1 条新记忆）
    ✓ PASS
 
-3. Verifying semantic memory count...
-   Found 5 semantic memories
-   Expected: 5
+3. 正在验证语义记忆数量...
+   找到 5 条语义记忆
+   预期：5
    ✓ PASS
 
-✓ All verifications passed! Routing is working correctly
+✓ 所有验证通过！路由工作正常
 ```
 ## 完整示例 {#complete-example}
 
@@ -641,16 +641,16 @@ from powermem import Memory
 import os
 
 def print_section(title: str):
-    """Print a formatted section header"""
+    """打印格式化的章节标题"""
     print("\n" + "=" * 70)
     print(f"  {title}")
     print("=" * 70 + "\n")
 
 def main():
-    print_section("Sub Store Complete Example")
+    print_section("子存储完整示例")
 
-    # Step 1: Configuration
-    print_section("Step 1: Configure Memory and Sub Stores")
+    # 第 1 步：配置
+    print_section("第 1 步：配置 Memory 和子存储")
 
     config = {
         "database": {
@@ -696,10 +696,10 @@ def main():
 
     memory = Memory(config=config)
     user_id = "demo_user"
-    print("✓ Memory initialized successfully")
+    print("✓ Memory 初始化成功")
 
-    # Step 2: Add memories
-    print_section("Step 2: Add Different Types of Memories")
+    # 第 2 步：添加记忆
+    print_section("第 2 步：添加不同类型的记忆")
 
     memories = {
         "semantic": [
@@ -718,7 +718,7 @@ def main():
     }
 
     for mem_type, mem_list in memories.items():
-        print(f"\nAdding {mem_type} memories...")
+        print(f"\n正在添加 {mem_type} 类型记忆...")
         for mem in mem_list:
             memory.add(
                 messages=mem,
@@ -727,21 +727,21 @@ def main():
             )
             print(f"  ✓ {mem}")
 
-    # Step 3: Migrate (REQUIRED for activation)
-    print_section("Step 3: Migrate to Sub Stores (REQUIRED)")
+    # 第 3 步：迁移（激活必需）
+    print_section("第 3 步：迁移到子存储（必需）")
 
-    print("⚠️ Important: This step is REQUIRED to activate sub stores!")
-    print("Even if you have no data to migrate, you must call this once.\n")
+    print("⚠️ 重要：此步骤是激活 Sub Store 的必需操作！")
+    print("即使没有需要迁移的数据，也必须调用一次。\n")
 
     working_count = memory.migrate_to_sub_store(0, delete_source=True)
     episodic_count = memory.migrate_to_sub_store(1, delete_source=True)
 
-    print(f"✓ Migration completed:")
-    print(f"  - Working memories: {working_count} → sub store 0 (ACTIVE)")
-    print(f"  - Episodic memories: {episodic_count} → sub store 1 (ACTIVE)")
+    print("✓ 迁移完成：")
+    print(f"  - 工作记忆：{working_count} → Sub Store 0（ACTIVE）")
+    print(f"  - 情景记忆：{episodic_count} → Sub Store 1（ACTIVE）")
 
-    # Step 4: Query verification
-    print_section("Step 4: Verify Automatic Routing")
+    # 第 4 步：查询验证
+    print_section("第 4 步：验证自动路由")
 
     test_queries = [
         ("today tasks", "working", "working_memories"),
@@ -757,27 +757,27 @@ def main():
             limit=5
         )
         results_list = results.get("results", [])
-        print(f"\nQuery '{query}' (type={mem_type}):")
-        print(f"  Found {len(results_list)} results")
+        print(f"\n查询 '{query}'（type={mem_type}）：")
+        print(f"  找到 {len(results_list)} 条结果")
         if results_list:
             actual_store = results_list[0].get('_source_store', 'unknown')
-            print(f"  Storage location: {actual_store}")
-            print(f"  {'✓ Correct' if expected_store in actual_store or actual_store == expected_store else '✗ Wrong'}")
+            print(f"  存储位置：{actual_store}")
+            print(f"  {'✓ 正确' if expected_store in actual_store or actual_store == expected_store else '✗ 错误'}")
 
-    print_section("✓ Example completed!")
-    print("Sub store functionality successfully demonstrated:")
-    print("  1. ✓ Configuration and initialization")
-    print("  2. ✓ Adding different types of memories")
-    print("  3. ✓ Data migration (REQUIRED for activation)")
-    print("  4. ✓ Automatic query routing")
+    print_section("✓ 示例完成！")
+    print("子存储功能演示成功：")
+    print("  1. ✓ 配置和初始化")
+    print("  2. ✓ 添加不同类型的记忆")
+    print("  3. ✓ 数据迁移（激活所必需）")
+    print("  4. ✓ 自动查询路由")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\nExample interrupted by user")
+        print("\n\n示例被用户中断")
     except Exception as e:
-        print(f"\n\n✗ Error occurred: {e}")
+        print(f"\n\n✗ 发生错误：{e}")
         import traceback
         traceback.print_exc()
 ```
@@ -792,13 +792,13 @@ python complete_sub_store_example.py
 为不同的子存储配置不同的嵌入维度以优化性能：
 ```python
 config = {
-    # ... main config ...
+    # ... 主配置 ...
     "sub_stores": [
         {
-            # Low-priority working memory uses smaller dimension
+            # 低优先级工作记忆使用较小维度
             "collection_name": "working_memories",
             "routing_filter": {"memory_type": "working"},
-            "embedding_model_dims": 512,  # Smaller dimension
+            "embedding_model_dims": 512,  # 较小维度
             "embedding": {
                 "provider": "qwen",
                 "config": {
@@ -809,10 +809,10 @@ config = {
             }
         },
         {
-            # Important episodic memory uses larger dimension
+            # 重要情景记忆使用较大维度
             "collection_name": "episodic_memories",
             "routing_filter": {"memory_type": "episodic"},
-            "embedding_model_dims": 1536,  # Larger dimension
+            "embedding_model_dims": 1536,  # 较大维度
         }
     ]
 }
@@ -822,25 +822,25 @@ config = {
 使用多个元数据字段进行路由：
 ```python
 config = {
-    # ... main config ...
+    # ... 主配置 ...
     "sub_stores": [
         {
             "collection_name": "important_working_memories",
             "routing_filter": {
                 "memory_type": "working",
-                "importance": "high"  # Multiple conditions
+                "importance": "high"  # 多个条件
             },
             "embedding_model_dims": 1536,
         }
     ]
 }
 
-# Add memory with multiple metadata fields
+# 添加包含多个 metadata 字段的记忆
 memory.add(
     messages="Important work task",
     metadata={
         "memory_type": "working",
-        "importance": "high"  # Matches routing condition
+        "importance": "high"  # 匹配路由条件
     },
     user_id=user_id
 )
@@ -849,10 +849,10 @@ memory.add(
 
 在源中保留一份副本的同时进行迁移：
 ```python
-# Migrate but don't delete original data (create copy)
+# 迁移但不删除原始数据（创建副本）
 count = memory.migrate_to_sub_store(
     sub_store_index=0,
-    delete_source=False  # Keep original data
+    delete_source=False  # 保留原始数据
 )
 print(f"Copied {count} memories to sub store")
 ```
@@ -860,21 +860,21 @@ print(f"Copied {count} memories to sub store")
 
 如果您是从头开始或希望立即使用子存储：
 ```python
-# Activate sub stores without migrating any data
-# This is REQUIRED even if you have no existing data
+# 激活 Sub Store，而不迁移任何数据
+# 即使没有现有数据，这也是必需的
 for i in range(len(config["sub_stores"])):
     memory.migrate_to_sub_store(
         sub_store_index=i,
-        delete_source=False  # No data to delete
+        delete_source=False  # 没有数据需要删除
     )
-    print(f"✓ Sub store {i} activated and ready for use")
+    print(f"✓ Sub Store {i} 已激活，可以使用")
 
-# Now you can add new memories and they'll route correctly
+# 现在可以添加新记忆，它们会正确路由
 memory.add(
     messages="New working memory",
     metadata={"memory_type": "working"},
     user_id=user_id
-)  # Will automatically go to sub store 0
+)  # 会自动进入子存储 0
 ```
 ## 最佳实践 {#best-practices}
 

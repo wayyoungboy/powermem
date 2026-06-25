@@ -27,10 +27,10 @@ UserMemory 扩展了 Memory 的功能，增加了用户档案管理能力：
 # user_profile_example.py
 from powermem import UserMemory, auto_config
 
-# Load configuration (auto-loads from .env or uses defaults)
+# 加载配置（自动从 .env 加载，或使用默认值）
 config = auto_config()
 
-# Create UserMemory instance
+# 创建 UserMemory 实例
 user_memory = UserMemory(config=config)
 
 print("✓ UserMemory initialized successfully!")
@@ -53,7 +53,7 @@ from powermem import UserMemory, auto_config
 config = auto_config()
 user_memory = UserMemory(config=config)
 
-# Add a conversation
+# 添加一段对话
 conversation = [
     {"role": "user", "content": "Hi, I'm Alice. I'm a 28-year-old software engineer from San Francisco. I work at a tech startup and love Python programming."},
     {"role": "assistant", "content": "Nice to meet you, Alice! Python is a great language for software engineering."}
@@ -93,7 +93,7 @@ from powermem import UserMemory, auto_config
 config = auto_config()
 user_memory = UserMemory(config=config)
 
-# First conversation
+# 第一次对话
 conversation1 = [
     {"role": "user", "content": "Hi, I'm Alice. I'm a software engineer from San Francisco."},
     {"role": "assistant", "content": "Nice to meet you, Alice!"}
@@ -110,7 +110,7 @@ print(f"Profile extracted: {result1.get('profile_extracted', False)}")
 if result1.get('profile_content'):
     print(f"Profile: {result1['profile_content']}")
 
-# Second conversation - adds more information
+# 第二次对话，添加更多信息
 conversation2 = [
     {"role": "user", "content": "I also enjoy reading science fiction novels and playing tennis on weekends."},
     {"role": "assistant", "content": "That sounds like great hobbies!"}
@@ -151,7 +151,7 @@ from powermem import UserMemory, auto_config
 config = auto_config()
 user_memory = UserMemory(config=config)
 
-# Add some conversations first
+# 先添加一些对话
 conversation = [
     {"role": "user", "content": "I'm Bob, a data scientist. I love machine learning and hiking."},
     {"role": "assistant", "content": "Great to meet you, Bob!"}
@@ -163,7 +163,7 @@ user_memory.add(
     agent_id="assistant_agent"
 )
 
-# Get the user profile
+# 获取用户档案
 profile = user_memory.profile(
     user_id="user_002"
 )
@@ -208,7 +208,7 @@ user_memory = UserMemory(config=config)
 
 user_id = "user_003"
 
-# Add some conversations
+# 添加一些对话
 user_memory.add(
     messages=[
         {"role": "user", "content": "I'm Charlie, a product manager. I work on mobile apps."},
@@ -227,13 +227,13 @@ user_memory.add(
     agent_id="assistant_agent"
 )
 
-# Search without profile
+# 不带档案搜索
 results = user_memory.search(
     query="work and preferences",
     user_id=user_id,
     agent_id="assistant_agent",
     limit=5,
-    add_profile=False  # Don't include profile
+    add_profile=False  # 不包含档案
 )
 
 print(f"✓ Search completed")
@@ -270,14 +270,14 @@ user_memory = UserMemory(config=config)
 
 user_id = "user_rewrite_demo"
 
-# Build profile with relocation info
+# 构建包含搬迁信息的档案
 user_memory.add(
     messages="Last month I moved from Chengdu to Hangzhou, and started a new job.",
     user_id=user_id,
     profile_type="content"
 )
 
-# Ambiguous query that relies on profile context
+# 依赖用户档案上下文的模糊查询
 results = user_memory.search(
     query="Recommend some delicious food near my place.",
     user_id=user_id,
@@ -288,15 +288,15 @@ results = user_memory.search(
 ```python
 import os
 
-# Enable query rewrite via env
+# 通过 env 启用查询重写
 os.environ["QUERY_REWRITE_ENABLED"] = "true"
 user_memory_rewrite = UserMemory(config=auto_config())
 
-# Disable query rewrite via env
+# 通过 env 禁用查询重写
 os.environ["QUERY_REWRITE_ENABLED"] = "false"
 user_memory_no_rewrite = UserMemory(config=auto_config())
 
-# Same query, same user profile
+# 相同查询、相同用户档案
 query = "Recommend some delicious food near my place."
 
 result_with_rewrite = user_memory_rewrite.search(
@@ -314,10 +314,10 @@ result_without_rewrite = user_memory_no_rewrite.search(
 示例配置:
 ```python
 config = {
-    # ... other config
+    # ... 其他配置
     "query_rewrite": {
         "enabled": True,
-        # "prompt": "Rewrite queries to be specific and grounded in the user profile."
+        # "prompt": "根据用户档案将查询重写得更具体、更有依据。"
     }
 }
 ```
@@ -342,7 +342,7 @@ user_memory = UserMemory(config=config)
 
 user_id = "user_004"
 
-# Add conversations
+# 添加对话
 user_memory.add(
     messages=[
         {"role": "user", "content": "I'm Diana, a UX designer. I love creating beautiful interfaces."},
@@ -352,16 +352,16 @@ user_memory.add(
     agent_id="assistant_agent"
 )
 
-# Search with profile
+# 带档案搜索
 results = user_memory.search(
     query="user background and interests",
     user_id=user_id,
     agent_id="assistant_agent",
     limit=5,
-    add_profile=True  # Include profile
+    add_profile=True  # 包含档案
 )
 
-print(f"✓ Search with profile completed")
+print("✓ 带档案搜索完成")
 print(f"  - Results count: {len(results.get('results', []))}")
 print(f"  - Profile included: {'profile_content' in results}")
 
@@ -379,7 +379,7 @@ python user_profile_example.py
 ```
 **预期输出：**
 ```
-✓ Search with profile completed
+✓ 带档案搜索完成
   - Results count: 1
   - Profile included: True
 
@@ -399,7 +399,7 @@ from powermem import UserMemory, auto_config
 config = auto_config()
 user_memory = UserMemory(config=config)
 
-# Example 1: English conversation, Chinese profile
+# 示例 1：英文对话，中文档案
 conversation_en = [
     {"role": "user", "content": "I am a software engineer working in Beijing. I love drinking tea and reading books."},
     {"role": "assistant", "content": "That sounds great!"}
@@ -408,14 +408,14 @@ conversation_en = [
 result_zh = user_memory.add(
     messages=conversation_en,
     user_id="user_bilingual_001",
-    native_language="zh"  # Extract profile in Chinese
+    native_language="zh"  # 提取中文档案
 )
 
 print("✓ English conversation processed")
 if result_zh.get('profile_content'):
     print(f"  - Profile (Chinese): {result_zh['profile_content']}")
 
-# Example 2: Chinese conversation, English profile
+# 示例 2：中文对话，英文档案
 conversation_zh = [
     {"role": "user", "content": "I'm 25 years old, working at Microsoft in Seattle."},
     {"role": "assistant", "content": "Nice to meet you"}
@@ -424,19 +424,19 @@ conversation_zh = [
 result_en = user_memory.add(
     messages=conversation_zh,
     user_id="user_bilingual_002",
-    native_language="en"  # Extract profile in English
+    native_language="en"  # 提取英文档案
 )
 
 print("\n✓ Chinese conversation processed")
 if result_en.get('profile_content'):
     print(f"  - Profile (English): {result_en['profile_content']}")
 
-# Example 3: Structured topics with native language
+# 示例 3：使用母语的结构化 topic
 result_topics = user_memory.add(
     messages="I'm 25 years old, working at Microsoft in Seattle.",
     user_id="user_bilingual_003",
     profile_type="topics",
-    native_language="zh"  # Topic values in Chinese, keys remain English
+    native_language="zh"  # topic 值使用中文，key 保持英文
 )
 
 print("\n✓ Structured topics extracted")
@@ -471,7 +471,7 @@ user_memory = UserMemory(config=config, agent_id="assistant_agent")
 
 user_id = "user_007"
 
-# Add conversation and create profile
+# 添加对话并创建档案
 user_memory.add(
     messages=[
         {"role": "user", "content": "I'm Grace, a teacher."},
@@ -480,13 +480,13 @@ user_memory.add(
     user_id=user_id
 )
 
-# Get profile to confirm it exists
+# 获取档案以确认其存在
 profile = user_memory.profile(user_id=user_id)
 if profile:
     profile_id = profile.get('id')
     print(f"✓ Profile exists with ID: {profile_id}")
 
-    # Delete the profile
+    # 删除档案
     deleted = user_memory.delete_profile(
         user_id=user_id
     )
@@ -496,7 +496,7 @@ if profile:
     else:
         print(f"✗ Failed to delete profile")
 
-    # Verify deletion
+    # 验证删除
     profile_after = user_memory.profile(user_id=user_id)
     if not profile_after:
         print("✓ Profile confirmed deleted")
@@ -521,10 +521,10 @@ python user_profile_example.py
 from powermem import UserMemory, auto_config
 
 def main():
-    # Load configuration
+    # 加载配置
     config = auto_config()
 
-    # Initialize UserMemory
+    # 初始化 UserMemory
     user_memory = UserMemory(config=config, agent_id="demo_agent")
     user_id = "demo_user"
 
@@ -532,7 +532,7 @@ def main():
     print("UserMemory Profile Management Example")
     print("=" * 60)
 
-    # Step 1: Add initial conversation
+    # 第 1 步：添加初始对话
     print("\n1. Adding initial conversation...")
     conversation1 = [
         {"role": "user", "content": "Hi, I'm Alex, a 32-year-old data scientist from New York. I specialize in machine learning and love reading tech blogs."},
@@ -549,7 +549,7 @@ def main():
     if result1.get('profile_content'):
         print(f"   Profile: {result1['profile_content']}")
 
-    # Step 2: Update profile with more information
+    # 第 2 步：用更多信息更新档案
     print("\n2. Updating profile with more conversations...")
     conversation2 = [
         {"role": "user", "content": "I also enjoy hiking and photography on weekends."},
@@ -564,7 +564,7 @@ def main():
 
     print(f"   ✓ Profile updated: {result2.get('profile_extracted', False)}")
 
-    # Step 3: Get full profile
+    # 第 3 步：获取完整档案
     print("\n3. Retrieving full profile...")
     profile = user_memory.profile(
         user_id=user_id
@@ -575,8 +575,8 @@ def main():
         print(f"   Profile content: {profile.get('profile_content', '')}")
         print(f"   Last updated: {profile.get('updated_at')}")
 
-    # Step 4: Search with profile
-    print("\n4. Searching memories with profile...")
+    # 第 4 步：带档案搜索
+    print("\n4. 正在使用档案搜索记忆...")
     search_results = user_memory.search(
         query="user interests and hobbies",
         user_id=user_id,
@@ -591,9 +591,9 @@ def main():
     for i, result in enumerate(search_results.get('results', []), 1):
         print(f"   {i}. {result.get('memory', '')} (score: {result.get('score', 0):.2f})")
 
-    # Step 5: Cleanup (optional)
+    # 第 5 步：清理（可选）
     print("\n5. Cleaning up...")
-    # Note: In production, you might want to keep the profiles
+    # 注意：生产环境中您可能希望保留档案
     # deleted = user_memory.delete_profile(user_id=user_id)
     # if deleted:
     #     print("   ✓ Profile deleted")
@@ -639,7 +639,7 @@ from powermem import UserMemory, auto_config
 config = auto_config()
 user_memory = UserMemory(config=config)
 
-# Conversation with multiple roles
+# 包含多个角色的对话
 conversation = [
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": "Hi, I'm Frank, a doctor from Boston."},
@@ -647,7 +647,7 @@ conversation = [
     {"role": "tool", "content": "Weather data: Boston, 72°F"}
 ]
 
-# Default behavior: only include 'user' messages, exclude 'assistant' messages
+# 默认行为：只包含 'user' 消息，排除 'assistant' 消息
 result = user_memory.add(
     messages=conversation,
     user_id="user_008"
@@ -655,17 +655,17 @@ result = user_memory.add(
 print("Default filtering (user only):")
 print(f"  Profile: {result.get('profile_content', 'N/A')}")
 
-# Include all messages (disable filtering)
+# 包含所有消息（禁用过滤）
 result = user_memory.add(
     messages=conversation,
     user_id="user_009",
-    include_roles=None,  # or []
-    exclude_roles=None   # or []
+    include_roles=None,  # 或 []
+    exclude_roles=None   # 或 []
 )
 print("\nNo filtering (all roles):")
 print(f"  Profile: {result.get('profile_content', 'N/A')}")
 
-# Custom filtering: include user and system, exclude tool
+# 自定义过滤：包含 user 和 system，排除 tool
 result = user_memory.add(
     messages=conversation,
     user_id="user_010",

@@ -40,14 +40,14 @@ config = {
             "embedding_dims": 1536,
         }
     },
-    # Configure sub stores
+    # 配置子存储
     "sub_stores": [
         {
-            # Sub store 1: Inherits main config
+            # 子存储 1：继承主配置
             "routing_filter": {"type": "semantic"}
         },
         {
-            # Sub store 2: Uses different embedding
+            # 子存储 2：使用不同的 Embedding
             "routing_filter": {"type": "working"},
             "embedding_model_dims": 768,
             "embedding": {
@@ -68,7 +68,7 @@ memory = Memory(config=config)
 
 **重要**：在使用子存储路由之前，即使没有数据需要迁移，也必须至少运行一次迁移以激活路由功能：
 ```python
-# Initialize sub store routing (required before first use)
+# 初始化子存储路由（首次使用前必需）
 memory.migrate_all_sub_stores(delete_source=False)
 ```
 这确保了子存储的迁移状态在数据库中被正确初始化，从而启用自动路由。
@@ -77,21 +77,21 @@ memory.migrate_all_sub_stores(delete_source=False)
 
 一旦初始化完成，数据将根据元数据自动路由到适当的子存储：
 ```python
-# Add data - automatically routed to sub stores
+# 添加数据，自动路由到子存储
 memory.add(
     "Python is a programming language",
-    metadata={"type": "semantic"}  # Routes to sub store 1
+    metadata={"type": "semantic"}  # 路由到子存储 1
 )
 
 memory.add(
     "Buy milk today",
-    metadata={"type": "working"}  # Routes to sub store 2
+    metadata={"type": "working"}  # 路由到子存储 2
 )
 
-# Search from specific sub store
+# 从指定子存储搜索
 results = memory.search(
     "programming concepts",
-    filters={"type": "semantic"},  # Searches in sub store 1
+    filters={"type": "semantic"},  # 在子存储 1 中搜索
     limit=5
 )
 ```
@@ -104,8 +104,8 @@ results = memory.search(
 定义哪些数据应被路由到此子存储：
 ```python
 "routing_filter": {
-    "type": "working",      # Single condition
-    "priority": "high"      # Multiple conditions (AND logic)
+    "type": "working",      # 单条件
+    "priority": "high"      # 多条件（AND 逻辑）
 }
 ```
 ### 可选参数 {#optional-parameters}
@@ -142,41 +142,41 @@ results = memory.search(
 覆盖主存储的 vector_store 配置：
 ```python
 "vector_store": {
-    "index_type": "HNSW",           # Use HNSW index
-    "vector_weight": 0.7,           # Vector search weight
-    "fts_weight": 0.3,              # Full-text search weight
-    "host": "different-host",       # Use different database
-    # Any vector_store parameter can be overridden
+    "index_type": "HNSW",           # 使用 HNSW 索引
+    "vector_weight": 0.7,           # 向量搜索权重
+    "fts_weight": 0.3,              # 全文搜索权重
+    "host": "different-host",       # 使用不同数据库
+    # 可覆盖任意 vector_store 参数
 }
 ```
 #### index_type {#index_type}
 
 此子存储的索引类型：
 ```python
-"index_type": "HNSW"  # Options: "HNSW", "IVF_FLAT", "IVF_PQ"
+"index_type": "HNSW"  # 可选值："HNSW", "IVF_FLAT", "IVF_PQ"
 ```
 ## 数据迁移 {#data-migration}
 
 ### 将数据迁移到 Sub Store {#migrate-data-to-sub-store}
 ```python
-# Method 1: Migrate by index
+# 方法 1：按索引迁移
 count = memory.migrate_to_sub_store(
-    sub_store_index=0,      # Sub store index
-    delete_source=False     # Keep source data
+    sub_store_index=0,      # 子存储索引
+    delete_source=False     # 保留源数据
 )
 
-# Method 2: Migrate by name
+# 方法 2：按名称迁移
 count = memory.migrate_to_sub_store(
     sub_store_name="memories_sub_0",
-    delete_source=True      # Delete source after migration
+    delete_source=True      # 迁移后删除源数据
 )
 
-# Method 3: Migrate all sub stores
+# 方法 3：迁移所有子存储
 count = memory.migrate_all_sub_stores(delete_source=False)
 ```
 ### 监控迁移状态 {#monitor-migration-status}
 ```python
-# Check migration status
+# 检查迁移状态
 status = memory.get_sub_store_migration_status("memories_sub_0")
 
 print(f"Status: {status['status']}")           # PENDING/MIGRATING/COMPLETED/FAILED
@@ -204,7 +204,7 @@ config = {
     "sub_stores": [
         {
             "routing_filter": {"priority": "low"},
-            "embedding_model_dims": 384,  # Smaller dimension
+            "embedding_model_dims": 384,  # 较小维度
             "embedding": {
                 "provider": "qwen",
                 "config": {"model": "text-embedding-v4", "embedding_dims": 384}
@@ -212,7 +212,7 @@ config = {
         },
         {
             "routing_filter": {"priority": "high"},
-            "embedding_model_dims": 3072,  # Larger dimension
+            "embedding_model_dims": 3072,  # 较大维度
             "embedding": {
                 "provider": "openai",
                 "config": {"model": "text-embedding-3-large", "embedding_dims": 3072}
@@ -225,13 +225,13 @@ config = {
 ```python
 config = {
     "vector_store": {
-        "config": {"index_type": "IVF_FLAT"}  # Main store: balanced
+        "config": {"index_type": "IVF_FLAT"}  # 主存储：均衡配置
     },
     "sub_stores": [
         {
             "routing_filter": {"access_pattern": "hot"},
             "vector_store": {
-                "index_type": "HNSW",      # Fast retrieval
+                "index_type": "HNSW",      # 快速检索
                 "vector_weight": 0.8,
                 "fts_weight": 0.2,
             }
@@ -239,7 +239,7 @@ config = {
         {
             "routing_filter": {"access_pattern": "cold"},
             "vector_store": {
-                "index_type": "IVF_PQ"     # Compressed storage
+                "index_type": "IVF_PQ"     # 压缩存储
             }
         }
     ]
@@ -254,8 +254,8 @@ config = {
             "routing_filter": {"tenant": "enterprise_a"},
             "collection_name": "memories_enterprise_a",
             "vector_store": {
-                "database": "tenant_a_db",     # Different database
-                "host": "db-a.example.com",    # Different host
+                "database": "tenant_a_db",     # 不同数据库
+                "host": "db-a.example.com",    # 不同主机
             }
         }
     ]
@@ -273,7 +273,7 @@ config = {
     {
         "routing_filter": {"type": "semantic"},
         "embedding_model_dims": 768,
-        "embedding": {...}  # Different model
+        "embedding": {...}  # 不同模型
     }
 ]
 ```
@@ -283,13 +283,13 @@ config = {
     {
         "routing_filter": {"priority": "high"},
         "vector_store": {
-            "index_type": "HNSW"  # Fast queries
+            "index_type": "HNSW"  # 快速查询
         }
     },
     {
         "routing_filter": {"priority": "low"},
         "vector_store": {
-            "index_type": "IVF_PQ"  # Save resources
+            "index_type": "IVF_PQ"  # 节省资源
         }
     }
 ]
@@ -328,10 +328,10 @@ memory.migrate_all_sub_stores(delete_source=False)
 确保两个维度参数匹配：
 ```python
 {
-    "embedding_model_dims": 768,  # Database table structure
+    "embedding_model_dims": 768,  # 数据库表结构
     "embedding": {
         "config": {
-            "embedding_dims": 768,  # API returns this dimension
+            "embedding_dims": 768,  # API 返回此维度
         }
     }
 }

@@ -27,10 +27,10 @@ Existing Table (without sparse vector)
 
 在运行升级脚本之前，您需要配置 Sparse Vector。将以下配置添加到您的 `.env` 文件中：
 ```env
-# Enable sparse vector
+# 启用稀疏向量
 SPARSE_VECTOR_ENABLE=true
 
-# Sparse vector embedding configuration
+# 稀疏向量 Embedding 配置
 SPARSE_EMBEDDER_PROVIDER=qwen
 SPARSE_EMBEDDER_API_KEY=your_api_key
 SPARSE_EMBEDDER_MODEL=text-embedding-v4
@@ -39,7 +39,7 @@ SPARSE_EMBEDDER_DIMS=1536
 或者使用字典配置：
 ```python
 config = {
-    # ... other configurations ...
+    # ... 其他配置 ...
     'sparse_embedder': {
         'provider': 'qwen',
         'config': {
@@ -50,8 +50,8 @@ config = {
     'vector_store': {
         'provider': 'oceanbase',
         'config': {
-            'include_sparse': True,  # Enable sparse vector
-            # ... other configurations ...
+            'include_sparse': True,  # 启用稀疏向量
+            # ... 其他配置 ...
         }
     }
 }
@@ -62,7 +62,7 @@ config = {
 ```python
 from script import ScriptManager
 
-# List all available scripts
+# 列出所有可用脚本
 ScriptManager.list_scripts()
 ```
 示例输出：
@@ -82,7 +82,7 @@ PowerMem Available Scripts
 ```python
 from script import ScriptManager
 
-# View upgrade script details
+# 查看升级脚本详情
 ScriptManager.info('upgrade-sparse-vector')
 ```
 示例输出：
@@ -103,10 +103,10 @@ Parameters:
 from powermem import auto_config
 from script import ScriptManager
 
-# Load configuration
+# 加载配置
 config = auto_config()
 
-# Run upgrade script
+# 运行升级脚本
 ScriptManager.run('upgrade-sparse-vector', config)
 ```
 **预期输出：**
@@ -154,7 +154,7 @@ Sparse vector upgrade completed successfully for table 'memories'
 ```python
 from script import ScriptManager
 
-# View migration script details
+# 查看迁移脚本详情
 ScriptManager.info('migrate-sparse-vector')
 ```
 ### 迁移参数 {#migration-parameters}
@@ -173,13 +173,13 @@ ScriptManager.info('migrate-sparse-vector')
 from powermem import Memory, auto_config
 from script import ScriptManager
 
-# Load configuration
+# 加载配置
 config = auto_config()
 
-# Create Memory instance (migration script requires Memory instance)
+# 创建 Memory 实例（迁移脚本需要 Memory 实例）
 memory = Memory(config=config)
 
-# Test mode (only processes 100 records, does not write to database)
+# 测试模式（仅处理 100 条记录，不写入数据库）
 print("Test mode (dry-run):")
 ScriptManager.run('migrate-sparse-vector', memory, dry_run=True)
 ```
@@ -210,13 +210,13 @@ Total: [██████████████]  100.0% | 100/100
 from powermem import Memory, auto_config
 from script import ScriptManager
 
-# Load configuration
+# 加载配置
 config = auto_config()
 
-# Create Memory instance
+# 创建 Memory 实例
 memory = Memory(config=config)
 
-# Formal migration (recommended to configure concurrent threads for better speed)
+# 正式迁移（建议配置并发线程以提升速度）
 print("Formal migration:")
 ScriptManager.run('migrate-sparse-vector', memory, batch_size=100, workers=3)
 ```
@@ -279,14 +279,14 @@ Workers (3):
 from powermem import Memory, auto_config
 import logging
 
-# Load configuration
+# 加载配置
 config = auto_config()
 memory = Memory(config=config)
 
-# Enable DEBUG logging to view search details
+# 启用 DEBUG 日志以查看搜索详情
 logging.getLogger().setLevel(logging.DEBUG)
 
-# Execute search
+# 执行搜索
 print("Executing verification search...")
 result = memory.search(query="test query", limit=10)
 
@@ -337,47 +337,47 @@ DEBUG:powermem.storage.oceanbase.oceanbase:_sparse_search results, len : 10
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Complete Sparse Vector Migration Example
-Demonstrates how to upgrade existing tables and migrate historical data
+完整稀疏向量迁移示例
+演示如何升级现有表并迁移历史数据
 """
 from powermem import Memory, auto_config
 from script import ScriptManager
 import logging
 
 def main():
-    # 1. List available scripts
+    # 1. 列出可用脚本
     print("=" * 60)
     print("Step 1: List Available Scripts")
     print("=" * 60)
     ScriptManager.list_scripts()
 
-    # 2. View script details
+    # 2. 查看脚本详情
     print("\n" + "=" * 60)
     print("Step 2: View Script Details")
     print("=" * 60)
     ScriptManager.info("upgrade-sparse-vector")
     ScriptManager.info("migrate-sparse-vector")
 
-    # 3. Load configuration
+    # 3. 加载配置
     config = auto_config()
 
-    # 4. Run upgrade script (add sparse vector support to existing table)
+    # 4. 运行升级脚本（为现有表添加稀疏向量支持）
     print("\n" + "=" * 60)
     print("Step 3: Run Schema Upgrade Script")
     print("=" * 60)
     ScriptManager.run('upgrade-sparse-vector', config)
 
-    # 5. Create Memory instance
+    # 5. 创建 Memory 实例
     memory = Memory(config=config)
 
-    # 6. Test migration (dry-run mode)
+    # 6. 测试迁移（dry-run 模式）
     print("\n" + "=" * 60)
     print("Step 4: Test Migration (dry-run)")
     print("=" * 60)
     ScriptManager.run('migrate-sparse-vector', memory, dry_run=True)
 
-    # 7. Formal migration (optional: generate sparse vectors for historical data)
-    # Note: Only migrated data will participate in sparse vector retrieval, results are more accurate after migration
+    # 7. 正式迁移（可选：为历史数据生成稀疏向量）
+    # 注意：只有已迁移数据会参与稀疏向量检索，迁移后结果更准确
     print("\n" + "=" * 60)
     print("Step 5: Run Data Migration Script (Optional)")
     print("=" * 60)
@@ -385,7 +385,7 @@ def main():
     if user_input.lower() == 'y':
         ScriptManager.run('migrate-sparse-vector', memory, batch_size=100, workers=3)
 
-    # 8. Verify search
+    # 8. 验证搜索
     print("\n" + "=" * 60)
     print("Step 6: Verify Search")
     print("=" * 60)
@@ -405,7 +405,7 @@ from script import ScriptManager
 
 config = auto_config()
 
-# Run downgrade script (will delete all sparse vector data)
+# 运行降级脚本（会删除所有稀疏向量数据）
 ScriptManager.run('downgrade-sparse-vector', config)
 ```
 > **警告**: 降级脚本将删除 `sparse_embedding` 列和索引。所有稀疏向量数据将被永久删除！

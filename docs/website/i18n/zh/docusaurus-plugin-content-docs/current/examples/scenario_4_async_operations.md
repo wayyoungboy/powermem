@@ -27,15 +27,15 @@ from powermem import AsyncMemory, auto_config
 async def main():
     config = auto_config()
 
-    # Create async memory instance
+    # 创建 AsyncMemory 实例
     async_memory = AsyncMemory(config=config)
 
-    # Initialize (required for async)
+    # 初始化（异步模式必需）
     await async_memory.initialize()
 
     print("✓ AsyncMemory initialized successfully!")
 
-# Run async function
+# 运行异步函数
 asyncio.run(main())
 ```
 **运行此代码：**
@@ -59,13 +59,13 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory asynchronously
+    # 异步添加记忆
     result = await async_memory.add(
-        "User likes Python programming",  # messages parameter (first positional argument)
+        "User likes Python programming",  # messages 参数（第一个位置参数）
         user_id="user123"
     )
 
-    # Handle result - check if results list is not empty
+    # 处理结果，检查 results 列表是否非空
     results_list = result.get('results', [])
     if results_list:
         memory_id = results_list[0].get('id', 'N/A')
@@ -112,7 +112,7 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add multiple memories concurrently
+    # 并发添加多条记忆
     memories = [
         "User likes Python programming",
         "User prefers email support",
@@ -120,13 +120,13 @@ async def main():
         "User favorite color is blue"
     ]
 
-    # Create tasks for concurrent execution
+    # 创建并发执行任务
     tasks = [
-        async_memory.add(mem, user_id="user123")  # messages as first positional argument
+        async_memory.add(mem, user_id="user123")  # messages 作为第一个位置参数
         for mem in memories
     ]
 
-    # Execute all tasks concurrently
+    # 并发执行所有任务
     results = await asyncio.gather(*tasks)
 
     print(f"✓ Added {len(results)} memories concurrently")
@@ -154,11 +154,11 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add some memories first
+    # 先添加一些记忆
     await async_memory.add("User likes Python", user_id="user123")
     await async_memory.add("User prefers email", user_id="user123")
 
-    # Search asynchronously
+    # 异步搜索
     results = await async_memory.search(
         query="user preferences",
         user_id="user123",
@@ -194,24 +194,24 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Large list of memories
+    # 大量记忆列表
     memories = [
         f"Memory {i}: User preference {i}"
         for i in range(100)
     ]
 
-    # Process in batches
+    # 分批处理
     batch_size = 10
     for i in range(0, len(memories), batch_size):
         batch = memories[i:i+batch_size]
 
-        # Create tasks for batch
+        # 为批次创建任务
         tasks = [
-            async_memory.add(mem, user_id="user123")  # messages as first positional argument
+            async_memory.add(mem, user_id="user123")  # messages 作为第一个位置参数
             for mem in batch
         ]
 
-        # Execute batch concurrently
+        # 并发执行批次
         await asyncio.gather(*tasks)
 
         print(f"✓ Processed batch {i//batch_size + 1}")
@@ -249,14 +249,14 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory with intelligent processing
+    # 使用智能处理添加记忆
     result = await async_memory.add(
         messages=[
             {"role": "user", "content": "I'm Alice, a software engineer"},
             {"role": "assistant", "content": "Nice to meet you!"}
         ],
         user_id="user123",
-        infer=True  # Enable intelligent fact extraction
+        infer=True  # 启用智能事实提取
     )
 
     print(f"✓ Processed conversation, extracted {len(result.get('results', []))} memories:")
@@ -287,15 +287,15 @@ async def main():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory (using infer=False to ensure it's added for demo purposes)
-    # In production, you might want infer=True for intelligent deduplication
+    # 添加记忆（演示时使用 infer=False 确保写入）
+    # 生产环境中可使用 infer=True 进行智能去重
     result = await async_memory.add(
-        "User likes Python",  # messages as first positional argument
+        "User likes Python",  # messages 作为第一个位置参数
         user_id="user123",
-        infer=False  # Disable intelligent deduplication for demo
+        infer=False  # 演示时禁用智能去重
     )
 
-    # Handle result - check if results list is not empty
+    # 处理结果，检查 results 列表是否非空
     results_list = result.get('results', [])
     if not results_list:
         print("Error: No memory was added")
@@ -306,14 +306,14 @@ async def main():
         print("Error: Memory ID not found in result")
         raise ValueError("Cannot update/delete: memory ID not found")
 
-    # Update memory
+    # 更新记忆
     updated = await async_memory.update(
         memory_id=memory_id,
         content="User loves Python programming"
     )
     print(f"✓ Updated memory: {updated.get('memory', 'N/A')}")
 
-    # Delete memory
+    # 删除记忆
     success = await async_memory.delete(memory_id)
     if success:
         print(f"✓ Deleted memory {memory_id}")
@@ -344,13 +344,13 @@ async_memory = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize async memory
+    # 启动时初始化异步记忆
     global async_memory
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
     yield
-    # Shutdown: cleanup (if needed)
-    # async_memory cleanup can be added here if needed
+    # 关闭时清理（如有需要）
+    # 如有需要，可在此清理 async_memory
 
 app = FastAPI(lifespan=lifespan)
 
@@ -362,7 +362,7 @@ class MemoryRequest(BaseModel):
 async def add_memory(request: MemoryRequest):
     try:
         result = await async_memory.add(
-            request.memory,  # messages as first positional argument
+            request.memory,  # messages 作为第一个位置参数
             user_id=request.user_id
         )
         return result
@@ -397,7 +397,7 @@ async def main():
     print("Async Memory Operations Demo")
     print("=" * 80)
 
-    # Step 1: Add memories concurrently
+    # 第 1 步：并发添加记忆
     print("\n[Step 1] Adding Memories Concurrently")
     print("-" * 60)
 
@@ -408,14 +408,14 @@ async def main():
     ]
 
     tasks = [
-        async_memory.add(mem, user_id="user123")  # messages as first positional argument
+        async_memory.add(mem, user_id="user123")  # messages 作为第一个位置参数
         for mem in memories
     ]
 
     results = await asyncio.gather(*tasks)
     print(f"✓ Added {len(results)} memories concurrently")
 
-    # Step 2: Search asynchronously
+    # 第 2 步：异步搜索
     print("\n[Step 2] Searching Memories")
     print("-" * 60)
 
@@ -428,7 +428,7 @@ async def main():
     for result in search_results.get('results', []):
         print(f"  - {result['memory']}")
 
-    # Step 3: Batch processing
+    # 第 3 步：批处理
     print("\n[Step 3] Batch Processing")
     print("-" * 60)
 
@@ -438,7 +438,7 @@ async def main():
     for i in range(0, len(batch_memories), batch_size):
         batch = batch_memories[i:i+batch_size]
         tasks = [
-            async_memory.add(mem, user_id="user123")  # messages as first positional argument
+            async_memory.add(mem, user_id="user123")  # messages 作为第一个位置参数
             for mem in batch
         ]
         await asyncio.gather(*tasks)
@@ -485,7 +485,7 @@ async def concurrent_searches():
 ```python
 async def safe_add(memory, user_id):
     try:
-        result = await async_memory.add(memory, user_id=user_id)  # messages as first positional argument
+        result = await async_memory.add(memory, user_id=user_id)  # messages 作为第一个位置参数
         return result
     except Exception as e:
         print(f"Error adding memory: {e}")
@@ -502,7 +502,7 @@ async def rate_limited_add(memories, user_id, rate=5):
 
     async def add_with_limit(memory):
         async with semaphore:
-            return await async_memory.add(memory, user_id=user_id)  # messages as first positional argument
+            return await async_memory.add(memory, user_id=user_id)  # messages 作为第一个位置参数
 
     tasks = [add_with_limit(mem) for mem in memories]
     return await asyncio.gather(*tasks)

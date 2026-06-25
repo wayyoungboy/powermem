@@ -40,7 +40,7 @@
     "description": "The label of footer link with label=Features linking to /features"
   },
   "link.item.label.Benchmark": {
-    "message": "Benchmark",
+    "message": "压测",
     "description": "The label of footer link with label=Benchmark linking to /benchmark"
   },
   "link.item.label.Community": {

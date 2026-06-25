@@ -3,6 +3,7 @@ import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import {localizedPath} from '../utils/localizedPath';
 import styles from './benchmark.module.css';
 
 const translations: Record<string, Record<string, string>> = {
@@ -179,6 +180,11 @@ export default function BenchmarkPage() {
             </Heading>
             <div className={styles.tableContainer}>
               <table className={styles.scoresTable}>
+                <colgroup>
+                  <col className={styles.categoryColumn} />
+                  <col className={styles.descriptionColumn} />
+                  <col className={styles.scoreColumn} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>{t('benchmark.scores.category')}</th>
@@ -204,7 +210,7 @@ export default function BenchmarkPage() {
             </div>
             <div className={styles.sectionFooter}>
               <Link
-                to="/docs/benchmark/overview"
+                to={localizedPath('/docs/benchmark/overview', isZh)}
                 className={styles.viewDetailsButton}
               >
                 {t('benchmark.scores.viewDetails')} →

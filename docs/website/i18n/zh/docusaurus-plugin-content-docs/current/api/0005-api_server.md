@@ -18,12 +18,12 @@ PowerMem HTTP API 服务器基于 FastAPI 构建，提供以下功能：
 
 > **注意：** 如果您已经运行了 PowerMem 服务器，可以跳过此部分并继续下一步。
 ```bash
-# Method 1: Install from powermem package, use CLI command
+# 方法 1：从 powermem 包安装并使用 CLI 命令
 pip install powermem
 powermem-server --host 0.0.0.0 --port 8848
 
-# Method 2: Using Docker
-# Build and run with Docker
+# 方法 2：使用 Docker
+# 使用 Docker 构建并运行
 docker build -t oceanbase/powermem-server:latest -f docker/Dockerfile .
 docker run -d \
   --name powermem-server \
@@ -32,28 +32,28 @@ docker run -d \
   --env-file .env \
   oceanbase/powermem-server:latest
 
-# Or use Docker Compose (recommended)
+# 或使用 Docker Compose（推荐）
 docker-compose -f docker/docker-compose.yml up -d
 
-# Method 3: From source code, use Makefile
+# 方法 3：从源码使用 Makefile
 git clone git@github.com:oceanbase/powermem.git
 cd powermem
-# Start server (production mode)
+# 启动服务器（生产模式）
 make server-start
 
-# Start server with auto-reload (development mode)
+# 启动带自动重载的服务器（开发模式）
 make server-start-reload
 
-# Check server status
+# 检查服务器状态
 make server-status
 
-# View server logs
+# 查看服务器日志
 make server-logs
 
-# Stop server
+# 停止服务器
 make server-stop
 
-# Restart server
+# 重启服务器
 make server-restart
 
 ```
@@ -61,10 +61,10 @@ make server-restart
 
 当 `powermem-server` 从交互式本地终端启动且已构建的 Dashboard 资源可用时，它会等待 `/dashboard/` 可访问，并在默认浏览器中打开该页面。
 ```bash
-# Disable automatic browser opening
+# 禁用自动打开浏览器
 powermem-server --no-open-browser
 
-# Explicitly request browser opening, including when output is redirected
+# 显式请求打开浏览器，包括输出被重定向的情况
 powermem-server --open-browser
 ```
 在 CI、容器、SSH 会话和无头环境中，总是会跳过浏览器的打开操作。绑定到 `0.0.0.0` 或 `::` 时，会打开等效的回环 URL，而不是未指定地址的 URL。
@@ -73,13 +73,13 @@ powermem-server --open-browser
 
 如果需要后端服务提供最新的仪表盘静态文件，请在启动或重启服务器之前运行以下步骤。如果您的部署中不需要前端资源，可以跳过此部分。
 ```bash
-# 1) Build dashboard
+# 1）构建 Dashboard
 cd dashboard
 pnpm install
 pnpm build
 cd ..
 
-# 2) Sync frontend artifacts to backend static directory
+# 2）同步前端产物到后端静态目录
 mkdir -p src/server/dashboard
 cp -r dashboard/dist/* src/server/dashboard/
 ```
@@ -89,76 +89,76 @@ cp -r dashboard/dist/* src/server/dashboard/
 PowerMem SDK 的配置与之前的 v0.2.0 版本相同，新增了 PowerMem 服务器配置部分 12：PowerMem HTTP API Server Configuration。在大多数情况下，可以保留默认配置。
 ```bash
 =============================================================================
-# 12. PowerMem HTTP API Server Configuration
+# 12. PowerMem HTTP API Server 配置
 # =============================================================================
-# Configuration for the PowerMem HTTP API Server
+# PowerMem HTTP API Server 配置
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Server Settings
+# 服务器设置
 # -----------------------------------------------------------------------------
-# Server host address (0.0.0.0 to listen on all interfaces)
+# 服务器主机地址（0.0.0.0 表示监听所有网卡）
 POWERMEM_SERVER_HOST=0.0.0.0
 
-# Server port number
+# 服务器端口号
 POWERMEM_SERVER_PORT=8848
 
-# Number of worker processes (only used when reload=false)
+# worker 进程数量（仅 reload=false 时使用）
 POWERMEM_SERVER_WORKERS=4
 
-# Enable auto-reload for development (true/false)
+# 开发环境启用自动重载（true/false）
 POWERMEM_SERVER_RELOAD=false
 
 # -----------------------------------------------------------------------------
-# Authentication Settings
+# 认证设置
 # -----------------------------------------------------------------------------
-# Enable API key authentication (true/false)
+# 启用 API key 认证（true/false）
 POWERMEM_SERVER_AUTH_ENABLED=false
 
-# API keys (comma-separated list)
-# Example: POWERMEM_SERVER_API_KEYS=key1,key2,key3
+# API key（逗号分隔列表）
+# 示例：POWERMEM_SERVER_API_KEYS=key1,key2,key3
 POWERMEM_SERVER_API_KEYS=
 
 # -----------------------------------------------------------------------------
-# Rate Limiting Settings
+# 限流设置
 # -----------------------------------------------------------------------------
-# Enable rate limiting (true/false)
+# 启用限流（true/false）
 POWERMEM_SERVER_RATE_LIMIT_ENABLED=true
 
-# Rate limit per minute per IP address
+# 每个 IP 地址每分钟的限流值
 POWERMEM_SERVER_RATE_LIMIT_PER_MINUTE=100
 
 # -----------------------------------------------------------------------------
-# Logging Settings
+# 日志设置
 # -----------------------------------------------------------------------------
 POWERMEM_SERVER_LOG_FILE=server-output.txt
 
-# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# 日志级别：DEBUG、INFO、WARNING、ERROR、CRITICAL
 POWERMEM_SERVER_LOG_LEVEL=INFO
 
-# Log format: json or text
+# 日志格式：json 或 text
 POWERMEM_SERVER_LOG_FORMAT=text
 
 # -----------------------------------------------------------------------------
-# API Settings
+# API 设置
 # -----------------------------------------------------------------------------
-# API title (shown in Swagger UI)
+# API 标题（显示在 Swagger UI 中）
 POWERMEM_SERVER_API_TITLE=PowerMem API
 
-# API version
+# API 版本
 POWERMEM_SERVER_API_VERSION=v1
 
-# API description (shown in Swagger UI)
+# API 描述（显示在 Swagger UI 中）
 POWERMEM_SERVER_API_DESCRIPTION=PowerMem HTTP API Server - Intelligent Memory System
 
 # -----------------------------------------------------------------------------
-# CORS Settings
+# CORS 设置
 # -----------------------------------------------------------------------------
-# Enable CORS (true/false)
+# 启用 CORS（true/false）
 POWERMEM_SERVER_CORS_ENABLED=true
 
-# CORS allowed origins (comma-separated, use * for all origins)
-# Example: POWERMEM_SERVER_CORS_ORIGINS=http://localhost:3000,https://example.com
+# CORS 允许的 origin（逗号分隔，使用 * 表示所有 origin）
+# 示例：POWERMEM_SERVER_CORS_ORIGINS=http://localhost:3000,https://example.com
 POWERMEM_SERVER_CORS_ORIGINS=*
 
 ```
@@ -179,11 +179,11 @@ API Base: http://0.0.0.0:8848/api/v1
 ## 身份验证 {#authentication}
 当启用身份验证时，请配置 `.env` 文件：
 ```bash
-# Enable API key authentication (true/false)
+# 启用 API key 认证（true/false）
 POWERMEM_AUTH_ENABLED=true
 
-# API keys (comma-separated list)
-# Example: POWERMEM_API_KEYS=key1,key2,key3
+# API key（逗号分隔列表）
+# 示例：POWERMEM_API_KEYS=key1,key2,key3
 POWERMEM_API_KEYS=test-api-key-123
 ```
 所有需要身份验证的端点必须在请求头中包含 API Key：
@@ -306,15 +306,15 @@ powermem_api_request_duration_seconds_count{method="GET",endpoint="/api/v1/syste
 
 **请求示例**:
 ```bash
-# Delete all memories (system level)
+# 删除所有记忆（系统级）
 curl -X DELETE "http://localhost:8848/api/v1/system/delete-all-memories" \
   -H "X-API-Key: test-api-key-123"
 
-# Delete all memories for a specific agent
+# 删除指定 Agent 的所有记忆
 curl -X DELETE "http://localhost:8848/api/v1/system/delete-all-memories?agent_id=agent-456" \
   -H "X-API-Key: test-api-key-123"
 
-# Delete all memories for a specific user
+# 删除指定用户的所有记忆
 curl -X DELETE "http://localhost:8848/api/v1/system/delete-all-memories?user_id=user-123" \
   -H "X-API-Key: test-api-key-123"
 ```
@@ -507,31 +507,31 @@ curl -X POST "http://localhost:8848/api/v1/memories/batch" \
 
 **请求示例**:
 ```bash
-# Basic query
+# 基础查询
 curl -X GET "http://localhost:8848/api/v1/memories?limit=10&offset=0" \
   -H "X-API-Key: test-api-key-123"
 
-# Filter by user
+# 按用户过滤
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&limit=20&offset=0" \
   -H "X-API-Key: test-api-key-123"
 
-# Filter by agent
+# 按 Agent 过滤
 curl -X GET "http://localhost:8848/api/v1/memories?agent_id=agent-456&limit=50&offset=0" \
   -H "X-API-Key: test-api-key-123"
 
-# Filter by metadata scope
+# 按 metadata scope 过滤
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&agent_id=agent-456&scope=personal&limit=20&offset=0" \
   -H "X-API-Key: test-api-key-123"
 
-# Sort by updated_at (descending - most recent first)
+# 按 updated_at 排序（降序，最新优先）
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&limit=10&sort_by=updated_at&order=desc" \
   -H "X-API-Key: test-api-key-123"
 
-# Sort by created_at (ascending - oldest first)
+# 按 created_at 排序（升序，最旧优先）
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&limit=10&sort_by=created_at&order=asc" \
   -H "X-API-Key: test-api-key-123"
 
-# Combined: filter, pagination, and sorting
+# 组合：过滤、分页和排序
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&agent_id=agent-456&limit=20&offset=0&sort_by=updated_at&order=desc" \
   -H "X-API-Key: test-api-key-123"
 ```
@@ -601,11 +601,11 @@ curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&agent_id=age
 
 **请求示例**:
 ```bash
-# First, list all memories to see available IDs
+# 先列出所有记忆以查看可用 ID
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&agent_id=agent-456" \
   -H "X-API-Key: test-api-key-123"
 
-# Then query by specific ID
+# 然后按指定 ID 查询
 curl -X GET "http://localhost:8848/api/v1/memories/1?user_id=user-123&agent_id=agent-456" \
   -H "X-API-Key: test-api-key-123"
 ```
@@ -668,11 +668,11 @@ curl -X GET "http://localhost:8848/api/v1/memories/1?user_id=user-123&agent_id=a
 
 **请求示例**:
 ```bash
-# First, list all memories to see available IDs
+# 先列出所有记忆以查看可用 ID
 curl -X GET "http://localhost:8848/api/v1/memories?user_id=user-123&agent_id=agent-456" \
   -H "X-API-Key: test-api-key-123"
 
-# Update content
+# 更新内容
 curl -X PUT "http://localhost:8848/api/v1/memories/658958031962243072" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -682,7 +682,7 @@ curl -X PUT "http://localhost:8848/api/v1/memories/658958031962243072" \
     "agent_id": "agent-456"
   }'
 
-# Update metadata
+# 更新 metadata
 curl -X PUT "http://localhost:8848/api/v1/memories/658958031962243072" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -696,7 +696,7 @@ curl -X PUT "http://localhost:8848/api/v1/memories/658958031962243072" \
     "agent_id": "agent-456"
   }'
 
-# Update both content and metadata
+# 同时更新内容和 metadata
 curl -X PUT "http://localhost:8848/api/v1/memories/658958031962243072" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1002,7 +1002,7 @@ curl -X DELETE "http://localhost:8848/api/v1/memories/batch" \
 
 **请求示例**:
 ```bash
-# First, create some data
+# 先创建一些数据
 curl -X POST "http://localhost:8848/api/v1/memories"   -H "X-API-Key: test-api-key-123"   -H "Content-Type: application/json"   -d '{
     "content": "User likes coffee and goes to Starbucks every morning",
     "user_id": "user-123",
@@ -1021,7 +1021,7 @@ curl -X POST "http://localhost:8848/api/v1/memories"   -H "X-API-Key: test-api-k
     "infer": true
   }'
 
-# Search
+# 搜索
 curl -X POST "http://localhost:8848/api/v1/memories/search" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1169,7 +1169,7 @@ curl -X POST "http://localhost:8848/api/v1/memories/search" \
 
 **请求示例**:
 ```bash
-# Add messages and extract profile (default: only extract from user messages)
+# 添加消息并提取档案（默认仅从 user 消息提取）
 curl -X POST "http://localhost:8848/api/v1/users/user-123/profile" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1186,7 +1186,7 @@ curl -X POST "http://localhost:8848/api/v1/users/user-123/profile" \
     "infer": true
   }'
 
-# Extract structured topics
+# 提取结构化 topic
 curl -X POST "http://localhost:8848/api/v1/users/user-123/profile" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1199,7 +1199,7 @@ curl -X POST "http://localhost:8848/api/v1/users/user-123/profile" \
     "strict_mode": false
   }'
 
-# Include all messages (disable role filtering)
+# 包含所有消息（禁用角色过滤）
 curl -X POST "http://localhost:8848/api/v1/users/user-123/profile" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1667,7 +1667,7 @@ curl -X GET "http://localhost:8848/api/v1/agents/agent-456/memories?limit=20&off
 
 **请求示例**:
 ```bash
-# Share all memories
+# 共享所有记忆
 curl -X POST "http://localhost:8848/api/v1/agents/agent-456/memories/share" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1675,7 +1675,7 @@ curl -X POST "http://localhost:8848/api/v1/agents/agent-456/memories/share" \
     "target_agent_id": "agent-789"
   }'
 
-# Share specific memories
+# 共享指定记忆
 curl -X POST "http://localhost:8848/api/v1/agents/agent-456/memories/share" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1765,10 +1765,10 @@ curl -X GET "http://localhost:8848/api/v1/agents/agent-789/memories/share?limit=
 
 **示例**:
 ```bash
-# No API Key
+# 无 API Key
 curl -X GET "http://localhost:8848/api/v1/memories"
 
-# Response
+# 响应
 {
   "success": false,
   "error": {
@@ -1789,13 +1789,13 @@ curl -X GET "http://localhost:8848/api/v1/memories"
 
 **示例**：
 ```bash
-# Send 200 requests quickly
+# 快速发送 200 个请求
 for i in {1..200}; do
   curl -X GET "http://localhost:8848/api/v1/memories" \
     -H "X-API-Key: test-api-key-123" &
 done
 
-# Response (when rate limit exceeded)
+# 响应（超过限流时）
 {
   "success": false,
   "error": {
@@ -1819,7 +1819,7 @@ done
 
 **示例**:
 ```bash
-# Missing required field
+# 缺少必填字段
 curl -X POST "http://localhost:8848/api/v1/memories" \
   -H "X-API-Key: test-api-key-123" \
   -H "Content-Type: application/json" \
@@ -1827,7 +1827,7 @@ curl -X POST "http://localhost:8848/api/v1/memories" \
     "user_id": "user-123"
   }'
 
-# Response
+# 响应
 {
   "success": false,
   "error": {
@@ -1865,11 +1865,11 @@ curl -X POST "http://localhost:8848/api/v1/memories" \
 ### 响应时间测试 {#response-time-testing}
 使用工具测量端点的响应时间：
 ```bash
-# Using curl to measure response time
+# 使用 curl 测量响应时间
 time curl -X GET "http://localhost:8848/api/v1/memories" \
   -H "X-API-Key: test-api-key-123"
 
-# Using httpie
+# 使用 httpie
 http --timeout=5 GET "http://localhost:8848/api/v1/memories" \
   X-API-Key:test-api-key-123
 ```
@@ -1878,11 +1878,11 @@ http --timeout=5 GET "http://localhost:8848/api/v1/memories" \
 ### 并发测试 {#concurrent-testing}
 使用工具进行并发负载测试：
 ```bash
-# Using Apache Bench
+# 使用 Apache Bench
 ab -n 1000 -c 10 -H "X-API-Key: test-api-key-123" \
   http://localhost:8848/api/v1/memories
 
-# Using wrk
+# 使用 wrk
 wrk -t4 -c100 -d30s -H "X-API-Key: test-api-key-123" \
   http://localhost:8848/api/v1/memories
 ```

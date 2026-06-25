@@ -441,13 +441,13 @@ Python 应用的主要接口：
 ```python
 from powermem import Memory, create_memory
 
-# Simple creation
+# 简单创建
 memory = create_memory()
 
-# Add memory
+# 添加记忆
 memory.add("User prefers Python programming", user_id="user123")
 
-# Search memories
+# 搜索记忆
 results = memory.search("programming preferences", user_id="user123")
 ```
 ### MCP Server {#mcp-server}
@@ -478,7 +478,7 @@ Agents 可以通过以下方式协作：
 - **Collaborative Memory**: 通过 Agent 交互创建的记忆
 - **Group Consensus**: 由多个 Agent 验证的记忆
 
-### Memory Scopes {#memory-scopes}
+### Memory 作用域 {#memory-scopes}
 
 系统支持不同的记忆范围：
 

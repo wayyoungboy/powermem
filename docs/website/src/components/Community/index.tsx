@@ -5,6 +5,7 @@ import Heading from '@theme/Heading';
 import GitHubIcon from './icons/GitHubIcon';
 import DiscordIcon from './icons/DiscordIcon';
 import XIcon from './icons/XIcon';
+import {localizedPath} from '../../utils/localizedPath';
 import styles from './styles.module.css';
 
 const communityLinks = [
@@ -100,7 +101,7 @@ export default function Community() {
             {t('community.contribute')}
           </p>
           <Link
-            to="/community"
+            to={localizedPath('/community', isZh)}
             className={styles.footerLink}
           >
             {t('community.learnMore')}

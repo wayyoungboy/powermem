@@ -15,13 +15,13 @@ from langchain_openai import ChatOpenAI
 from powermem import Memory, auto_config
 from typing import List, Dict, Any
 
-# Create powermem instance
+# 创建 PowerMem 实例
 config = auto_config()
 powermem = Memory(config=config)
 
-# Custom memory class for PowerMem integration
+# 用于 PowerMem 集成的自定义记忆类
 class PowermemMemory:
-    """Custom memory class that integrates PowerMem with LangChain 1.1.0+."""
+    """将 PowerMem 与 LangChain 1.1.0+ 集成的自定义记忆类。"""
 
     def __init__(self, powermem_instance, user_id: str):
         self.powermem = powermem_instance
@@ -29,15 +29,15 @@ class PowermemMemory:
         self.messages: List[BaseMessage] = []
 
     def add_message(self, message: BaseMessage):
-        """Add a message to conversation history."""
+        """向对话历史添加消息。"""
         self.messages.append(message)
 
     def get_messages(self) -> List[BaseMessage]:
-        """Get all conversation messages."""
+        """获取所有对话消息。"""
         return self.messages
 
     def save_to_powermem(self, user_input: str, assistant_output: str):
-        """Save conversation to PowerMem with intelligent fact extraction."""
+        """使用智能事实提取将对话保存到 PowerMem。"""
         messages = [
             {"role": "user", "content": user_input},
             {"role": "assistant", "content": assistant_output}
@@ -45,11 +45,11 @@ class PowermemMemory:
         self.powermem.add(
             messages=messages,
             user_id=self.user_id,
-            infer=True  # Enable intelligent fact extraction
+            infer=True  # 启用智能事实提取
         )
 
     def get_context(self, query: str) -> str:
-        """Retrieve relevant context from PowerMem."""
+        """从 PowerMem 检索相关上下文。"""
         results = self.powermem.search(
             query=query,
             user_id=self.user_id,
@@ -66,20 +66,20 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 
-# Initialize components
+# 初始化组件
 llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
 memory = PowermemMemory(powermem, user_id="user123")
 
-# Create prompt template
+# 创建 Prompt 模板
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful assistant. Use the following context to provide personalized responses."),
     MessagesPlaceholder(variable_name="history"),
     ("human", "{input}")
 ])
 
-# Build the chain with context retrieval
+# 构建带上下文检索的链
 def format_messages(input_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Retrieve context and format messages."""
+    """检索上下文并格式化消息。"""
     user_input = input_dict.get("input", "")
     context = memory.get_context(user_input)
     messages = memory.get_messages()
@@ -95,14 +95,14 @@ def format_messages(input_dict: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"history": formatted_history, "input": user_input}
 
-# Create the chain using LCEL
+# 使用 LCEL 创建链
 chain = (
     RunnableLambda(format_messages)
     | prompt
     | llm
 )
 
-# Use the chain
+# 使用链
 user_input = "Hello, I'm Alice"
 memory.add_message(HumanMessage(content=user_input))
 
@@ -124,27 +124,27 @@ from langchain_openai import ChatOpenAI
 from powermem import Memory, auto_config
 from typing import TypedDict, Annotated, List
 
-# Create powermem instance
+# 创建 PowerMem 实例
 config = auto_config()
 powermem = Memory(config=config)
 
-# Define state schema
+# 定义状态 schema
 class ConversationState(TypedDict):
     messages: Annotated[List[BaseMessage], "Conversation messages"]
     user_id: str
     context: dict
 
-# Initialize LLM
+# 初始化 LLM
 llm = ChatOpenAI(model="gpt-3.5-turbo")
 
-# Define nodes
+# 定义节点
 def load_context(state: ConversationState) -> ConversationState:
-    """Load relevant context from PowerMem."""
+    """从 PowerMem 加载相关上下文。"""
     user_id = state["user_id"]
     last_message = state["messages"][-1] if state["messages"] else None
     query = last_message.content if last_message else ""
 
-    # Search PowerMem
+    # 搜索 PowerMem
     results = powermem.search(query=query, user_id=user_id, limit=5)
     state["context"] = {
         "memories": [mem.get('memory', '') for mem in results.get('results', [])]
@@ -152,7 +152,7 @@ def load_context(state: ConversationState) -> ConversationState:
     return state
 
 def generate_response(state: ConversationState) -> ConversationState:
-    """Generate response using LLM."""
+    """使用 LLM 生成响应。"""
     last_message = state["messages"][-1]
     context_str = "\n".join(state["context"].get("memories", []))
 
@@ -167,7 +167,7 @@ Assistant:"""
     return state
 
 def save_conversation(state: ConversationState) -> ConversationState:
-    """Save conversation to PowerMem."""
+    """将对话保存到 PowerMem。"""
     messages = state["messages"]
     if len(messages) >= 2:
         user_msg = messages[-2]
@@ -183,7 +183,7 @@ def save_conversation(state: ConversationState) -> ConversationState:
         )
     return state
 
-# Build the graph
+# 构建图
 workflow = StateGraph(ConversationState)
 workflow.add_node("load_context", load_context)
 workflow.add_node("generate_response", generate_response)
@@ -196,7 +196,7 @@ workflow.add_edge("save_conversation", END)
 
 app = workflow.compile()
 
-# Use the graph
+# 使用图
 initial_state = {
     "messages": [HumanMessage(content="Hello, I'm Alice")],
     "user_id": "user123",
@@ -263,13 +263,13 @@ async def async_example():
     async_memory = AsyncMemory(config=config)
     await async_memory.initialize()
 
-    # Add memory
+    # 添加记忆
     await async_memory.add(
         messages="User preference",
         user_id="user123"
     )
 
-    # Search
+    # 搜索
     results = await async_memory.search(
         query="preferences",
         user_id="user123"
@@ -277,7 +277,7 @@ async def async_example():
 
     return results
 
-# Run async
+# 运行异步流程
 results = asyncio.run(async_example())
 ```
 ## 自定义 LLM 集成 {#custom-llm-integration}
@@ -292,7 +292,7 @@ class CustomLLM(LLMBase):
         self.model = config.get('model', 'default')
 
     def generate(self, prompt, **kwargs):
-        # Your custom LLM implementation
+        # 您的自定义 LLM 实现
         response = your_llm_client.generate(
             prompt=prompt,
             model=self.model,
@@ -301,7 +301,7 @@ class CustomLLM(LLMBase):
         return response
 
     def extract_facts(self, messages):
-        # Custom fact extraction logic
+        # 自定义事实提取逻辑
         facts = your_custom_extractor(messages)
         return facts
 ```
@@ -317,7 +317,7 @@ class CustomEmbedder(EmbedderBase):
         self.model = config.get('model', 'default')
 
     def embed(self, text):
-        # Your custom embedding implementation
+        # 您的自定义 Embedding 实现
         embedding = your_embedding_client.embed(
             text=text,
             model=self.model,
@@ -326,7 +326,7 @@ class CustomEmbedder(EmbedderBase):
         return embedding
 
     def embed_batch(self, texts):
-        # Batch embedding
+        # 批量 Embedding
         embeddings = []
         for text in texts:
             embeddings.append(self.embed(text))
@@ -343,7 +343,7 @@ class CustomVectorStore(VectorStoreBase):
         self.connection = your_database_connect(config)
 
     def add(self, memory, embedding, metadata):
-        # Your custom storage implementation
+        # 您的自定义存储实现
         self.connection.insert({
             'memory': memory,
             'embedding': embedding,
@@ -351,7 +351,7 @@ class CustomVectorStore(VectorStoreBase):
         })
 
     def search(self, query_embedding, limit, filters):
-        # Your custom search implementation
+        # 您的自定义搜索实现
         results = self.connection.similarity_search(
             query_embedding=query_embedding,
             limit=limit,
@@ -374,7 +374,7 @@ EMBEDDING_MODEL=text-embedding-3-large
 ```python
 from powermem import create_memory
 
-memory = create_memory()  # Auto-loads OpenAI config from .env
+memory = create_memory()  # 自动从 .env 加载 OpenAI 配置
 ```
 ## Anthropic 集成 {#anthropic-integration}
 
@@ -388,7 +388,7 @@ LLM_MODEL=claude-3-opus-20240229
 ```python
 from powermem import create_memory
 
-memory = create_memory()  # Auto-loads Anthropic config
+memory = create_memory()  # 自动加载 Anthropic 配置
 ```
 ## Qwen 集成 {#qwen-integration}
 
@@ -405,7 +405,7 @@ EMBEDDING_MODEL=text-embedding-v4
 ```python
 from powermem import create_memory
 
-memory = create_memory()  # Auto-loads Qwen config
+memory = create_memory()  # 自动加载 Qwen 配置
 ```
 ## 最佳实践 {#best-practices}
 

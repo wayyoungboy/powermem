@@ -1,3 +1,8 @@
+---
+title: Multi-Agent 指南
+sidebar_label: Multi-Agent 指南
+---
+
 ## 前置条件 {#prerequisites}
 
 - Python 3.11+
@@ -57,7 +62,7 @@ Multi-Agent Memory 允许为不同的 AI Agent 创建独立的记忆空间，同
 ```python
 from powermem import Memory
 
-# Define configuration as a dictionary (JSON-like format)
+# 将配置定义为字典（类似 JSON 的格式）
 config = {
     'llm': {
         'provider': 'qwen',
@@ -92,7 +97,7 @@ config = {
     }
 }
 
-# Create multiple agents with the same configuration
+# 使用相同配置创建多个 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
@@ -105,7 +110,7 @@ print("✓ Created agents with JSON config!")
 > - 相同的配置可以重复用于所有 Agent 以确保一致性
 > - 确保包含所有必需字段（`llm`、`embedder`、`vector_store`），以及它们各自的 `provider` 和 `config` 部分
 
-## 理解Multi-Agent 记忆架构 {#understanding-multi-agent-memory-architecture}
+## 理解 Multi-Agent 记忆架构 {#understanding-multi-agent-memory-architecture}
 
 PowerMem中的Multi-Agent 记忆基于以下几个关键原则：
 
@@ -170,7 +175,7 @@ from powermem import Memory, auto_config
 
 config = auto_config()
 
-# Create memory instances for different agents
+# 为不同 Agent 创建 Memory 实例
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
@@ -214,26 +219,26 @@ from powermem import Memory, auto_config
 config = auto_config()
 customer_id = "customer_12345"
 
-# Create agents
+# 创建 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
-# Support agent adds memory
+# 客服 Agent 添加记忆
 support_agent.add(
     "Customer prefers email support over phone calls",
     user_id=customer_id,
     metadata={"category": "communication_preference"}
 )
 
-# Sales agent adds memory
+# 销售 Agent 添加记忆
 sales_agent.add(
     "Customer interested in AI-powered features and automation",
     user_id=customer_id,
     metadata={"category": "product_interest"}
 )
 
-# Technical agent adds memory
+# 技术 Agent 添加记忆
 tech_agent.add(
     "Customer uses Python and PostgreSQL in their tech stack",
     user_id=customer_id,
@@ -286,11 +291,11 @@ from powermem import Memory, auto_config
 config = auto_config()
 customer_id = "customer_12345"
 
-# Create agents
+# 创建 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 
-# Add memories
+# 添加记忆
 support_agent.add(
     "Customer prefers email support",
     user_id=customer_id
@@ -300,7 +305,7 @@ sales_agent.add(
     user_id=customer_id
 )
 
-# Support agent searches their memories
+# 客服 Agent 搜索自己的记忆
 print("Support Agent Search:")
 support_results = support_agent.search(
     query="customer preferences",
@@ -310,7 +315,7 @@ support_results = support_agent.search(
 for result in support_results.get('results', []):
     print(f"  - {result['memory']}")
 
-# Sales agent searches their memories
+# 销售 Agent 搜索自己的记忆
 print("\nSales Agent Search:")
 sales_results = sales_agent.search(
     query="customer interests",
@@ -370,22 +375,22 @@ from powermem import Memory, auto_config
 config = auto_config()
 customer_id = "customer_12345"
 
-# Create agents
+# 创建 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
-# Add memories for each agent
+# 为每个 Agent 添加记忆
 support_agent.add("Customer prefers email support", user_id=customer_id)
 sales_agent.add("Customer interested in AI features", user_id=customer_id)
 tech_agent.add("Customer uses Python and PostgreSQL", user_id=customer_id)
 
-# Cross-agent search (no agent_id filter)
+# 跨 Agent 搜索（不加 agent_id 过滤）
 print("Cross-Agent Search:")
 all_results = support_agent.search(
     query="customer information",
     user_id=customer_id
-    # No agent_id - searches all agents
+    # 不传 agent_id：搜索所有 Agent 的记忆
 )
 
 print(f"Found {len(all_results.get('results', []))} memories across all agents:")
@@ -406,7 +411,7 @@ for result in all_results.get('results', []):
 3. **项目范围搜索**：在所有 Agent 的记忆中搜索特定项目
 4. **元数据组织**：使用元数据按项目的不同方面对记忆进行分类
 
-### 使用run_id进行项目组织 {#using-run_id-for-project-organization}
+### 使用 run_id 进行项目组织 {#using-run_id-for-project-organization}
 
 `run_id`参数允许您：
 
@@ -436,12 +441,12 @@ from powermem import Memory, auto_config
 config = auto_config()
 project_id = "project_ai_platform"
 
-# Create developer agents
+# 创建开发者 Agent
 alice_dev = Memory(config=config, agent_id="alice_dev")
 bob_dev = Memory(config=config, agent_id="bob_dev")
 charlie_qa = Memory(config=config, agent_id="charlie_qa")
 
-# Alice adds development memory
+# Alice 添加开发记忆
 alice_dev.add(
     "Implemented user authentication module with JWT tokens",
     user_id="alice",
@@ -449,7 +454,7 @@ alice_dev.add(
     metadata={"scope": "development", "module": "authentication"}
 )
 
-# Bob adds development memory
+# Bob 添加开发记忆
 bob_dev.add(
     "Created database schema for user profiles",
     user_id="bob",
@@ -457,7 +462,7 @@ bob_dev.add(
     metadata={"scope": "development", "module": "database"}
 )
 
-# Charlie adds QA memory
+# Charlie 添加 QA 记忆
 charlie_qa.add(
     "Found critical bug in user registration flow",
     user_id="charlie",
@@ -465,7 +470,7 @@ charlie_qa.add(
     metadata={"scope": "testing", "issue_type": "bug"}
 )
 
-# Search project-wide memories
+# 搜索项目范围内的记忆
 print("Project Status Search:")
 project_results = alice_dev.search(
     query="project status and progress",
@@ -527,10 +532,10 @@ from powermem import Memory, auto_config
 
 config = auto_config()
 
-# Create agent
+# 创建 Agent
 agent = Memory(config=config, agent_id="demo_agent")
 
-# Add memories with different scopes
+# 添加不同 scope 的记忆
 agent.add(
     "Agent-specific memory",
     user_id="user123",
@@ -549,8 +554,8 @@ agent.add(
     metadata={"scope": "GROUP"}
 )
 
-# Search by scope using filters parameter
-# Note: For nested metadata fields, use the key path like "metadata.scope"
+# 使用 filters 参数按范围搜索
+# 注意：嵌套 metadata 字段需要使用类似 "metadata.scope" 的 key path
 print("Agent-scoped memories:")
 results = agent.search(
     query="memories",
@@ -560,7 +565,7 @@ results = agent.search(
 for result in results.get('results', []):
     print(f"  - {result['memory']}")
 
-# Alternative: Search all memories and filter in Python
+# 替代方案：搜索所有记忆后在 Python 中过滤
 print("\nAll memories:")
 all_results = agent.search(
     query="memories",
@@ -624,23 +629,23 @@ from powermem import Memory, auto_config
 config = auto_config()
 user_id = "user123"
 
-# Create two agents
+# 创建两个 Agent
 agent1 = Memory(config=config, agent_id="agent1")
 agent2 = Memory(config=config, agent_id="agent2")
 
-# Agent1 adds memory
+# Agent1 添加记忆
 agent1.add("Agent1's memory", user_id=user_id)
 
-# Agent2 adds memory
+# Agent2 添加记忆
 agent2.add("Agent2's memory", user_id=user_id)
 
-# Agent1 searches (should only see their own)
+# Agent1 搜索（应只看到自己的记忆）
 print("Agent1 search:")
 results1 = agent1.search(query="memories", user_id=user_id, agent_id="agent1")
 for result in results1.get('results', []):
     print(f"  - {result['memory']}")
 
-# Agent2 searches (should only see their own)
+# Agent2 搜索（应只看到自己的记忆）
 print("\nAgent2 search:")
 results2 = agent2.search(query="memories", user_id=user_id, agent_id="agent2")
 for result in results2.get('results', []):
@@ -688,29 +693,29 @@ PowerMem 中的Multi-Agent 记忆提供了一种强大的方式来管理多个AI
 
 **模式1：客户支持系统**
 ```python
-# Multiple agents for different aspects
+# 针对不同业务面创建多个 Agent
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
-# Each agent maintains their own context
-# Cross-agent search for comprehensive customer view
+# 每个 Agent 维护自己的上下文
+# 跨 Agent 搜索，获得完整客户视图
 ```
 **模式 2：开发团队**
 ```python
-# Multiple developers on same project
+# 多个开发者协作同一项目
 dev_agent = Memory(config=config, agent_id="dev_agent")
 qa_agent = Memory(config=config, agent_id="qa_agent")
 
-# Use run_id to group by project
-# Cross-agent search for project-wide context
+# 使用 run_id 按项目分组
+# 跨 Agent 搜索项目级上下文
 ```
 **模式 3：企业部门**
 ```python
-# Different departments
+# 不同部门
 hr_agent = Memory(config=config, agent_id="hr_agent")
 finance_agent = Memory(config=config, agent_id="finance_agent")
 
-# Isolated memories with selective sharing
-# Use scopes for access control
+# 隔离记忆并按需共享
+# 使用 scope 做访问控制
 ```
