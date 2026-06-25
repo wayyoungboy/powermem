@@ -147,7 +147,7 @@ from powermem import create_memory
 # 从环境变量自动加载 Prompt
 memory = create_memory()
 ```
-> **注意：** 在 `.env` 文件中使用多行提示时，请使用单行格式或以编程方式加载值。环境变量配置最适合用于短的单行提示覆盖，或在配置文件不方便的部署环境中使用。
+> **注意：** 在 `.env` 文件中使用多行 prompt 时，请使用单行格式或以编程方式加载值。环境变量配置最适合用于短的单行 prompt 覆盖，或在配置文件不方便的部署环境中使用。
 
 ### 方法 3：使用字典配置 {#method-3-using-dictionary-configuration}
 ```python
