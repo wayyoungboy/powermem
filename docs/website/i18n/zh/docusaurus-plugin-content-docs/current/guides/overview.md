@@ -11,10 +11,10 @@
 - **[集成指南](./0009-integrations.md)** - 第三方集成（LangChain、LangGraph、FastAPI、自定义提供商）
 - **[子存储指南](./0006-sub_stores.md)** - 高级子存储配置
 - **[多模态功能](../examples/scenario_7_multimodal.md)** - 图像和多媒体处理
-- **[UserMemory 指南](./0010-user_memory.md)** - 用户配置文件管理和提取
+- **[UserMemory 使用指南](./0010-user_memory.md)** - 用户配置文件管理和提取
 - **[稀疏向量指南](./0011-sparse_vector.md)** - 稀疏向量配置、升级和迁移
 - **[CLI 使用指南](./0012-cli_usage.md)** - PowerMem CLI (pmem) 使用和参考（1.0.0+）
-- **[Web Dashboard 指南](./0013-dashboard.md)** - 可视化界面，用于记忆检查、分析和系统监控
+- **[Web Dashboard 使用指南](./0013-dashboard.md)** - 可视化界面，用于记忆检查、分析和系统监控
 
 ## 生态系统集成 {#ecosystem-integrations}
 
@@ -36,7 +36,7 @@
 - **集成？** 查看 [集成指南](./0009-integrations.md)
 - **使用 Claude Code 或 IDE？** 查看 [生态系统集成](../integrations/overview.md)
 - **多模态？** 查看 [多模态功能](../examples/scenario_7_multimodal.md)
-- **用户配置文件？** 查看 [UserMemory 指南](./0010-user_memory.md)
+- **用户配置文件？** 查看 [UserMemory 使用指南](./0010-user_memory.md)
 - **稀疏向量？** 查看 [稀疏向量指南](./0011-sparse_vector.md)
 - **CLI (pmem)？** 查看 [CLI 使用指南](./0012-cli_usage.md)
-- **Web Dashboard？** 查看 [Web Dashboard 指南](./0013-dashboard.md)
+- **Web Dashboard？** 查看 [Web Dashboard 使用指南](./0013-dashboard.md)

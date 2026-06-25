@@ -1,9 +1,9 @@
 ---
-title: PowerMem Web Dashboard 指南
-sidebar_label: Web Dashboard 指南
+title: PowerMem Web Dashboard 使用指南
+sidebar_label: Web Dashboard 使用指南
 ---
 
-# PowerMem Web Dashboard 指南 {#powermem-web-dashboard-guide}
+# PowerMem Web Dashboard 使用指南 {#powermem-web-dashboard-guide}
 
 PowerMem Web Dashboard 提供了一个可视化界面，用于检查、管理和监控您的 AI Agent 记忆。它随 HTTP API 服务器一起提供，支持实时分析、记忆的 CRUD 操作、用户配置文件检查以及系统健康监控。
 

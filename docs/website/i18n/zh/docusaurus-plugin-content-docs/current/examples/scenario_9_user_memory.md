@@ -692,6 +692,6 @@ Custom filtering (user + system, exclude tool):
 ```
 ## 相关文档 {#related-documents}
 
-- [UserMemory 指南](../guides/0010-user_memory.md) - 有关 UserMemory 功能的详细指南
+- [UserMemory 使用指南](../guides/0010-user_memory.md) - 有关 UserMemory 功能的详细指南
 - [快速开始](scenario_1_basic_usage.md) - 学习 PowerMem 的基础知识
 - [Multi-Agent 指南](scenario_3_multi_agent.md) - 使用多个 Agent 与记忆

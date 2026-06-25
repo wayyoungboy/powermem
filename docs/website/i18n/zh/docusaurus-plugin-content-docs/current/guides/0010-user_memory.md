@@ -1,9 +1,9 @@
 ---
-title: UserMemory 指南
-sidebar_label: UserMemory 指南
+title: UserMemory 使用指南
+sidebar_label: UserMemory 使用指南
 ---
 
-# UserMemory 指南 {#usermemory-guide}
+# UserMemory 使用指南 {#usermemory-guide}
 
 UserMemory 是 PowerMem 的高级用户档案管理模块。它能够自动从对话中提取并维护用户档案信息，同时管理对话事件记忆。
 
