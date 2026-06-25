@@ -251,7 +251,11 @@ func stdinHook() {
 		payload["_powermem_precompact_end_byte"] = snapshot.EndByte
 		payload["_powermem_precompact_max_chars"] = maxPreCompactChars()
 		payload["_powermem_precompact_max_lines"] = maxPreCompactLines()
-		spawnMapPayloadWorker("worker-precompact", payload)
+		handoff := prepareMapPayloadHandoff(payload, report)
+		if handoff == nil {
+			return
+		}
+		spawnMapPayloadWorker("worker-precompact", handoff)
 	case "PostToolUse":
 		if !captureToolSuccess() {
 			return
@@ -289,12 +293,20 @@ func stdinHook() {
 		if !captureSubagents() {
 			return
 		}
-		spawnMapPayloadWorker("worker-lifecycle", payload)
+		handoff := prepareMapPayloadHandoff(payload, scrubReport{})
+		if handoff == nil {
+			return
+		}
+		spawnMapPayloadWorker("worker-lifecycle", handoff)
 	case "TaskCreated", "TaskCompleted":
 		if !captureTasks() {
 			return
 		}
-		spawnMapPayloadWorker("worker-lifecycle", payload)
+		handoff := prepareMapPayloadHandoff(payload, scrubReport{})
+		if handoff == nil {
+			return
+		}
+		spawnMapPayloadWorker("worker-lifecycle", handoff)
 	}
 }
 
@@ -957,6 +969,8 @@ func workerPreCompact() {
 	if payload == nil {
 		return
 	}
+	parentReport := decodeScrubReport(stringField(payload, preparedParentScrubReportKey))
+	delete(payload, preparedParentScrubReportKey)
 	path := stringField(payload, "transcript_path")
 	if path == "" {
 		return
@@ -994,7 +1008,7 @@ func workerPreCompact() {
 	if custom := stringField(payload, "custom_instructions"); custom != "" {
 		meta["custom_instructions"] = custom
 	}
-	if err := postMemory(content, meta, &runID, inferPreCompact()); err != nil {
+	if err := postMemoryWithScrubReport(content, meta, &runID, inferPreCompact(), parentReport); err != nil {
 		os.Exit(1)
 	}
 }
@@ -1175,6 +1189,28 @@ func scrubPayloadReportForHandoff(v any) (scrubReport, bool) {
 		return report, false
 	}
 	return report, true
+}
+
+func prepareMapPayloadHandoff(payload map[string]any, parentReport scrubReport) map[string]any {
+	if payload == nil {
+		return nil
+	}
+	if shouldBlockWrite(loadHookPrivacyConfig(), parentReport) {
+		return nil
+	}
+	scrubbed, report, ok := scrubValueForHandoffWithReport(payload)
+	if !ok {
+		return nil
+	}
+	parentReport.merge(report)
+	handoff, ok := scrubbed.(map[string]any)
+	if !ok {
+		return nil
+	}
+	if encoded := encodeScrubReport(parentReport); encoded != "" {
+		handoff[preparedParentScrubReportKey] = encoded
+	}
+	return handoff
 }
 
 func buildToolEventPost(payload map[string]any) (string, map[string]any, string, bool, bool) {
@@ -1380,6 +1416,8 @@ func workerLifecycleEvent() {
 	if payload == nil {
 		return
 	}
+	parentReport := decodeScrubReport(stringField(payload, preparedParentScrubReportKey))
+	delete(payload, preparedParentScrubReportKey)
 	eventName := stringField(payload, "hook_event_name")
 	if eventName == "" {
 		return
@@ -1390,7 +1428,6 @@ func workerLifecycleEvent() {
 	kind := eventKind(eventName)
 	content := lifecycleContent(eventName, sid, cwd, payload)
 	infer := inferLifecycleEvent(eventName)
-	parentReport := scrubReport{}
 	rawPayload, report, ok := scrubValueForHandoffWithReport(payload)
 	if !ok {
 		return
@@ -1410,6 +1447,10 @@ func workerLifecycleEvent() {
 	copyStringMeta(meta, payload, "agent_id", "agent_id", "agentId", "subagent_id", "subagentId")
 	copyStringMeta(meta, payload, "agent_type", "agent_type", "agentType", "subagent_type", "subagentType")
 	copyStringMeta(meta, payload, "task_id", "task_id", "taskId")
+	copyStringMeta(meta, payload, "task_subject", "task_subject", "taskSubject")
+	copyStringMeta(meta, payload, "task_description", "task_description", "taskDescription")
+	copyStringMeta(meta, payload, "teammate_name", "teammate_name", "teammateName")
+	copyStringMeta(meta, payload, "team_name", "team_name", "teamName")
 	copyStringMeta(meta, payload, "tool_use_id", "tool_use_id", "toolUseID", "toolUseId")
 	copyStringMeta(meta, payload, "status", "status")
 	if usage := firstAny(payload, "token_usage", "tokenUsage", "usage"); usage != nil {
@@ -1800,7 +1841,7 @@ func lifecycleContent(eventName string, sid string, cwd string, payload map[stri
 	parts := []string{
 		fmt.Sprintf("Claude Code lifecycle event (event=%s, session_id=%s, cwd=%s)", eventName, sid, cwd),
 	}
-	for _, key := range []string{"agent_id", "agentId", "subagent_id", "subagentId", "agent_type", "agentType", "task_id", "taskId", "status", "description", "subject"} {
+	for _, key := range []string{"agent_id", "agentId", "subagent_id", "subagentId", "agent_type", "agentType", "task_id", "taskId", "task_subject", "taskSubject", "task_description", "taskDescription", "teammate_name", "teammateName", "team_name", "teamName", "status", "description", "subject"} {
 		if s := stringField(payload, key); s != "" {
 			parts = append(parts, key+": "+truncateText(s, 2000))
 		}

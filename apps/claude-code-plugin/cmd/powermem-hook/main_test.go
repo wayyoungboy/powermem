@@ -172,6 +172,51 @@ func TestPrepareToolEventHandoffBlocksRawPayloadSecret(t *testing.T) {
 	}
 }
 
+func TestPrepareMapPayloadHandoffScrubsBeforeWorkerPayloadFile(t *testing.T) {
+	setHookScrubForTest(t, true)
+
+	handoff := prepareMapPayloadHandoff(map[string]any{
+		"hook_event_name":       "TaskCompleted",
+		"session_id":            "session-lifecycle",
+		"cwd":                   "/workspace/project",
+		"transcript_path":       "/workspace/project/transcript.jsonl",
+		"task_id":               "task-unit",
+		"task_subject":          "Review handoff behavior",
+		"task_description":      "Validate " + unitSecret + " is scrubbed before writing payload files.",
+		"agent_transcript_path": "/workspace/project/agent-transcript.jsonl",
+	}, scrubReport{})
+	if handoff == nil {
+		t.Fatal("expected scrubbed lifecycle handoff")
+	}
+	requireNoUnitSecret(t, handoff)
+	b, err := json.Marshal(handoff)
+	if err != nil {
+		t.Fatalf("marshal handoff: %v", err)
+	}
+	if strings.Contains(string(b), "/workspace/project") {
+		t.Fatalf("handoff leaked absolute path before worker payload file: %s", b)
+	}
+	if _, ok := handoff[preparedParentScrubReportKey]; !ok {
+		t.Fatalf("expected parent scrub report in handoff: %#v", handoff)
+	}
+}
+
+func TestPrepareMapPayloadHandoffBlocksBeforeWorkerPayloadFile(t *testing.T) {
+	setHookScrubForTest(t, true)
+	t.Setenv("POWERMEM_HOOK_SECRET_ACTION", "block")
+
+	handoff := prepareMapPayloadHandoff(map[string]any{
+		"hook_event_name":  "TaskCreated",
+		"session_id":       "session-block",
+		"task_id":          "task-block",
+		"task_subject":     "Block raw payload secret",
+		"task_description": "Do not write " + unitSecret + " to a worker payload file.",
+	}, scrubReport{})
+	if handoff != nil {
+		t.Fatalf("secret_action=block should skip worker handoff before temp file write: %#v", handoff)
+	}
+}
+
 func TestBuildToolEventPostCapturesAgentResponseLink(t *testing.T) {
 	setHookScrubForTest(t, true)
 	t.Setenv("POWERMEM_TOOL_SUCCESS_INCLUDE", "")
@@ -446,6 +491,25 @@ func TestEventKindUsesHookEventName(t *testing.T) {
 	for input, want := range cases {
 		if got := eventKind(input); got != want {
 			t.Fatalf("eventKind(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestLifecycleContentCapturesTaskSchemaFields(t *testing.T) {
+	content := lifecycleContent("TaskCompleted", "session-task", "/workspace/project", map[string]any{
+		"task_id":          "task-001",
+		"task_subject":     "Implement user authentication",
+		"task_description": "Add login and signup endpoints",
+		"teammate_name":    "implementer",
+	})
+	for _, want := range []string{
+		"task_id: task-001",
+		"task_subject: Implement user authentication",
+		"task_description: Add login and signup endpoints",
+		"teammate_name: implementer",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("lifecycle content %q did not include %q", content, want)
 		}
 	}
 }

@@ -717,6 +717,35 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
             self.assertIn("SubagentStop", request.body["content"])
             self.assert_no_sentinel(request.body, result.stdout, result.stderr)
 
+    def test_task_lifecycle_records_task_schema_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp_path = Path(raw_tmp)
+            payload = load_fixture_json("payloads/task_completed.json")
+            result = self.run_hook(payload, tmp_path)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            request = self.wait_for_request("/api/v1/memories", kind="task-completed")
+            self.wait_for_no_hook_workers()
+
+            metadata = request.body["metadata"]
+            self.assertFalse(request.body["infer"])
+            self.assertEqual(request.body["run_id"], "session-task-1045")
+            self.assertEqual(metadata["kind"], "task-completed")
+            self.assertEqual(metadata["event_name"], "TaskCompleted")
+            self.assertEqual(metadata["task_id"], "task-1045")
+            self.assertEqual(
+                metadata["task_subject"],
+                "Review Claude hook lifecycle capture",
+            )
+            self.assertIn("Verify task lifecycle fields", metadata["task_description"])
+            self.assertEqual(metadata["teammate_name"], "implementer")
+            self.assertIn("task_subject", request.body["content"])
+            self.assertIn("Review Claude hook lifecycle capture", request.body["content"])
+            self.assertIn("task_description", request.body["content"])
+            self.assertIn("Verify task lifecycle fields", request.body["content"])
+            self.assertNotIn("/workspace/project", str(metadata["raw_payload"]))
+            self.assert_no_sentinel(request.body, result.stdout, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
