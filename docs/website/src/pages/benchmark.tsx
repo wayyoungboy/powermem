@@ -25,7 +25,6 @@ const translations: Record<string, Record<string, string>> = {
     'benchmark.metrics.retrievalP95.baseline': 'baseline 17.12s, -91.6%',
     'benchmark.metrics.tokenUsage.baseline': 'baseline ~26k, -96.5%',
     'benchmark.scores.title': 'Mean Scores Per Category',
-    'benchmark.scores.overall': 'Overall Mean Scores',
     'benchmark.scores.bleu': 'BLEU Score',
     'benchmark.scores.f1': 'F1 Score',
     'benchmark.scores.llm': 'LLM Score',
@@ -68,7 +67,6 @@ const translations: Record<string, Record<string, string>> = {
     'benchmark.metrics.retrievalP95.baseline': 'baseline 17.12s, 降低 -91.6%',
     'benchmark.metrics.tokenUsage.baseline': 'baseline ~26k, 降低 -96.5%',
     'benchmark.scores.title': '分类平均评分',
-    'benchmark.scores.overall': '总体平均评分',
     'benchmark.scores.bleu': 'BLEU 评分',
     'benchmark.scores.f1': 'F1 评分',
     'benchmark.scores.llm': 'LLM 评分',
@@ -149,10 +147,6 @@ const categoryScores = [
   },
 ];
 
-const overallScores = {
-  llm_score: 0.8779,
-};
-
 function formatScore(num: number): string {
   return (num * 100).toFixed(2) + '%';
 }
@@ -194,19 +188,6 @@ export default function BenchmarkPage() {
                   <div className={styles.metricDetail}>{t(metric.baselineKey)}</div>
                 </div>
               ))}
-            </div>
-          </section>
-
-          {/* Overall Mean Scores */}
-          <section className={styles.section}>
-            <Heading as="h2" className={styles.sectionTitle}>
-              {t('benchmark.scores.overall')}
-            </Heading>
-            <div className={styles.overallGrid}>
-              <div className={`${styles.scoreCard} ${styles.scoreCardGreen}`}>
-                <div className={styles.scoreLabel}>{t('benchmark.scores.llm')}</div>
-                <div className={styles.scoreValue}>{formatScore(overallScores.llm_score)}</div>
-              </div>
             </div>
           </section>
 
