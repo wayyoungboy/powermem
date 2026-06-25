@@ -3,6 +3,12 @@
 ## Unreleased
 
 - **UserPromptSubmit:** `POWERMEM_PROMPT_SEARCH` defaults to **on** (`POST /api/v1/memories/search` + `additionalContext` per prompt). Set `0`, `false`, `no`, or `off` to disable.
+- **Codex hooks:** `.codex-plugin/plugin.json` now bundles `hooks/codex-hooks.json`
+  for `SessionStart`, `UserPromptSubmit`, `Stop`, and opt-in `PostToolUse`
+  integration with the shared `powermem-hook` runner.
+- **Codex controls:** `POWERMEM_CODEX_SESSION_SEARCH=0` disables session-start
+  recall, `POWERMEM_CODEX_STOP_SAVE=0` disables stop-summary writes, and
+  `POWERMEM_CODEX_POST_TOOL_SAVE=1` opts into tool-use summary writes.
 
 ## 0.1.0
 

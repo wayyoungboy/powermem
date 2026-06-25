@@ -9,9 +9,9 @@ the local `pmem` CLI) — there are no per-client schema rewrites.
 - **[Claude Code](./claude_code.md)** — Plugin (`memory-powermem`) with silent
   HTTP-mode capture via hooks and an optional MCP mode for in-chat
   `search_memories` / `add_memory` tools.
-- **[Codex CLI](./codex.md)** — Native `memory-powermem` plugin with
-  init/status/stop/reset skills and explicit `codex mcp add` wiring to the
-  managed PowerMem server.
+- **[Codex](./codex.md)** — Native `memory-powermem` plugin with
+  init/status/stop/reset skills, bundled lifecycle hooks, and explicit
+  `codex mcp add` wiring to the managed PowerMem server.
 - **[VS Code](./vs_code.md)** — First-party extension with setup UI, status bar,
   query/add commands, dashboard, and AI-tool config linking.
 - **[Cursor](./cursor.md)** — MCP setup through the VS Code extension, writing

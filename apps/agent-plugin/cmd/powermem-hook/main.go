@@ -1,4 +1,6 @@
-// powermem-hook: Claude Code hook — stdin JSON (SessionEnd / PostCompact) → background HTTP POST to PowerMem.
+// powermem-hook: Claude Code and Codex hook runner.
+// Claude events push transcripts/compact summaries; Codex events retrieve context
+// and can save compact turn summaries to PowerMem.
 // Cross-platform; zero runtime deps beyond the single binary.
 package main
 
@@ -29,6 +31,12 @@ func main() {
 			return
 		case "worker-compact":
 			workerCompact()
+			return
+		case "worker-codex-stop":
+			workerCodexStop()
+			return
+		case "worker-codex-tool":
+			workerCodexTool()
 			return
 		case "worker-file":
 			workerFile()
@@ -109,10 +117,10 @@ func scrubValue(v any) any {
 	}
 }
 
-func spawnWorker(mode string, envExtra map[string]string) {
+func spawnWorker(mode string, envExtra map[string]string) bool {
 	self, err := os.Executable()
 	if err != nil {
-		return
+		return false
 	}
 	env := os.Environ()
 	for k, v := range envExtra {
@@ -124,7 +132,7 @@ func spawnWorker(mode string, envExtra map[string]string) {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	setDetachedChild(cmd)
-	_ = cmd.Start()
+	return cmd.Start() == nil
 }
 
 func stdinHook() {
@@ -142,8 +150,14 @@ func stdinHook() {
 	cwd, _ := payload["cwd"].(string)
 
 	switch event {
+	case "SessionStart":
+		handleCodexSessionStart(payload)
 	case "UserPromptSubmit":
 		handleUserPromptSubmit(payload)
+	case "Stop":
+		handleCodexStop(payload)
+	case "PostToolUse":
+		handleCodexPostToolUse(payload)
 	case "SessionEnd":
 		tp, _ := payload["transcript_path"].(string)
 		if tp == "" {
@@ -225,6 +239,33 @@ func promptSearchEnabled() bool {
 	}
 }
 
+func codexSessionSearchEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_CODEX_SESSION_SEARCH"))) {
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
+}
+
+func codexStopSaveEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_CODEX_STOP_SAVE"))) {
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
+}
+
+func codexPostToolSaveEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_CODEX_POST_TOOL_SAVE"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 func searchBodyUserID() string {
 	if u := strings.TrimSpace(os.Getenv("POWERMEM_USER_ID")); u != "" {
 		return u
@@ -268,6 +309,122 @@ func promptSearchMaxContextChars() int {
 	return n
 }
 
+func maxCodexSaveChars() int {
+	const defaultMax = 60000
+	s := strings.TrimSpace(os.Getenv("POWERMEM_CODEX_SAVE_MAX_CHARS"))
+	if s == "" {
+		return defaultMax
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 500 {
+		return defaultMax
+	}
+	return n
+}
+
+func truncateText(s string, maxChars int) string {
+	if maxChars > 0 && len(s) > maxChars {
+		return s[:maxChars] + "\n..."
+	}
+	return s
+}
+
+func codexRunID(sessionID, turnID string) string {
+	if sessionID == "" {
+		return turnID
+	}
+	if turnID == "" {
+		return sessionID
+	}
+	return sessionID + ":" + turnID
+}
+
+type codexStopWorkerPayload struct {
+	Message   string `json:"message"`
+	SessionID string `json:"session_id"`
+	TurnID    string `json:"turn_id"`
+	CWD       string `json:"cwd"`
+	RunID     string `json:"run_id"`
+}
+
+type codexToolWorkerPayload struct {
+	ToolName  string `json:"tool_name"`
+	Input     string `json:"input"`
+	Response  string `json:"response"`
+	SessionID string `json:"session_id"`
+	TurnID    string `json:"turn_id"`
+	CWD       string `json:"cwd"`
+	RunID     string `json:"run_id"`
+}
+
+func writeWorkerPayload(prefix string, payload any) (string, error) {
+	f, err := os.CreateTemp("", prefix+"-*.json")
+	if err != nil {
+		return "", err
+	}
+	name := f.Name()
+	encErr := json.NewEncoder(f).Encode(payload)
+	closeErr := f.Close()
+	if encErr != nil {
+		_ = os.Remove(name)
+		return "", encErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(name)
+		return "", closeErr
+	}
+	return name, nil
+}
+
+func readWorkerPayload(path string, dest any) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	defer os.Remove(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return json.Unmarshal(data, dest) == nil
+}
+
+func writeAdditionalContext(eventName, ctx string) {
+	ctx = strings.TrimSpace(ctx)
+	if ctx == "" {
+		return
+	}
+	out := map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":     eventName,
+			"additionalContext": ctx,
+		},
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return
+	}
+	_, _ = os.Stdout.Write(b)
+}
+
+func handleCodexSessionStart(payload map[string]any) {
+	if !codexSessionSearchEnabled() {
+		return
+	}
+	cwd, _ := payload["cwd"].(string)
+	source, _ := payload["source"].(string)
+	query := strings.TrimSpace(fmt.Sprintf("Codex session context for cwd %s source %s", cwd, source))
+	if query == "" {
+		query = "Codex session context"
+	}
+	ctx, err := searchMemoriesForPrompt(query)
+	if err != nil || strings.TrimSpace(ctx) == "" {
+		return
+	}
+	maxC := promptSearchMaxContextChars()
+	writeAdditionalContext("SessionStart", truncateText(ctx, maxC))
+}
+
 func handleUserPromptSubmit(payload map[string]any) {
 	if !promptSearchEnabled() {
 		return
@@ -283,19 +440,68 @@ func handleUserPromptSubmit(payload map[string]any) {
 	}
 	maxC := promptSearchMaxContextChars()
 	if len(ctx) > maxC {
-		ctx = ctx[:maxC] + "\n…"
+		ctx = ctx[:maxC] + "\n..."
 	}
-	out := map[string]any{
-		"hookSpecificOutput": map[string]any{
-			"hookEventName":     "UserPromptSubmit",
-			"additionalContext": ctx,
-		},
+	writeAdditionalContext("UserPromptSubmit", ctx)
+}
+
+func handleCodexStop(payload map[string]any) {
+	if !codexStopSaveEnabled() {
+		return
 	}
-	b, err := json.Marshal(out)
+	message, _ := payload["last_assistant_message"].(string)
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return
+	}
+	sid, _ := payload["session_id"].(string)
+	turnID, _ := payload["turn_id"].(string)
+	cwd, _ := payload["cwd"].(string)
+	runID := codexRunID(sid, turnID)
+	path, err := writeWorkerPayload("powermem-codex-stop", codexStopWorkerPayload{
+		Message:   truncateText(message, maxCodexSaveChars()),
+		SessionID: sid,
+		TurnID:    turnID,
+		CWD:       cwd,
+		RunID:     runID,
+	})
 	if err != nil {
 		return
 	}
-	_, _ = os.Stdout.Write(b)
+	if !spawnWorker("worker-codex-stop", map[string]string{"POWERMEM_WORKER_CODEX_PAYLOAD_PATH": path}) {
+		_ = os.Remove(path)
+	}
+}
+
+func handleCodexPostToolUse(payload map[string]any) {
+	if !codexPostToolSaveEnabled() {
+		return
+	}
+	toolName, _ := payload["tool_name"].(string)
+	if strings.TrimSpace(toolName) == "" {
+		return
+	}
+	input, _ := json.Marshal(payload["tool_input"])
+	response, _ := json.Marshal(payload["tool_response"])
+	sid, _ := payload["session_id"].(string)
+	turnID, _ := payload["turn_id"].(string)
+	cwd, _ := payload["cwd"].(string)
+	runID := codexRunID(sid, turnID)
+	path, err := writeWorkerPayload("powermem-codex-tool", codexToolWorkerPayload{
+		ToolName:  toolName,
+		Input:     truncateText(string(input), 16000),
+		Response:  truncateText(string(response), maxCodexSaveChars()),
+		SessionID: sid,
+		TurnID:    turnID,
+		CWD:       cwd,
+		RunID:     runID,
+	})
+	if err != nil {
+		return
+	}
+	if !spawnWorker("worker-codex-tool", map[string]string{"POWERMEM_WORKER_CODEX_PAYLOAD_PATH": path}) {
+		_ = os.Remove(path)
+	}
 }
 
 func searchMemoriesForPrompt(query string) (string, error) {
@@ -467,6 +673,89 @@ func workerCompact() {
 		"cwd":             cwd,
 		"compact_trigger": trigger,
 	}, &runID, inferCompact()); err != nil {
+		os.Exit(1)
+	}
+}
+
+func inferCodexStop() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("POWERMEM_INFER_CODEX_STOP"))) {
+	case "0", "false", "no":
+		return false
+	default:
+		return true
+	}
+}
+
+func workerCodexStop() {
+	payload := codexStopWorkerPayload{
+		Message:   os.Getenv("POWERMEM_WORKER_CODEX_MESSAGE"),
+		SessionID: os.Getenv("POWERMEM_WORKER_SESSION_ID"),
+		TurnID:    os.Getenv("POWERMEM_WORKER_TURN_ID"),
+		CWD:       os.Getenv("POWERMEM_WORKER_CWD"),
+		RunID:     os.Getenv("POWERMEM_WORKER_RUN_ID"),
+	}
+	if path := os.Getenv("POWERMEM_WORKER_CODEX_PAYLOAD_PATH"); path != "" {
+		if !readWorkerPayload(path, &payload) {
+			return
+		}
+	}
+	message := strings.TrimSpace(payload.Message)
+	if message == "" {
+		return
+	}
+	sid := payload.SessionID
+	turnID := payload.TurnID
+	cwd := payload.CWD
+	runID := payload.RunID
+	content := fmt.Sprintf("Codex turn summary (session_id=%s, turn_id=%s, cwd=%s)\n\n%s", sid, turnID, cwd, message)
+	if err := postMemory(content, map[string]any{
+		"source":     "codex-hook",
+		"kind":       "codex-stop-summary",
+		"session_id": sid,
+		"turn_id":    turnID,
+		"cwd":        cwd,
+	}, &runID, inferCodexStop()); err != nil {
+		os.Exit(1)
+	}
+}
+
+func workerCodexTool() {
+	payload := codexToolWorkerPayload{
+		ToolName:  os.Getenv("POWERMEM_WORKER_TOOL_NAME"),
+		Input:     os.Getenv("POWERMEM_WORKER_TOOL_INPUT"),
+		Response:  os.Getenv("POWERMEM_WORKER_TOOL_RESPONSE"),
+		SessionID: os.Getenv("POWERMEM_WORKER_SESSION_ID"),
+		TurnID:    os.Getenv("POWERMEM_WORKER_TURN_ID"),
+		CWD:       os.Getenv("POWERMEM_WORKER_CWD"),
+		RunID:     os.Getenv("POWERMEM_WORKER_RUN_ID"),
+	}
+	if path := os.Getenv("POWERMEM_WORKER_CODEX_PAYLOAD_PATH"); path != "" {
+		if !readWorkerPayload(path, &payload) {
+			return
+		}
+	}
+	toolName := strings.TrimSpace(payload.ToolName)
+	if toolName == "" {
+		return
+	}
+	sid := payload.SessionID
+	turnID := payload.TurnID
+	cwd := payload.CWD
+	runID := payload.RunID
+	input := strings.TrimSpace(payload.Input)
+	response := strings.TrimSpace(payload.Response)
+	if input == "" && response == "" {
+		return
+	}
+	content := fmt.Sprintf("Codex tool use summary (tool=%s, session_id=%s, turn_id=%s, cwd=%s)\n\nInput:\n%s\n\nOutput:\n%s", toolName, sid, turnID, cwd, input, response)
+	if err := postMemory(content, map[string]any{
+		"source":     "codex-hook",
+		"kind":       "codex-post-tool-use",
+		"session_id": sid,
+		"turn_id":    turnID,
+		"cwd":        cwd,
+		"tool_name":  toolName,
+	}, &runID, false); err != nil {
 		os.Exit(1)
 	}
 }
