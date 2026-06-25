@@ -70,7 +70,7 @@ const translations: Record<string, Record<string, string>> = {
     'category.4.name': '单跳查询',
     'category.4.desc': '询问在单个会话对话中直接提到的特定事实的问题。',
     'category.5.name': '对抗性',
-    'category.5.desc': '这些问题旨在诱使代理提供错误答案，期望代理能正确识别它们为无法回答的问题。',
+    'category.5.desc': '这些问题旨在诱使 Agent 提供错误答案，期望 Agent 能正确识别它们为无法回答的问题。',
   },
 };
 
@@ -144,7 +144,7 @@ export default function BenchmarkPage() {
   const t = (key: string) => translations[isZh ? 'zh' : 'en'][key] || key;
 
   return (
-    <Layout title="Benchmark" description="PowerMem Performance Benchmarks">
+    <Layout title={t('benchmark.title')} description={t('benchmark.subtitle')}>
       <div className={styles.benchmarkPage}>
         <div className="container margin-vert--lg">
           <div className={styles.header}>

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useBaseUrl from '@docusaurus/useBaseUrl';
 import Heading from '@theme/Heading';
 import CodeIcon from './icons/CodeIcon';
 import {Highlight, themes} from 'prism-react-renderer';

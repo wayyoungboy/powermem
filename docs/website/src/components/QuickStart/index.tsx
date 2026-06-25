@@ -29,7 +29,7 @@ sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
 # Add agent-specific memories
-support_memory.add("Customer prefers email support", user_id="customer123")`,
+support_agent.add("Customer prefers email support", user_id="customer123")`,
   },
   zh: {
     install: 'pip install powermem',
@@ -44,17 +44,16 @@ memory.add("用户喜欢咖啡", user_id="user123")
 
 # 搜索记忆
 memories = memory.search("用户偏好", user_id="user123")`,
-    multiAgent: `# 为不同代理创建独立的记忆空间
-from powermem import Memory, auto_config
+    multiAgent: `from powermem import Memory, auto_config
 
 config = auto_config()
-# Create memory instances for different agents
+# 为不同 Agent 创建独立的记忆空间
 support_agent = Memory(config=config, agent_id="support_agent")
 sales_agent = Memory(config=config, agent_id="sales_agent")
 tech_agent = Memory(config=config, agent_id="tech_agent")
 
-# 添加代理特定记忆
-support_memory.add("客户偏好邮件支持", user_id="customer123")`,
+# 添加 Agent 特定记忆
+support_agent.add("客户偏好邮件支持", user_id="customer123")`,
   },
 };
 
@@ -79,7 +78,7 @@ const translations: Record<string, Record<string, string>> = {
     'quickStart.viewDocs': '查看完整文档',
     'install': '安装',
     'basicUsage': '基础使用',
-    'multiAgent': '多Agent场景',
+    'multiAgent': 'Multi-Agent 场景',
   },
 };
 
@@ -154,7 +153,7 @@ export default function QuickStart() {
                   <button
                     className={styles.copyButton}
                     onClick={() => copyToClipboard(code, index)}
-                    aria-label="Copy code"
+                    aria-label={isZh ? '复制代码' : 'Copy code'}
                   >
                     {copiedIndex === index ? '✓' : '📋'}
                   </button>
