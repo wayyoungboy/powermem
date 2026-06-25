@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from typing import Callable, Dict, Tuple
 
@@ -15,6 +16,11 @@ logger = logging.getLogger("server")
 _DependencyProbe = Callable[[], DependencyStatus]
 _DEPENDENCY_STATUS_CACHE: Dict[str, Tuple[float, DependencyStatus]] = {}
 _DEPENDENCY_STATUS_LOCKS: Dict[str, asyncio.Lock] = {}
+_DEPENDENCY_STATUS_IN_FLIGHT: Dict[str, Future[DependencyStatus]] = {}
+_DEPENDENCY_PROBE_EXECUTOR = ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="powermem-dependency-probe",
+)
 
 
 def _get_dependency_lock(name: str) -> asyncio.Lock:
@@ -44,9 +50,14 @@ async def _run_probe_with_timeout(
     timeout_seconds: float,
 ) -> DependencyStatus:
     start_time = time.time()
+    future = _DEPENDENCY_STATUS_IN_FLIGHT.get(name)
+    if future is None or future.done():
+        future = _DEPENDENCY_PROBE_EXECUTOR.submit(probe)
+        _DEPENDENCY_STATUS_IN_FLIGHT[name] = future
+
     try:
         return await asyncio.wait_for(
-            asyncio.to_thread(probe),
+            asyncio.wrap_future(future),
             timeout=timeout_seconds,
         )
     except asyncio.TimeoutError:
@@ -60,6 +71,9 @@ async def _run_probe_with_timeout(
             },
         )
         return _timeout_status(name, timeout_seconds, latency_ms)
+    finally:
+        if future.done() and _DEPENDENCY_STATUS_IN_FLIGHT.get(name) is future:
+            _DEPENDENCY_STATUS_IN_FLIGHT.pop(name, None)
 
 
 async def _cached_probe(
