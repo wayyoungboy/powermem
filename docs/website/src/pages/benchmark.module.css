@@ -187,13 +187,6 @@
   text-shadow: 0 0 20px rgba(134, 239, 172, 0.6);
 }
 
-.metricDetail {
-  color: #9ca3af;
-  font-size: 0.875rem;
-  margin-top: 0.75rem;
-  font-family: 'JetBrains Mono', monospace;
-}
-
 /* Scores Table */
 .tableContainer {
   overflow-x: auto;
@@ -226,16 +219,15 @@
 }
 
 .scoresTable th:first-child {
-  width: 24%;
+  width: 20%;
 }
 
 .scoresTable th:nth-child(2) {
-  width: 48%;
+  width: 60%;
 }
 
-.scoresTable th:nth-child(3),
 .scoresTable th:last-child {
-  width: 14%;
+  width: 20%;
   text-align: center;
 }
 
@@ -307,14 +299,6 @@
 
 .llmCell {
   color: #86efac;
-  font-weight: 600;
-  font-size: 1.125rem;
-  font-family: 'JetBrains Mono', monospace;
-  text-align: center;
-}
-
-.countCell {
-  color: #e5e7eb;
   font-weight: 600;
   font-size: 1.125rem;
   font-family: 'JetBrains Mono', monospace;
@@ -599,3 +583,4 @@
     font-size: 1rem;
   }
 }
+
