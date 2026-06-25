@@ -1,4 +1,4 @@
-"""No-LLM regression tests for the Claude Code hook binary.
+"""No-LLM regression tests for the shared agent hook binary.
 
 The suite intentionally uses only the Python standard library so it can run in
 an isolated Docker container without installing project or test dependencies.
@@ -323,6 +323,157 @@ class ClaudeHookNoLLMRegressionTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
         self.assert_no_request("/api/v1/memories/search")
+        self.assert_no_sentinel(result.stdout, result.stderr)
+
+    def test_codex_session_start_searches_with_event_context(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = {
+                "hook_event_name": "SessionStart",
+                "session_id": "codex-session-1049",
+                "cwd": "/workspace/powermem",
+                "source": "startup",
+            }
+            result = self.run_hook(payload, Path(raw_tmp))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        request = self.wait_for_request("/api/v1/memories/search")
+
+        self.assertEqual(request.headers.get("x-api-key"), "hook-api-key")
+        self.assertEqual(request.body["user_id"], "hook-user")
+        self.assertEqual(request.body["agent_id"], "hook-agent")
+        self.assertIn("Codex session context", request.body["query"])
+        self.assertIn("/workspace/powermem", request.body["query"])
+        self.assert_no_sentinel(request.body, result.stdout, result.stderr)
+
+        output = json.loads(result.stdout)
+        hook_output = output["hookSpecificOutput"]
+        self.assertEqual(hook_output["hookEventName"], "SessionStart")
+        self.assertIn("PowerMem", hook_output["additionalContext"])
+        self.assertIn("isolated hook regression suite", hook_output["additionalContext"])
+        self.assert_no_sentinel(hook_output["additionalContext"])
+
+    def test_codex_session_start_can_disable_search(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = {
+                "hook_event_name": "SessionStart",
+                "session_id": "codex-session-1049",
+                "cwd": "/workspace/powermem",
+                "source": "resume",
+            }
+            result = self.run_hook(
+                payload,
+                Path(raw_tmp),
+                POWERMEM_CODEX_SESSION_SEARCH="0",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assert_no_request("/api/v1/memories/search")
+        self.assert_no_sentinel(result.stdout, result.stderr)
+
+    def test_codex_stop_posts_last_assistant_message(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = {
+                "hook_event_name": "Stop",
+                "session_id": "codex-session-1049",
+                "turn_id": "turn-7",
+                "cwd": "/workspace/powermem",
+                "last_assistant_message": "Remembered the Codex hook install path.",
+            }
+            result = self.run_hook(payload, Path(raw_tmp))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            request = self.wait_for_request(
+                "/api/v1/memories",
+                kind="codex-stop-summary",
+            )
+            self.wait_for_no_hook_workers()
+
+            self.assertEqual(request.headers.get("x-api-key"), "hook-api-key")
+            self.assertTrue(request.body["infer"])
+            self.assertEqual(request.body["user_id"], "hook-user")
+            self.assertEqual(request.body["agent_id"], "hook-agent")
+            self.assertEqual(request.body["run_id"], "codex-session-1049:turn-7")
+            self.assertIn("Codex turn summary", request.body["content"])
+            self.assertIn("Remembered the Codex hook install path.", request.body["content"])
+            self.assertEqual(request.body["metadata"]["source"], "codex-hook")
+            self.assertEqual(request.body["metadata"]["session_id"], "codex-session-1049")
+            self.assertEqual(request.body["metadata"]["turn_id"], "turn-7")
+            self.assertEqual(request.body["metadata"]["cwd"], "/workspace/powermem")
+            self.assert_no_sentinel(request.body, result.stdout, result.stderr)
+
+    def test_codex_stop_can_disable_save(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = {
+                "hook_event_name": "Stop",
+                "session_id": "codex-session-1049",
+                "turn_id": "turn-7",
+                "cwd": "/workspace/powermem",
+                "last_assistant_message": "This should not be saved.",
+            }
+            result = self.run_hook(
+                payload,
+                Path(raw_tmp),
+                POWERMEM_CODEX_STOP_SAVE="0",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assert_no_request("/api/v1/memories")
+        self.assert_no_sentinel(result.stdout, result.stderr)
+
+    def test_codex_post_tool_use_opt_in_posts_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = {
+                "hook_event_name": "PostToolUse",
+                "session_id": "codex-session-1049",
+                "turn_id": "turn-8",
+                "cwd": "/workspace/powermem",
+                "tool_name": "Bash",
+                "tool_input": {"command": "python -m pytest tests/regression"},
+                "tool_response": {"exit_code": 1, "output": "one assertion failed"},
+            }
+            result = self.run_hook(
+                payload,
+                Path(raw_tmp),
+                POWERMEM_CODEX_POST_TOOL_SAVE="1",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            request = self.wait_for_request(
+                "/api/v1/memories",
+                kind="codex-post-tool-use",
+            )
+            self.wait_for_no_hook_workers()
+
+            self.assertEqual(request.headers.get("x-api-key"), "hook-api-key")
+            self.assertFalse(request.body["infer"])
+            self.assertEqual(request.body["run_id"], "codex-session-1049:turn-8")
+            self.assertIn("Codex tool use summary", request.body["content"])
+            self.assertIn("python -m pytest tests/regression", request.body["content"])
+            self.assertIn("one assertion failed", request.body["content"])
+            self.assertEqual(request.body["metadata"]["source"], "codex-hook")
+            self.assertEqual(request.body["metadata"]["tool_name"], "Bash")
+            self.assertEqual(request.body["metadata"]["session_id"], "codex-session-1049")
+            self.assertEqual(request.body["metadata"]["turn_id"], "turn-8")
+            self.assert_no_sentinel(request.body, result.stdout, result.stderr)
+
+    def test_codex_post_tool_use_default_does_not_save(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            payload = {
+                "hook_event_name": "PostToolUse",
+                "session_id": "codex-session-1049",
+                "turn_id": "turn-8",
+                "cwd": "/workspace/powermem",
+                "tool_name": "Bash",
+                "tool_input": {"command": "python -m pytest tests/regression"},
+                "tool_response": {"exit_code": 0, "output": "ok"},
+            }
+            result = self.run_hook(payload, Path(raw_tmp))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assert_no_request("/api/v1/memories")
         self.assert_no_sentinel(result.stdout, result.stderr)
 
     def test_session_end_posts_transcript_and_ignores_bad_transcripts(self) -> None:

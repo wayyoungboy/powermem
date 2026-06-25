@@ -1,4 +1,4 @@
-# PowerMem Plugin for Claude Code and Codex CLI
+# PowerMem Plugin for Claude Code and Codex
 
 The full Claude Code integration guide — the auto-setup prompt, manual steps, the
 two connection modes (HTTP / MCP), hooks, configuration, troubleshooting, and
@@ -6,7 +6,7 @@ uninstall — lives in the docs:
 
 **➡ [docs/integrations/claude_code.md](../../docs/integrations/claude_code.md)**
 
-The Codex CLI guide lives here:
+The Codex guide lives here:
 
 **➡ [docs/integrations/codex.md](../../docs/integrations/codex.md)**
 
@@ -63,7 +63,7 @@ from the same branch:
 /reload-plugins
 ```
 
-## Codex CLI Install
+## Codex Install
 
 Install the Codex marketplace and plugin:
 
@@ -81,7 +81,9 @@ codex plugin marketplace add https://github.com/<owner>/powermem.git --ref <bran
 codex plugin add memory-powermem@powermem
 ```
 
-Start a new Codex thread, then ask Codex:
+Start a new Codex thread so Codex loads the bundled skills and hooks. Review and
+trust the PowerMem hooks when Codex asks, or open `/hooks` and trust them there.
+Then ask Codex:
 
 ```text
 Use the memory-powermem init skill to initialize PowerMem.
@@ -94,6 +96,11 @@ After init succeeds, wire MCP to the managed server:
 codex mcp remove powermem 2>/dev/null || true
 codex mcp add powermem --url "${POWERMEM_BASE_URL%/}/mcp"
 ```
+
+The bundled hooks provide automatic recall on `SessionStart` and
+`UserPromptSubmit`, plus concise turn-summary saves on `Stop`. `PostToolUse`
+summaries are opt-in via `POWERMEM_CODEX_POST_TOOL_SAVE=1`. MCP remains an
+explicit setup step so tool access points at the runtime URL written by init.
 
 To pre-download the default local embedding model through ModelScope before
 starting the server:

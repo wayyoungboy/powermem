@@ -1,0 +1,59 @@
+{
+  "description": "PowerMem lifecycle hooks for Codex CLI and Codex app. SessionStart and UserPromptSubmit retrieve relevant memories as additionalContext. Stop can save the latest assistant summary. PostToolUse writes only when POWERMEM_CODEX_POST_TOOL_SAVE=1. POWERMEM_BASE_URL defaults to http://localhost:8848.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run-hook.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"& \\\"$env:PLUGIN_ROOT\\\\hooks\\\\run-hook.ps1\\\"\"",
+            "timeout": 5,
+            "statusMessage": "Loading PowerMem context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run-hook.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"& \\\"$env:PLUGIN_ROOT\\\\hooks\\\\run-hook.ps1\\\"\"",
+            "timeout": 5,
+            "statusMessage": "Searching PowerMem"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run-hook.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"& \\\"$env:PLUGIN_ROOT\\\\hooks\\\\run-hook.ps1\\\"\"",
+            "timeout": 10,
+            "statusMessage": "Saving PowerMem memory"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${PLUGIN_ROOT}/hooks/run-hook.sh\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"& \\\"$env:PLUGIN_ROOT\\\\hooks\\\\run-hook.ps1\\\"\"",
+            "timeout": 5,
+            "statusMessage": "Checking PowerMem tool context"
+          }
+        ]
+      }
+    ]
+  }
+}

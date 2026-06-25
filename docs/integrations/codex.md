@@ -1,12 +1,14 @@
-# Codex CLI
+# Codex
 
-Connect Codex CLI to PowerMem with the native `memory-powermem` plugin plus an
-explicit MCP server entry.
+Connect Codex CLI or the Codex app to PowerMem with the native
+`memory-powermem` plugin, bundled lifecycle hooks, and an explicit MCP server
+entry for tools.
 
 The Codex plugin installs PowerMem skills and reuses the same backend bootstrap
-as the Claude Code plugin. It intentionally does **not** register Codex hooks or
-write a hard-coded MCP URL during plugin install. After init writes
-`~/.powermem/runtime.env`, add the MCP endpoint with `codex mcp add`.
+as the Claude Code plugin. It also bundles Codex hooks from
+`apps/agent-plugin/hooks/codex-hooks.json` so new threads can retrieve relevant
+memories and save concise turn summaries. MCP is still wired explicitly after
+init writes `~/.powermem/runtime.env`.
 
 ## Recommended Setup
 
@@ -27,7 +29,8 @@ codex plugin add memory-powermem@powermem
 ```
 
 Start a new Codex thread after installing or updating the plugin so Codex loads
-the new skills. Then ask Codex:
+the new skills and hooks. Review and trust the plugin hooks when Codex asks, or
+open `/hooks` and trust the PowerMem hook definitions there. Then ask Codex:
 
 ```text
 Use the memory-powermem init skill to initialize PowerMem.
@@ -51,9 +54,46 @@ codex mcp remove powermem 2>/dev/null || true
 codex mcp add powermem --url "${POWERMEM_BASE_URL%/}/mcp"
 ```
 
+## Bundled Hooks
+
+The plugin manifest points Codex at `hooks/codex-hooks.json`. The hook commands
+run `hooks/run-hook.sh`, which executes the packaged `powermem-hook` binary and
+reads the runtime endpoint from `~/.powermem/runtime.env`.
+
+Default behavior:
+
+- `SessionStart` searches PowerMem for project/session context and injects it as
+  Codex `additionalContext`.
+- `UserPromptSubmit` searches PowerMem for memories relevant to the current
+  prompt and injects them as `additionalContext`.
+- `Stop` saves the latest assistant turn summary to PowerMem.
+- `PostToolUse` is registered but does not save tool inputs or outputs unless
+  explicitly enabled with `POWERMEM_CODEX_POST_TOOL_SAVE=1`.
+
+Hook environment controls:
+
+```bash
+# Disable prompt-time recall.
+export POWERMEM_PROMPT_SEARCH=0
+
+# Disable SessionStart recall.
+export POWERMEM_CODEX_SESSION_SEARCH=0
+
+# Disable Stop summary writes.
+export POWERMEM_CODEX_STOP_SAVE=0
+
+# Opt in to saving selected PostToolUse summaries.
+export POWERMEM_CODEX_POST_TOOL_SAVE=1
+```
+
+Codex requires non-managed command hooks to be reviewed and trusted. If a hook
+definition changes after an update, open `/hooks` again and trust the new
+PowerMem hook hash.
+
 ## Prerequisites
 
-- Codex CLI with `codex plugin` and `codex mcp` commands.
+- Codex CLI or Codex app with plugin support. CLI setup uses the
+  `codex plugin` and `codex mcp` commands.
 - A supported Python runtime for the PowerMem backend. The init script creates
   `~/.powermem/venv` and installs `powermem` there.
 - Anthropic credentials available from the environment or `~/.claude/settings.json`.
@@ -88,13 +128,17 @@ the local server lifecycle for you.
    codex mcp list
    ```
 
-3. In Codex, ask it to remember a probe such as
+3. Open `/hooks` and confirm the PowerMem hooks are trusted.
+
+4. In Codex, ask it to remember a probe such as
    `PowerMem Codex probe: dragonfruit-zx9`, then search for `dragonfruit-zx9`.
 
 ## Troubleshooting
 
 - If the plugin skills do not appear, start a new Codex thread after
   `codex plugin add`.
+- If the hooks do not run, open `/hooks`, trust the PowerMem hook definitions,
+  and start a new thread.
 - If MCP uses the wrong port, reload `~/.powermem/runtime.env` and re-run
   `codex mcp remove powermem` followed by `codex mcp add`.
 - If the server fails to start, read the server log under the local state directory.
