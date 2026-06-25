@@ -95,7 +95,7 @@ memories = memory.search("user preferences", user_id="user123")`;
           </Heading>
 
           <p className={styles.heroSubtitle}>
-            {isZh ? '几分钟上手，轻松扩展到百万级' : 'Get started in minutes, scale to millions'}
+            {isZh ? '几分钟上手，轻松扩展到百万级记忆' : 'Get started in minutes, scale to millions'}
           </p>
 
           {/* CTA Buttons */}

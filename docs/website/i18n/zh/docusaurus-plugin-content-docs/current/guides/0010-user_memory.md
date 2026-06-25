@@ -120,7 +120,7 @@ def add(
 - `filters` (dict, 可选): 高级过滤元数据
 - `scope` (str, 可选): 记忆范围（例如，`user`、`agent`、`session`）
 - `memory_type` (str, 可选): 记忆类型/类别
-- `prompt` (str, 可选): 用于智能处理的自定义提示
+- `prompt` (str, 可选): 用于智能处理的自定义 prompt
 - `infer` (bool): 是否启用智能记忆处理（默认值：True）
 - `profile_type` (str): 配置文件提取的类型，可以是 "content"（非结构化）或 "topics"（结构化）。默认值："content"
 - `custom_topics` (str, 可选): 用于结构化提取的自定义主题 JSON 字符串。仅在 profile_type="topics" 时使用。格式应为 JSON 字符串：

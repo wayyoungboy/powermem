@@ -42,7 +42,7 @@ Agent 遵循 [`apps/mcp-client/SETUP.md`](https://github.com/oceanbase/powermem/
 ## 验证 {#verify}
 
 1. 重启 Codex，使其重新加载 `~/.codex/context.json`。
-2. 确认 `powermem` MCP 服务器已列出。
+2. 确认 `powermem` MCP Server 已列出。
 3. 添加一个内容为 `PowerMem Codex probe: dragonfruit-zx9` 的探测记忆。
 4. 搜索 `dragonfruit-zx9` 并确认 Codex 收到了结果。
 

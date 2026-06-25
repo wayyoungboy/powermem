@@ -6,7 +6,7 @@
 
 - **[入门指南](./0001-getting_started.md)** - 快速入门指南
 - **[配置指南](./0003-configuration.md)** - 配置选项
-- **[自定义提示使用](./0004-custom_prompts_usage.md)** - 自定义提示以处理记忆
+- **[自定义 prompt 使用](./0004-custom_prompts_usage.md)** - 自定义 prompt 以处理记忆
 - **[Multi-Agent 指南](./0005-multi_agent.md)** - Multi-Agent 场景
 - **[集成指南](./0009-integrations.md)** - 第三方集成（LangChain、LangGraph、FastAPI、自定义提供商）
 - **[子存储指南](./0006-sub_stores.md)** - 高级子存储配置

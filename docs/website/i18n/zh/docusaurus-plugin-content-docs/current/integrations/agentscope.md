@@ -2,7 +2,7 @@
 
 通过 AgentScope 的 MCP 客户端支持，将 PowerMem 用作 AgentScope Agents 的长期记忆工具提供者。这种集成方式保持了轻量化：PowerMem 负责记忆的存储和检索，而 AgentScope 通过其 MCP 客户端发现并调用 PowerMem 的 MCP 工具。
 
-AgentScope 支持 HTTP 和 stdio 的 MCP 服务器，以及有状态和无状态的 MCP 客户端。PowerMem 通过 `powermem-mcp` 提供相同的记忆工具，因此不需要特定于 AgentScope 的存储适配器。
+AgentScope 支持 HTTP 和 stdio 的 MCP Server，以及有状态和无状态的 MCP 客户端。PowerMem 通过 `powermem-mcp` 提供相同的记忆工具，因此不需要特定于 AgentScope 的存储适配器。
 
 ## 前置条件 {#prerequisites}
 
@@ -97,7 +97,7 @@ asyncio.run(search_powermem())
 ## 疑难解答 {#troubleshooting}
 
 - 如果 AgentScope 无法列出工具，请确认 `http://localhost:8848/mcp` 与 PowerMem MCP 的传输地址和端口匹配。
-- 如果记忆调用失败，请首先验证 PowerMem 的 `.env` 文件。MCP 服务器依赖于与 Python SDK 相同的存储、LLM 和 Embedding 配置。
+- 如果记忆调用失败，请首先验证 PowerMem 的 `.env` 文件。MCP Server 依赖于与 Python SDK 相同的存储、LLM 和 Embedding 配置。
 - 如果 AgentScope 进程运行在不同的 shell 或容器中，请在其中传递相同的 PowerMem 环境变量，包括启用认证时的 `POWERMEM_API_KEY`。
 - 对于 stdio、SSE 和认证的变体，请参考通用的 [MCP 客户端指南](./mcp_client.md)。
 

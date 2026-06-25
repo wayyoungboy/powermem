@@ -47,7 +47,7 @@ memory = Memory(config=config, agent_id="my_agent")
 - `filters` (dict, 可选): 用于子存储路由和高级过滤的过滤元数据。根据元数据值将记忆路由到特定子存储。格式详情见下文的 [过滤参数格式](#filter-parameter-format)。
 - `scope` (str, 可选): 记忆范围（例如，'user'、'agent'、'session'）。
 - `memory_type` (str, 可选): 记忆类型分类。
-- `prompt` (str, 可选): 用于智能处理的自定义提示。
+- `prompt` (str, 可选): 用于智能处理的自定义 prompt。
 - `infer` (bool): 启用智能记忆处理（默认值: True）。
 
 **返回值:**

@@ -1246,7 +1246,7 @@ curl -X POST "http://localhost:8848/api/v1/users/user-123/profile" \
 | filters | object | 否 | null | 用于高级过滤的元数据过滤器 |
 | scope | string | 否 | null | 记忆范围 |
 | memory_type | string | 否 | null | 记忆类型分类 |
-| prompt | string | 否 | null | 用于智能处理的自定义提示 |
+| prompt | string | 否 | null | 用于智能处理的自定义 prompt |
 | infer | boolean | 否 | true | 启用智能记忆处理 |
 | profile_type | string | 否 | "content" | 提取配置类型："content" 或 "topics" |
 | custom_topics | string | 否 | null | 自定义主题的 JSON 字符串（仅适用于 profile_type="topics"） |

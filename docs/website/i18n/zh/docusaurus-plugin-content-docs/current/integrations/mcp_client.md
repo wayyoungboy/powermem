@@ -1,13 +1,13 @@
 # 通用 MCP 客户端 {#generic-mcp-client}
 
-本指南适用于 Claude Desktop、Cline、Codex、OpenCode、Roo Code、Goose 或任何其他支持标准 MCP 服务器定义的 MCP 客户端。
+本指南适用于 Claude Desktop、Cline、Codex、OpenCode、Roo Code、Goose 或任何其他支持标准 MCP Server 定义的 MCP 客户端。
 
 ## 前置条件 {#prerequisites}
 
 - 已安装支持 MCP 的 PowerMem。对于零配置的本地 seekdb，请使用 `powermem[server,seekdb]`，或者当您的 `.env` 指向非 seekdb 的存储/嵌入提供商时，使用 `powermem[server]`。
 - 已使用您的 LLM 提供商、API 密钥和模型配置 PowerMem。
 
-## 启动 MCP 服务器 {#start-an-mcp-server}
+## 启动 MCP Server {#start-an-mcp-server}
 
 选择一种传输方式。
 
@@ -92,4 +92,4 @@ PowerMem 暴露了核心记忆工具：
 
 ## 卸载 {#uninstall}
 
-仅从客户端配置中移除 `powermem` MCP 服务器条目，然后重新加载客户端。
+仅从客户端配置中移除 `powermem` MCP Server 条目，然后重新加载客户端。

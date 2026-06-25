@@ -16,11 +16,11 @@
 ```text
 Read and follow apps/mcp-client/SETUP.md to setup PowerMem
 ```
-当 Cline 是目标客户端时，仅需配置 Cline 的 MCP 服务器条目。
+当 Cline 是目标客户端时，仅需配置 Cline 的 MCP Server 条目。
 
 ## 手动设置 {#manual-setup}
 
-在 Cline 的 MCP 设置中添加一个 PowerMem MCP 服务器。
+在 Cline 的 MCP 设置中添加一个 PowerMem MCP Server。
 
 对于本地 stdio MCP：
 ```json
@@ -47,7 +47,7 @@ Read and follow apps/mcp-client/SETUP.md to setup PowerMem
 
 ## 验证 {#verify}
 
-1. 重新加载 Cline MCP 服务器。
+1. 重新加载 Cline MCP Server。
 2. 确认 `powermem` 已连接。
 3. 确认诸如 `add_memory`、`search_memories`、`get_memory_by_id`、`update_memory`、`delete_memory`、`delete_all_memories` 和 `list_memories` 等工具可见。
 4. 添加并搜索包含 `dragonfruit-zx9` 的测试记忆。

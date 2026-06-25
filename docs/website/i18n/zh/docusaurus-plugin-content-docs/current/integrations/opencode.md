@@ -44,7 +44,7 @@ OpenCode 从 `opencode.json` 中读取 MCP 配置。常见位置如下：
 | 项目配置 | `opencode.json` |
 | 项目本地配置 | `.opencode/opencode.json` |
 
-如果是个人 PowerMem 设置，使用全局配置。仅当团队希望共享 MCP 服务器定义时，使用项目配置。
+如果是个人 PowerMem 设置，使用全局配置。仅当团队希望共享 MCP Server 定义时，使用项目配置。
 
 ### 本地 stdio MCP {#local-stdio-mcp}
 
@@ -100,8 +100,8 @@ powermem-mcp streamable-http 8848
 
 ## 验证 {#verify}
 
-1. 重启 OpenCode 或重新加载 MCP 服务器。
-2. 确认 `powermem` 被列为启用的 MCP 服务器。
+1. 重启 OpenCode 或重新加载 MCP Server。
+2. 确认 `powermem` 被列为启用的 MCP Server。
 3. 确认诸如 `add_memory`、`search_memories`、`get_memory_by_id`、`update_memory`、`delete_memory`、`delete_all_memories` 和 `list_memories` 等工具可见。
 4. 添加一个包含 `PowerMem OpenCode probe: dragonfruit-zx9` 的记忆。
 5. 搜索 `dragonfruit-zx9` 并确认返回了结果。
@@ -115,4 +115,4 @@ powermem-mcp streamable-http 8848
 
 ## 卸载 {#uninstall}
 
-从你编辑的 OpenCode 配置文件中移除 `mcp.powermem` 条目，然后重启 OpenCode 或重新加载 MCP 服务器。对于 Agent 引导的清理，请参考 [`apps/mcp-client/UNINSTALL.md`](https://github.com/oceanbase/powermem/blob/main/apps/mcp-client/UNINSTALL.md)。
+从你编辑的 OpenCode 配置文件中移除 `mcp.powermem` 条目，然后重启 OpenCode 或重新加载 MCP Server。对于 Agent 引导的清理，请参考 [`apps/mcp-client/UNINSTALL.md`](https://github.com/oceanbase/powermem/blob/main/apps/mcp-client/UNINSTALL.md)。

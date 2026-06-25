@@ -96,11 +96,11 @@ powermem-server --host 0.0.0.0 --port 8848
 ```
 ### 配置 Qoder CLI {#configure-qoder-cli}
 
-添加一个用户级别的 stdio MCP 服务器：
+添加一个用户级别的 stdio MCP Server：
 ```bash
 qodercli mcp add -s user powermem -- powermem-mcp stdio
 ```
-如果 Qoder CLI 已经在运行，请重新加载 MCP 服务器：
+如果 Qoder CLI 已经在运行，请重新加载 MCP Server：
 ```text
 /mcp reload
 ```
@@ -108,7 +108,7 @@ qodercli mcp add -s user powermem -- powermem-mcp stdio
 
 ## 验证 {#verify}
 
-1. 在 Qoder 中，打开 MCP 服务器列表并确认 `powermem` 已连接。
+1. 在 Qoder 中，打开 MCP Server 列表并确认 `powermem` 已连接。
 2. 展开服务器并确认以下工具可用：`add_memory`、`search_memories`、`get_memory_by_id`、`update_memory`、`delete_memory`、`delete_all_memories` 和 `list_memories`。
 3. 添加一个包含 `PowerMem Qoder probe: dragonfruit-zx9` 的记忆。
 4. 搜索 `dragonfruit-zx9` 并确认返回了结果。
@@ -118,8 +118,8 @@ qodercli mcp add -s user powermem -- powermem-mcp stdio
 - 如果远程 MCP 无法连接，请验证 `http://localhost:8848/api/v1/system/health` 是否正常，以及 `http://localhost:8848/mcp` 是否可访问。
 - 如果 stdio MCP 失败，请验证是否可以从终端启动 `powermem-mcp stdio`。
 - 如果工具超时，请增加 Qoder 的 MCP 请求超时时间，或检查 PowerMem 服务器日志以排查 LLM 提取速度慢的问题。
-- 如果身份验证失败，请为 stdio 设置 `POWERMEM_API_KEY`，或在 Qoder 的 MCP 服务器设置中配置所需的 HTTP 头。
+- 如果身份验证失败，请为 stdio 设置 `POWERMEM_API_KEY`，或在 Qoder 的 MCP Server 设置中配置所需的 HTTP 头。
 
 ## 卸载 {#uninstall}
 
-从 Qoder 设置中移除 `powermem` MCP 服务器，或者运行匹配的 Qoder CLI 移除命令以适配您的安装范围。然后重新加载 Qoder 或运行 `/mcp reload`。
+从 Qoder 设置中移除 `powermem` MCP Server，或者运行匹配的 Qoder CLI 移除命令以适配您的安装范围。然后重新加载 Qoder 或运行 `/mcp reload`。

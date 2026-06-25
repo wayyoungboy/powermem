@@ -1179,6 +1179,6 @@ from powermem import create_memory
 # 从环境变量自动加载 Prompt
 memory = create_memory()
 ```
-如果未设置环境变量，系统将回退到内置的默认提示。有关详细的提示示例和指南，请参阅[自定义提示使用指南](0004-custom_prompts_usage.md)。
+如果未设置环境变量，系统将回退到内置的默认 prompt。有关详细的 prompt 示例和指南，请参阅[自定义 prompt 使用指南](0004-custom_prompts_usage.md)。
 
 ---
