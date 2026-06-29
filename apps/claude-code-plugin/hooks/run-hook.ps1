@@ -28,6 +28,9 @@ function Import-PowerMemEnvFile {
 $dataDir = if ($env:POWERMEM_DATA_DIR) { $env:POWERMEM_DATA_DIR } else { Join-Path $HOME ".powermem" }
 Import-PowerMemEnvFile (Join-Path $dataDir "runtime.env")
 Import-PowerMemEnvFile (Join-Path $PluginRoot "config\runtime.env")
+if ($env:POWERMEM_CONNECTION_MODE -eq "mcp") {
+    exit 0
+}
 
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
 $exe = Join-Path $Root "bin\powermem-hook-windows-$arch.exe"

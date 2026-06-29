@@ -21,4 +21,7 @@ bash scripts/apply-connection-mode.sh http   # default
 bash scripts/apply-connection-mode.sh mcp
 ```
 
+For a remote PowerMem server, `scripts/init.sh` can write the URL directly:
+`POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com POWERMEM_INIT_CONNECTION_MODE=hook|mcp|both sh scripts/init.sh`.
+
 Restart Claude Code after changing `.mcp.json`.

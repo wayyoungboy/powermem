@@ -16,6 +16,19 @@ Use the plugin scripts as directed by that section:
 - `scripts/status.sh`
 - `scripts/init.sh`
 
+If the user already has a reachable PowerMem server, configure remote mode
+instead of starting a local backend:
+
+```bash
+POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com \
+POWERMEM_INIT_CONNECTION_MODE=hook \
+sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+```
+
+Use `POWERMEM_INIT_CONNECTION_MODE=mcp` for in-chat MCP tools only, or `both`
+for both hooks and MCP tools. If the server requires PowerMem API auth, pass
+`POWERMEM_INIT_REMOTE_API_KEY`; never print the value.
+
 Remember that `scripts/init.sh` ensures uv and starts the backend with the
 uvx-style launcher. Package depends on the storage backend: SQLite (default)
 uses `uvx --from 'powermem[server,extras]' powermem-server` (pulls

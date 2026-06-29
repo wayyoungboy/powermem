@@ -66,7 +66,22 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    first, then retry `/memory-powermem:init`.
 2. Run `sh "$CLAUDE_PLUGIN_ROOT/scripts/status.sh"` and inspect whether config,
    uv, managed PID, Python versions, and health are present.
-3. If `.env` is missing, run init with auto-detection first:
+3. If the user already has a remote PowerMem server, configure that endpoint
+   instead of creating a local backend. Choose `hook`, `mcp`, or `both`:
+
+   ```bash
+   POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com \
+   POWERMEM_INIT_CONNECTION_MODE=hook \
+   sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+   ```
+
+   Use `POWERMEM_INIT_CONNECTION_MODE=mcp` to configure only the HTTP MCP
+   endpoint, or `both` to enable both hooks and MCP tools. If the server requires
+   API-key auth, add `POWERMEM_INIT_REMOTE_API_KEY=...`; never print the value.
+   Remote init writes `runtime.env` and/or `.mcp.json`, then exits without
+   creating the plugin `.env`, launching `uvx`, or managing a local PID.
+4. If `.env` is missing and the user wants a local backend, run init with
+   auto-detection first:
 
    ```bash
    sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
@@ -83,7 +98,7 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
    OceanBase/seekdb production use), local HuggingFace embedding (no API key,
    `sentence-transformers` from `powermem[extras]`), server settings, and logging
    settings.
-4. If init reports missing values, ask the user only for those missing values. Do
+5. If init reports missing values, ask the user only for those missing values. Do
    not invent credentials. Re-run init with the matching environment variables:
 
    ```bash
@@ -114,11 +129,11 @@ sh "$CLAUDE_PLUGIN_ROOT/scripts/..."
      `powermem[server,extras] @ git+https://github.com/oceanbase/powermem.git@<branch-or-sha>`.
    - `POWERMEM_INIT_PYTHON` to force a specific Python >= 3.11.
    - `POWERMEM_INIT_PORT` to force the managed server port.
-5. Never print API keys, auth tokens, or other credentials. Mask any secret in
+6. Never print API keys, auth tokens, or other credentials. Mask any secret in
    summaries.
-6. After init succeeds, run `sh "$CLAUDE_PLUGIN_ROOT/scripts/status.sh"` again and
+7. After init succeeds, run `sh "$CLAUDE_PLUGIN_ROOT/scripts/status.sh"` again and
    report the base URL.
-7. The hook launcher reads `runtime.env`, so once init writes a base URL, prompt
+8. The hook launcher reads `runtime.env`, so once init writes a base URL, prompt
    recall and session-save hooks use that backend automatically.
 
 The default local embedding model (`all-MiniLM-L6-v2`) is downloaded

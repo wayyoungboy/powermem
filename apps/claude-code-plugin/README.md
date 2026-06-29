@@ -45,6 +45,11 @@ while CN networks use the USTC mirror at
 `https://mirrors.ustc.edu.cn/github-release/astral-sh/uv/LatestRelease/`.
 CN package resolution uses `--default-index https://pypi.tuna.tsinghua.edu.cn/simple`.
 
+If you already run PowerMem on another host, initialize the plugin with
+`POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com` and
+`POWERMEM_INIT_CONNECTION_MODE=hook|mcp|both`; remote init writes the Claude
+connection files without starting a local server.
+
 The PyPI package used by init must include the backend features and dependencies
 required by the plugin, including the default local embedding path
 (`sentence-transformers` / `all-MiniLM-L6-v2`). If you are testing plugin changes

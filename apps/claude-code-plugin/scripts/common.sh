@@ -299,6 +299,122 @@ runtime_base_url() {
   printf '%s\n' "http://localhost:8848"
 }
 
+normalize_base_url() {
+  printf '%s\n' "$1" \
+    | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's#/*$##'
+}
+
+is_loopback_base_url() {
+  case "$(normalize_base_url "$1")" in
+    http://localhost:*|http://127[.]0[.]0[.]1:*|http://[[]::1[]]:*|http://localhost|http://127[.]0[.]0[.]1|http://[[]::1[]]|https://localhost:*|https://127[.]0[.]0[.]1:*|https://[[]::1[]]:*|https://localhost|https://127[.]0[.]0[.]1|https://[[]::1[]])
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+configured_remote_base_url() {
+  if [ -n "${POWERMEM_INIT_REMOTE_BASE_URL:-}" ]; then
+    normalize_base_url "$POWERMEM_INIT_REMOTE_BASE_URL"
+    return
+  fi
+  if [ -n "${POWERMEM_REMOTE_BASE_URL:-}" ]; then
+    normalize_base_url "$POWERMEM_REMOTE_BASE_URL"
+    return
+  fi
+  if [ -n "${POWERMEM_BASE_URL:-}" ] && ! is_loopback_base_url "$POWERMEM_BASE_URL"; then
+    normalize_base_url "$POWERMEM_BASE_URL"
+    return
+  fi
+  if runtime_remote_mode; then
+    normalize_base_url "$(runtime_base_url)"
+    return
+  fi
+  printf '%s\n' ""
+}
+
+configured_connection_mode() {
+  mode=${POWERMEM_INIT_CONNECTION_MODE:-${POWERMEM_CONNECTION_MODE:-}}
+  if [ -z "$mode" ]; then
+    mode=$(runtime_connection_mode)
+  fi
+  mode=${mode:-hook}
+  printf '%s\n' "$mode" | tr '[:upper:]' '[:lower:]'
+}
+
+validate_connection_mode() {
+  case "$1" in
+    hook|mcp|both) return 0 ;;
+  esac
+  echo "Invalid POWERMEM_INIT_CONNECTION_MODE='$1'. Use hook, mcp, or both." >&2
+  return 1
+}
+
+runtime_connection_mode() {
+  if [ -n "${POWERMEM_CONNECTION_MODE:-}" ]; then
+    printf '%s\n' "$POWERMEM_CONNECTION_MODE" | tr '[:upper:]' '[:lower:]'
+    return
+  fi
+  if [ -f "$RUNTIME_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$RUNTIME_FILE"
+    if [ -n "${POWERMEM_CONNECTION_MODE:-}" ]; then
+      printf '%s\n' "$POWERMEM_CONNECTION_MODE" | tr '[:upper:]' '[:lower:]'
+      return
+    fi
+  fi
+  printf '%s\n' ""
+}
+
+runtime_remote_mode() {
+  if [ "${POWERMEM_REMOTE_MODE:-}" = "1" ]; then
+    return 0
+  fi
+  if [ -f "$RUNTIME_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$RUNTIME_FILE"
+    if [ "${POWERMEM_REMOTE_MODE:-}" = "1" ]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+configured_remote_api_key() {
+  if [ -n "${POWERMEM_INIT_REMOTE_API_KEY:-}" ]; then
+    printf '%s\n' "$POWERMEM_INIT_REMOTE_API_KEY"
+    return
+  fi
+  if [ -n "${POWERMEM_REMOTE_API_KEY:-}" ]; then
+    printf '%s\n' "$POWERMEM_REMOTE_API_KEY"
+    return
+  fi
+  if [ -n "${POWERMEM_API_KEY:-}" ]; then
+    printf '%s\n' "$POWERMEM_API_KEY"
+    return
+  fi
+  if runtime_remote_mode && [ -f "$RUNTIME_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$RUNTIME_FILE"
+    if [ -n "${POWERMEM_API_KEY:-}" ]; then
+      printf '%s\n' "$POWERMEM_API_KEY"
+      return
+    fi
+  fi
+  printf '%s\n' ""
+}
+
+quote_runtime_value() {
+  value=$1
+  if contains_newline "$value"; then
+    echo "Remote PowerMem runtime values must be single-line values." >&2
+    return 1
+  fi
+  printf "'"
+  printf '%s' "$value" | sed "s/'/'\\\\''/g"
+  printf "'"
+}
+
 write_runtime_base_url() {
   base_url=$1
   tmp="$RUNTIME_FILE.tmp"
@@ -307,6 +423,101 @@ write_runtime_base_url() {
     printf 'POWERMEM_ENV_FILE=%s\n' "$ENV_FILE"
   } > "$tmp"
   mv "$tmp" "$RUNTIME_FILE"
+}
+
+write_remote_runtime_config_file() {
+  target=$1
+  base_url=$2
+  mode=$3
+  remote_auth=${4:-}
+
+  quoted_base_url=$(quote_runtime_value "$base_url") || return 1
+  quoted_mode=$(quote_runtime_value "$mode") || return 1
+  {
+    printf 'POWERMEM_BASE_URL=%s\n' "$quoted_base_url"
+    printf 'POWERMEM_CONNECTION_MODE=%s\n' "$quoted_mode"
+    printf 'POWERMEM_REMOTE_MODE=1\n'
+    if [ -n "$remote_auth" ]; then
+      quoted_remote_auth=$(quote_runtime_value "$remote_auth") || return 1
+      printf 'POWERMEM_API_KEY=%s\n' "$quoted_remote_auth"
+    fi
+  } > "$target"
+}
+
+write_remote_runtime_config() {
+  base_url=$1
+  mode=$2
+  remote_auth=${3:-}
+  tmp="$RUNTIME_FILE.tmp"
+  write_remote_runtime_config_file "$tmp" "$base_url" "$mode" "$remote_auth" || return 1
+  mv "$tmp" "$RUNTIME_FILE"
+}
+
+mcp_endpoint_url() {
+  base_url=$(normalize_base_url "$1")
+  case "$base_url" in
+    */mcp) printf '%s\n' "$base_url" ;;
+    *) printf '%s/mcp\n' "$base_url" ;;
+  esac
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+contains_newline() {
+  case "$1" in
+    *'
+'*) return 0 ;;
+  esac
+  return 1
+}
+
+write_http_only_mcp_config() {
+  tmp="$PLUGIN_ROOT/.mcp.json.tmp"
+  printf '{\n  "mcpServers": {}\n}\n' > "$tmp"
+  mv "$tmp" "$PLUGIN_ROOT/.mcp.json"
+}
+
+write_remote_mcp_config() {
+  base_url=$1
+  remote_auth=${2:-}
+  mcp_url=$(mcp_endpoint_url "$base_url")
+  if contains_newline "$mcp_url" || contains_newline "$remote_auth"; then
+    echo "Remote PowerMem URL and API key must be single-line values." >&2
+    return 1
+  fi
+
+  escaped_url=$(json_escape "$mcp_url")
+  tmp="$PLUGIN_ROOT/.mcp.json.tmp"
+  if [ -n "$remote_auth" ]; then
+    escaped_key=$(json_escape "$remote_auth")
+    {
+      printf '{\n'
+      printf '  "mcpServers": {\n'
+      printf '    "powermem": {\n'
+      printf '      "transport": "http",\n'
+      printf '      "url": "%s",\n' "$escaped_url"
+      printf '      "headers": {\n'
+      printf '        "X-API-Key": "%s"\n' "$escaped_key"
+      printf '      }\n'
+      printf '    }\n'
+      printf '  }\n'
+      printf '}\n'
+    } > "$tmp"
+  else
+    {
+      printf '{\n'
+      printf '  "mcpServers": {\n'
+      printf '    "powermem": {\n'
+      printf '      "transport": "http",\n'
+      printf '      "url": "%s"\n' "$escaped_url"
+      printf '    }\n'
+      printf '  }\n'
+      printf '}\n'
+    } > "$tmp"
+  fi
+  mv "$tmp" "$PLUGIN_ROOT/.mcp.json"
 }
 
 export_env_file_vars() {
@@ -339,6 +550,14 @@ health_url() {
 is_healthy() {
   url=$(health_url "$1")
   curl -fsS -m 5 "$url" 2>/dev/null | grep -q '"healthy"'
+}
+
+announce_dashboard_url() {
+  case "$1" in
+    */) dashboard_url="${1}dashboard/" ;;
+    *) dashboard_url="${1}/dashboard/" ;;
+  esac
+  echo "Memory dashboard: $dashboard_url"
 }
 
 pid_alive() {

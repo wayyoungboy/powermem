@@ -9,6 +9,59 @@ echo "PowerMem Claude Code plugin init"
 echo "Data dir: $DATA_DIR"
 
 base_url=$(runtime_base_url)
+remote_base_url=$(configured_remote_base_url)
+
+if [ -n "$remote_base_url" ]; then
+  case "$remote_base_url" in
+    http://*|https://*) ;;
+    *)
+      echo "POWERMEM_INIT_REMOTE_BASE_URL must start with http:// or https://." >&2
+      exit 2
+      ;;
+  esac
+
+  connection_mode=$(configured_connection_mode)
+  validate_connection_mode "$connection_mode" || exit 2
+  remote_auth=$(configured_remote_api_key)
+
+  echo "Configuring remote PowerMem backend: $remote_base_url"
+  echo "Connection mode: $connection_mode"
+  runtime_tmp="$RUNTIME_FILE.tmp"
+  write_remote_runtime_config_file "$runtime_tmp" "$remote_base_url" "$connection_mode" "$remote_auth"
+  case "$connection_mode" in
+    hook)
+      write_http_only_mcp_config
+      mv "$runtime_tmp" "$RUNTIME_FILE"
+      echo "Configured hooks through $RUNTIME_FILE."
+      echo "PowerMem MCP tools are disabled in $PLUGIN_ROOT/.mcp.json."
+      ;;
+    mcp)
+      write_remote_mcp_config "$remote_base_url" "$remote_auth"
+      mv "$runtime_tmp" "$RUNTIME_FILE"
+      echo "Configured MCP tools in $PLUGIN_ROOT/.mcp.json."
+      echo "Hooks are disabled by POWERMEM_CONNECTION_MODE=mcp in $RUNTIME_FILE."
+      ;;
+    both)
+      write_remote_mcp_config "$remote_base_url" "$remote_auth"
+      mv "$runtime_tmp" "$RUNTIME_FILE"
+      echo "Configured hooks through $RUNTIME_FILE."
+      echo "Configured MCP tools in $PLUGIN_ROOT/.mcp.json."
+      ;;
+  esac
+
+  if [ -n "$remote_auth" ]; then
+    echo "Remote API key configured (value hidden)."
+  fi
+
+  if is_healthy "$remote_base_url"; then
+    echo "Remote PowerMem backend is healthy: $remote_base_url"
+    announce_dashboard_url "$remote_base_url"
+  else
+    echo "Warning: remote PowerMem health check is unavailable now; configuration was still written." >&2
+  fi
+  echo "Remote mode does not create plugin .env, start uvx, or manage a local PID."
+  exit 0
+fi
 
 ensure_bootstrap_python || exit 1
 echo "Bootstrap Python: $BOOTSTRAP_PYTHON ($(python_version "$BOOTSTRAP_PYTHON"))"
@@ -589,14 +642,6 @@ stop_unhealthy_managed_server() {
     fi
   fi
   remove_managed_pid_files
-}
-
-announce_dashboard_url() {
-  case "$1" in
-    */) dashboard_url="${1}dashboard/" ;;
-    *) dashboard_url="${1}/dashboard/" ;;
-  esac
-  echo "Memory dashboard: $dashboard_url"
 }
 
 if [ ! -f "$ENV_FILE" ]; then

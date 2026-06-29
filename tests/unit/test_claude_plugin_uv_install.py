@@ -1,4 +1,6 @@
+import json
 import os
+import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -60,6 +62,29 @@ def run_stop_script(tmp_path: Path, *, bin_dir: Path) -> subprocess.CompletedPro
     return subprocess.run(
         ["sh", "-c", command, str(STOP_SH)],
         cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
+def run_init_script(
+    plugin_root: Path,
+    tmp_path: Path,
+    *,
+    bin_dir: Path,
+    extra_env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["PATH"] = f"{bin_dir}:/usr/bin:/bin"
+    env["POWERMEM_DATA_DIR"] = str(tmp_path / ".powermem")
+    env.update(extra_env)
+    return subprocess.run(
+        ["sh", str(plugin_root / "scripts" / "init.sh")],
+        cwd=tmp_path,
         env=env,
         text=True,
         stdout=subprocess.PIPE,
@@ -352,6 +377,263 @@ def test_hook_launcher_exports_runtime_env_to_native_binary(tmp_path: Path) -> N
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "BASE=http://localhost:18848"
+
+
+def test_hook_launcher_skips_native_binary_in_mcp_only_mode(tmp_path: Path) -> None:
+    plugin_root = tmp_path / "plugin"
+    hooks_dir = plugin_root / "hooks"
+    bin_dir = hooks_dir / "bin"
+    hooks_dir.mkdir(parents=True)
+    run_hook = hooks_dir / "run-hook.sh"
+    run_hook.write_text(RUN_HOOK_SH.read_text(encoding="utf-8"), encoding="utf-8")
+    run_hook.chmod(0o755)
+    write_executable(
+        bin_dir / "powermem-hook-linux-amd64",
+        """
+        #!/usr/bin/env sh
+        printf 'unexpected\n'
+        exit 42
+        """,
+    )
+    data_dir = tmp_path / ".powermem"
+    data_dir.mkdir()
+    (data_dir / "runtime.env").write_text(
+        "POWERMEM_BASE_URL=https://powermem.example.com\n"
+        "POWERMEM_CONNECTION_MODE=mcp\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["sh", str(run_hook)],
+        cwd=tmp_path,
+        env={**os.environ, "HOME": str(tmp_path), "POWERMEM_DATA_DIR": str(data_dir)},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_write_remote_runtime_config_includes_mode_and_api_key(tmp_path: Path) -> None:
+    result = run_common(
+        """
+        write_remote_runtime_config "https://powermem.example.com" "both" "test-key"
+        cat "$RUNTIME_FILE"
+        """,
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "POWERMEM_BASE_URL='https://powermem.example.com'" in result.stdout
+    assert "POWERMEM_CONNECTION_MODE='both'" in result.stdout
+    assert "POWERMEM_REMOTE_MODE=1" in result.stdout
+    assert "POWERMEM_API_KEY='test-key'" in result.stdout
+    assert "POWERMEM_ENV_FILE=" not in result.stdout
+
+
+def test_write_remote_runtime_config_shell_quotes_values(tmp_path: Path) -> None:
+    result = run_common(
+        r"""
+        base_url='https://powermem.example.com/path?x=1&y=$(touch "$HOME/url-pwned")'
+        api_key='key with spaces & $(touch "$HOME/key-pwned") and '\'' quote'
+        write_remote_runtime_config "$base_url" "both" "$api_key"
+        . "$RUNTIME_FILE"
+        printf 'BASE=%s\n' "$POWERMEM_BASE_URL"
+        printf 'MODE=%s\n' "$POWERMEM_CONNECTION_MODE"
+        printf 'KEY=%s\n' "$POWERMEM_API_KEY"
+        [ ! -e "$HOME/url-pwned" ]
+        [ ! -e "$HOME/key-pwned" ]
+        """,
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "BASE=https://powermem.example.com/path?x=1&y=$(touch" in result.stdout
+    assert "MODE=both" in result.stdout
+    assert "KEY=key with spaces & $(touch" in result.stdout
+    assert "and ' quote" in result.stdout
+    assert not (tmp_path / "url-pwned").exists()
+    assert not (tmp_path / "key-pwned").exists()
+
+
+def test_write_remote_mcp_config_sets_endpoint_and_header(tmp_path: Path) -> None:
+    plugin_root = tmp_path / "plugin"
+    plugin_root.mkdir()
+
+    result = run_common(
+        f"""
+        PLUGIN_ROOT="{plugin_root}"
+        write_remote_mcp_config "https://powermem.example.com/" "test-key"
+        cat "$PLUGIN_ROOT/.mcp.json"
+        """,
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    config = json.loads(result.stdout)
+    server = config["mcpServers"]["powermem"]
+    assert server["transport"] == "http"
+    assert server["url"] == "https://powermem.example.com/mcp"
+    assert server["headers"] == {"X-API-Key": "test-key"}
+
+
+def test_remote_init_configures_both_mode_without_local_server_lifecycle(tmp_path: Path) -> None:
+    plugin_root = tmp_path / "plugin"
+    shutil.copytree(ROOT / "apps" / "claude-code-plugin", plugin_root)
+    bin_dir = tmp_path / "bin"
+    write_executable(
+        bin_dir / "curl",
+        """
+        #!/usr/bin/env sh
+        printf '%s\n' "$*" > "$HOME/curl_args"
+        printf '{"success":true,"data":{"status":"healthy"}}\n'
+        """,
+    )
+    write_executable(
+        bin_dir / "uv",
+        """
+        #!/usr/bin/env sh
+        printf 'uv should not run\n' >&2
+        exit 99
+        """,
+    )
+
+    result = run_init_script(
+        plugin_root,
+        tmp_path,
+        bin_dir=bin_dir,
+        extra_env={
+            "POWERMEM_INIT_REMOTE_BASE_URL": "https://powermem.example.com/",
+            "POWERMEM_INIT_CONNECTION_MODE": "both",
+            "POWERMEM_INIT_REMOTE_API_KEY": "test-key",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "test-key" not in result.stdout
+    assert "test-key" not in result.stderr
+    data_dir = tmp_path / ".powermem"
+    runtime = (data_dir / "runtime.env").read_text(encoding="utf-8")
+    assert "POWERMEM_BASE_URL='https://powermem.example.com'" in runtime
+    assert "POWERMEM_CONNECTION_MODE='both'" in runtime
+    assert "POWERMEM_API_KEY='test-key'" in runtime
+    assert not (data_dir / ".env").exists()
+    assert not (data_dir / "powermem.pid").exists()
+
+    config = json.loads((plugin_root / ".mcp.json").read_text(encoding="utf-8"))
+    server = config["mcpServers"]["powermem"]
+    assert server["url"] == "https://powermem.example.com/mcp"
+    assert server["headers"] == {"X-API-Key": "test-key"}
+    assert "tool run" not in result.stdout
+    assert "uv should not run" not in result.stderr
+    assert "Remote mode does not create plugin .env, start uvx, or manage a local PID." in result.stdout
+
+
+def test_remote_init_is_idempotent_from_existing_runtime(tmp_path: Path) -> None:
+    plugin_root = tmp_path / "plugin"
+    shutil.copytree(ROOT / "apps" / "claude-code-plugin", plugin_root)
+    bin_dir = tmp_path / "bin"
+    write_executable(
+        bin_dir / "curl",
+        """
+        #!/usr/bin/env sh
+        printf '{"success":true,"data":{"status":"healthy"}}\n'
+        """,
+    )
+    write_executable(
+        bin_dir / "uv",
+        """
+        #!/usr/bin/env sh
+        printf 'uv should not run\n' >&2
+        exit 99
+        """,
+    )
+
+    first = run_init_script(
+        plugin_root,
+        tmp_path,
+        bin_dir=bin_dir,
+        extra_env={
+            "POWERMEM_INIT_REMOTE_BASE_URL": "https://powermem.example.com",
+            "POWERMEM_INIT_CONNECTION_MODE": "both",
+            "POWERMEM_INIT_REMOTE_API_KEY": "test-key",
+        },
+    )
+    assert first.returncode == 0, first.stderr
+
+    second = run_init_script(
+        plugin_root,
+        tmp_path,
+        bin_dir=bin_dir,
+        extra_env={},
+    )
+
+    assert second.returncode == 0, second.stderr
+    assert "Configuring remote PowerMem backend: https://powermem.example.com" in second.stdout
+    assert "Connection mode: both" in second.stdout
+    assert "uv should not run" not in second.stderr
+    data_dir = tmp_path / ".powermem"
+    runtime = (data_dir / "runtime.env").read_text(encoding="utf-8")
+    assert "POWERMEM_CONNECTION_MODE='both'" in runtime
+    assert "POWERMEM_API_KEY='test-key'" in runtime
+    assert not (data_dir / ".env").exists()
+    assert not (data_dir / "powermem.pid").exists()
+
+
+def test_status_remote_mode_does_not_require_python(tmp_path: Path) -> None:
+    plugin_root = tmp_path / "plugin"
+    shutil.copytree(ROOT / "apps" / "claude-code-plugin", plugin_root)
+    data_dir = tmp_path / ".powermem"
+    data_dir.mkdir()
+    (data_dir / "runtime.env").write_text(
+        "POWERMEM_BASE_URL='https://powermem.example.com'\n"
+        "POWERMEM_CONNECTION_MODE='hook'\n"
+        "POWERMEM_REMOTE_MODE=1\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["PATH"] = "/usr/bin:/bin"
+    env["POWERMEM_DATA_DIR"] = str(data_dir)
+    env["POWERMEM_INIT_PYTHON"] = "missing-python"
+
+    result = subprocess.run(
+        ["sh", str(plugin_root / "scripts" / "status.sh")],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Connection mode: remote hook" in result.stdout
+    assert "Bootstrap Python: not required for remote mode" in result.stdout
+    assert "missing Python" not in result.stdout
+
+
+def test_remote_init_rejects_invalid_connection_mode(tmp_path: Path) -> None:
+    plugin_root = tmp_path / "plugin"
+    shutil.copytree(ROOT / "apps" / "claude-code-plugin", plugin_root)
+    bin_dir = tmp_path / "bin"
+
+    result = run_init_script(
+        plugin_root,
+        tmp_path,
+        bin_dir=bin_dir,
+        extra_env={
+            "POWERMEM_INIT_REMOTE_BASE_URL": "https://powermem.example.com",
+            "POWERMEM_INIT_CONNECTION_MODE": "invalid",
+        },
+    )
+
+    assert result.returncode == 2
+    assert "Use hook, mcp, or both" in result.stderr
+    assert not (tmp_path / ".powermem" / "runtime.env").exists()
 
 
 def test_bootstrap_python_uses_uv_managed_python_by_default(tmp_path: Path) -> None:

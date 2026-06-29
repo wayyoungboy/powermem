@@ -240,7 +240,7 @@ After updating, restart the Claude Code session (or the whole app) so MCP config
 
 ### Two PowerMem modes (HTTP default, MCP optional)
 
-Same **MCP / HTTP** split as elsewhere in PowerMem. **Standard shipping = HTTP mode**: root `.mcp.json` has **`mcpServers: {}`**. **Hooks always use REST** in both modes.
+Same **MCP / HTTP** split as elsewhere in PowerMem. **Standard shipping = HTTP mode**: root `.mcp.json` has **`mcpServers: {}`**. Hooks use REST when enabled; remote init with `POWERMEM_INIT_CONNECTION_MODE=mcp` configures MCP tools only and disables the hook launcher.
 
 | Mode | Plugin root `.mcp.json` | Claude in-chat | Silent capture (hooks → REST) |
 |------|-------------------------|----------------|--------------------------------|
@@ -257,6 +257,36 @@ bash scripts/apply-connection-mode.sh mcp   # enable in-chat PowerMem tools
 Restart Claude Code after changing `.mcp.json`. See [`config/README.md`](https://github.com/oceanbase/powermem/blob/main/apps/claude-code-plugin/config/README.md).
 
 **Naming note:** In **MCP mode**, `transport: "http"` means “connect to the **MCP** endpoint over HTTP” (`https://host/mcp`), not “replace MCP with REST.” **HTTP mode** means “no MCP entry for PowerMem”; REST is still used by hooks.
+
+### Remote server init
+
+If PowerMem already runs on another machine, initialize the Claude Code plugin
+against that server instead of starting a local `powermem-server`. Remote init
+writes `~/.powermem/runtime.env` and/or the plugin root `.mcp.json`, then exits
+without creating the plugin `.env`, launching `uvx`, or managing a local PID.
+The default local path still uses `http://localhost:8848`.
+
+```bash
+# Hooks only: transcript capture and prompt search through REST
+POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com \
+POWERMEM_INIT_CONNECTION_MODE=hook \
+sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+
+# MCP tools only: configure Claude's PowerMem MCP endpoint
+POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com \
+POWERMEM_INIT_CONNECTION_MODE=mcp \
+sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+
+# Both hooks and MCP tools
+POWERMEM_INIT_REMOTE_BASE_URL=https://powermem.example.com \
+POWERMEM_INIT_CONNECTION_MODE=both \
+sh "$CLAUDE_PLUGIN_ROOT/scripts/init.sh"
+```
+
+If the server requires API-key auth, add
+`POWERMEM_INIT_REMOTE_API_KEY=<key>`. Hooks receive it as `POWERMEM_API_KEY`
+and send `X-API-Key`; MCP HTTP config writes the same header under
+`mcpServers.powermem.headers`.
 
 ### MCP mode: team or local URL
 

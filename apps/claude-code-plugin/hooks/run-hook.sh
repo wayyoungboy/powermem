@@ -12,6 +12,9 @@ load_env_file() {
 }
 load_env_file "$DATA_DIR/runtime.env"
 load_env_file "$PLUGIN_ROOT/config/runtime.env"
+case "${POWERMEM_CONNECTION_MODE:-}" in
+  mcp) exit 0 ;;
+esac
 case "$(uname -s 2>/dev/null)" in
   Darwin) GOOS=darwin ;;
   Linux) GOOS=linux ;;
