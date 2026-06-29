@@ -8,7 +8,7 @@ with the interface expected by the Memory class.
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from powermem.storage.base import VectorStoreBase
 from powermem.utils.utils import serialize_datetime, get_current_datetime
@@ -68,11 +68,16 @@ class StorageAdapter:
             logger.warning(f"Failed to generate sparse embedding ({memory_action}): {e}")
             return None
 
-    def _metadata_filter_key_for_store(self, key: str) -> str:
+    def _metadata_filter_key_for_store(
+        self,
+        key: str,
+        store: Optional[VectorStoreBase] = None,
+    ) -> str:
         """Translate logical metadata filters to backend-specific payload paths."""
         if key in self._PAYLOAD_FILTER_KEYS:
             return key
-        store_module = self.vector_store.__class__.__module__
+        store = store or self.vector_store
+        store_module = store.__class__.__module__
         payload_nested_store = (
             store_module.endswith("sqlite.sqlite_vector_store")
             or ".pgvector." in store_module
@@ -89,23 +94,194 @@ class StorageAdapter:
         agent_id: Optional[str] = None,
         run_id: Optional[str] = None,
         filters: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        store: Optional[VectorStoreBase] = None,
+        return_coverage: bool = False,
+    ) -> Dict[str, Any] | Tuple[Dict[str, Any], bool]:
         """Build filters that can be executed by the vector store."""
+        store = store or self.vector_store
+        skip_filter_keys = self._explicit_scope_filter_keys(user_id, agent_id, run_id)
+        filters = self._filter_expression_without_keys(filters, skip_filter_keys)
         db_filters: Dict[str, Any] = {}
+        fully_pushed = True
         if user_id:
             db_filters["user_id"] = user_id
         if agent_id:
             db_filters["agent_id"] = agent_id
         if run_id:
             db_filters["run_id"] = run_id
+
+        if self._store_supports_complex_filters(store):
+            translated_filters = self._translate_filter_expression_for_store(
+                filters,
+                store,
+            )
+            if db_filters and translated_filters:
+                if self._filter_expression_has_logical_operator(translated_filters):
+                    and_operands = [db_filters]
+                    if (
+                        isinstance(translated_filters, dict)
+                        and set(translated_filters) == {"AND"}
+                        and isinstance(translated_filters["AND"], list)
+                    ):
+                        and_operands.extend(translated_filters["AND"])
+                    else:
+                        and_operands.append(translated_filters)
+                    db_filters = {"AND": and_operands}
+                else:
+                    db_filters.update(translated_filters)
+            elif translated_filters:
+                db_filters = translated_filters
+            if return_coverage:
+                return db_filters, True
+            return db_filters
+
+        if filters and not isinstance(filters, dict):
+            fully_pushed = False
+            filters = None
         if filters:
             for key, value in filters.items():
+                if not self._can_push_filter_to_store(key, value, store):
+                    fully_pushed = False
+                    continue
                 if key in self._SYSTEM_FILTER_KEYS:
                     if key not in db_filters:
                         db_filters[key] = value
+                    elif db_filters[key] != value:
+                        fully_pushed = False
                 else:
-                    db_filters[self._metadata_filter_key_for_store(key)] = value
+                    db_filters[self._metadata_filter_key_for_store(key, store)] = value
+        if return_coverage:
+            return db_filters, fully_pushed
         return db_filters
+
+    def _translate_filter_expression_for_store(
+        self,
+        filters: Any,
+        store: VectorStoreBase,
+    ) -> Any:
+        """Translate and normalize nested logical expressions for a store."""
+        if not filters:
+            return filters
+        if isinstance(filters, list):
+            return [
+                self._translate_filter_expression_for_store(item, store)
+                for item in filters
+                if item
+            ]
+        if not isinstance(filters, dict):
+            return filters
+
+        scalar_filters = {}
+        logical_filters = []
+        for key, value in filters.items():
+            operator = str(key).lstrip("$").upper()
+            if operator in {"AND", "OR"}:
+                translated_value = self._translate_filter_expression_for_store(value, store)
+                if translated_value:
+                    logical_filters.append({key: translated_value})
+                continue
+            scalar_filters[self._metadata_filter_key_for_store(key, store)] = value
+
+        if not logical_filters:
+            return scalar_filters
+
+        clauses = []
+        if scalar_filters:
+            clauses.append(scalar_filters)
+        clauses.extend(logical_filters)
+
+        if len(clauses) == 1:
+            return clauses[0]
+        return {"AND": clauses}
+
+    def _filter_expression_has_logical_operator(self, filters: Any) -> bool:
+        """Return whether filters contain a nested AND/OR expression."""
+        if not filters:
+            return False
+        if isinstance(filters, list):
+            return any(
+                self._filter_expression_has_logical_operator(item)
+                for item in filters
+            )
+        if not isinstance(filters, dict):
+            return False
+        for key, value in filters.items():
+            operator = str(key).lstrip("$").upper()
+            if operator in {"AND", "OR"}:
+                return True
+            if self._filter_expression_has_logical_operator(value):
+                return True
+        return False
+
+    @staticmethod
+    def _store_supports_complex_filters(store: VectorStoreBase) -> bool:
+        """Return whether a store can execute logical/operator filters itself."""
+        store_module = store.__class__.__module__
+        return ".oceanbase." in store_module
+
+    def _can_push_filter_to_store(
+        self,
+        key: str,
+        value: Any,
+        store: VectorStoreBase,
+    ) -> bool:
+        """Return whether a logical filter is safe to pass to the backend."""
+        if self._store_supports_complex_filters(store):
+            return True
+        operator = str(key).lstrip("$").upper()
+        if operator in {"AND", "OR"}:
+            return False
+        return value is not None and not isinstance(value, (dict, list, tuple, set))
+
+    @staticmethod
+    def _explicit_scope_filter_keys(
+        user_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> set[str]:
+        """Return system filter keys superseded by explicit scope arguments."""
+        skipped = set()
+        if user_id is not None:
+            skipped.add("user_id")
+        if agent_id is not None:
+            skipped.add("agent_id")
+        if run_id is not None:
+            skipped.add("run_id")
+        return skipped
+
+    def _filter_expression_without_keys(
+        self,
+        filters: Any,
+        keys_to_skip: set[str],
+    ) -> Any:
+        """Remove raw system filters that explicit scope arguments override."""
+        if not filters or not keys_to_skip:
+            return filters
+        if isinstance(filters, list):
+            items = [
+                self._filter_expression_without_keys(item, keys_to_skip)
+                for item in filters
+            ]
+            return [item for item in items if item]
+        if not isinstance(filters, dict):
+            return filters
+
+        cleaned = {}
+        for key, value in filters.items():
+            operator = str(key).lstrip("$").upper()
+            if operator in {"AND", "OR"}:
+                if isinstance(value, list):
+                    cleaned_value = self._filter_expression_without_keys(
+                        value,
+                        keys_to_skip,
+                    )
+                    if cleaned_value:
+                        cleaned[key] = cleaned_value
+                continue
+            if key in keys_to_skip:
+                continue
+            cleaned[key] = value
+        return cleaned
 
     def _memory_matches_filter(self, memory: Dict[str, Any], key: str, expected: Any) -> bool:
         """Match logical filters against normalized memory payloads."""
@@ -116,7 +292,113 @@ class StorageAdapter:
                 actual = metadata.get(key[len("metadata."):])
             if actual is None:
                 actual = metadata.get(key)
+        return self._filter_value_matches(actual, expected)
+
+    @staticmethod
+    def _filter_value_matches(actual: Any, expected: Any) -> bool:
+        """Return whether a normalized payload value satisfies a filter value."""
+        if isinstance(expected, dict):
+            for op, op_value in expected.items():
+                op = str(op).lstrip("$")
+                if op == "eq":
+                    if actual != op_value:
+                        return False
+                elif op == "ne":
+                    if actual == op_value:
+                        return False
+                elif op == "in":
+                    if not isinstance(op_value, (list, tuple, set)) or actual not in op_value:
+                        return False
+                elif op == "nin":
+                    if isinstance(op_value, (list, tuple, set)) and actual in op_value:
+                        return False
+                elif op in {"gt", "gte", "lt", "lte"}:
+                    try:
+                        if op == "gt" and not actual > op_value:
+                            return False
+                        if op == "gte" and not actual >= op_value:
+                            return False
+                        if op == "lt" and not actual < op_value:
+                            return False
+                        if op == "lte" and not actual <= op_value:
+                            return False
+                    except TypeError:
+                        return False
+                elif op == "like":
+                    if str(op_value).replace("%", "") not in str(actual):
+                        return False
+                elif op == "ilike":
+                    if str(op_value).replace("%", "").lower() not in str(actual).lower():
+                        return False
+                else:
+                    return False
+            return True
+        if isinstance(expected, (list, tuple, set)):
+            return actual in expected
         return actual == expected
+
+    def _memory_matches_logical_filters(
+        self,
+        memory: Dict[str, Any],
+        user_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Double-check normalized search results against caller scope filters."""
+        if user_id is not None and memory.get("user_id") != user_id:
+            return False
+        if agent_id is not None and memory.get("agent_id") != agent_id:
+            return False
+        if run_id is not None and memory.get("run_id") != run_id:
+            return False
+        if not filters:
+            return True
+        filters = self._filter_expression_without_keys(
+            filters,
+            self._explicit_scope_filter_keys(user_id, agent_id, run_id),
+        )
+        return self._memory_matches_filter_expression(memory, filters)
+
+    def _memory_matches_filter_expression(
+        self,
+        memory: Dict[str, Any],
+        filters: Any,
+    ) -> bool:
+        """Match nested logical filters against a normalized memory payload."""
+        if not filters:
+            return True
+        if isinstance(filters, list):
+            return all(
+                self._memory_matches_filter_expression(memory, item)
+                for item in filters
+            )
+        if not isinstance(filters, dict):
+            return True
+
+        for key, expected in filters.items():
+            operator = str(key).lstrip("$").upper()
+            if operator == "AND":
+                if not isinstance(expected, list):
+                    return False
+                if not all(
+                    self._memory_matches_filter_expression(memory, item)
+                    for item in expected
+                ):
+                    return False
+                continue
+            if operator == "OR":
+                if not isinstance(expected, list):
+                    return False
+                if not any(
+                    self._memory_matches_filter_expression(memory, item)
+                    for item in expected
+                ):
+                    return False
+                continue
+            if not self._memory_matches_filter(memory, key, expected):
+                return False
+        return True
 
     def add_memory(self, memory_data: Dict[str, Any]) -> int:
         """Add a memory to the store."""
@@ -223,10 +505,17 @@ class StorageAdapter:
             effective_filters["agent_id"] = agent_id
         if run_id is not None:
             effective_filters["run_id"] = run_id
-        db_filters = self._build_db_filters(user_id, agent_id, run_id, filters)
-        
         # Route to target store (main or sub store)
         target_store = self._route_to_store(effective_filters)
+        db_filters, filters_fully_pushed = self._build_db_filters(
+            user_id,
+            agent_id,
+            run_id,
+            filters,
+            store=target_store,
+            return_coverage=True,
+        )
+        search_limit = limit if filters_fully_pushed else max(limit * 5, 100)
 
         # Unified search method - try OceanBase format first, fallback to SQLite
         # Pass query text to enable hybrid search (vector + full-text search)
@@ -242,7 +531,7 @@ class StorageAdapter:
             search_kwargs = {
                 "query": search_query,
                 "vectors": query_vector,
-                "limit": limit,
+                "limit": search_limit,
                 "filters": db_filters if db_filters else None,
             }
             if 'sparse_embedding' in search_params:
@@ -257,7 +546,7 @@ class StorageAdapter:
             results = target_store.search(
                 search_query if query else "",
                 vectors=[query_vector],
-                limit=limit,
+                limit=search_limit,
                 filters=db_filters if db_filters else None,
             )
         
@@ -339,12 +628,25 @@ class StorageAdapter:
                 "metadata": user_metadata if user_metadata else {},  # Add user metadata
             }
             
-            # No need to apply filters here - filters are already applied at the database level
-            # in vector_store.search(), so all returned results should already match the filters
+            # Keep a defensive filter boundary here too. Hybrid search can combine
+            # multiple backend paths; this prevents any branch that misses a
+            # payload filter from feeding cross-scope candidates to callers.
+            if not self._memory_matches_logical_filters(
+                memory,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                filters=filters,
+            ):
+                logger.debug(
+                    "Skipping search result %s outside requested memory scope",
+                    memory_id,
+                )
+                continue
+
             memories.append(memory)
         
-        # Vector store already applied limit, no need to slice again
-        return memories
+        return memories[:limit]
     
     def get_memory(
         self,
@@ -541,19 +843,27 @@ class StorageAdapter:
         user_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         run_id: Optional[str] = None,
-        limit: int = 100,
+        limit: Optional[int] = 100,
         offset: int = 0,
         sort_by: Optional[str] = None,
         order: str = "desc",
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """Get all memories with optional filtering and sorting."""
-        db_filters = self._build_db_filters(user_id, agent_id, run_id, filters)
+        db_filters, filters_fully_pushed = self._build_db_filters(
+            user_id,
+            agent_id,
+            run_id,
+            filters,
+            return_coverage=True,
+        )
+        backend_limit = limit if filters_fully_pushed else None
+        backend_offset = offset if filters_fully_pushed else 0
 
         results = self.vector_store.list(
             filters=db_filters if db_filters else None,
-            limit=limit,
-            offset=offset,
+            limit=backend_limit,
+            offset=backend_offset,
             order_by=sort_by,
             order=order
         )
@@ -604,28 +914,21 @@ class StorageAdapter:
                 "updated_at": updated_at,
             }
             
-            # Apply filters (as double-check if database didn't filter)
-            # Note: If filters were applied at database level, these will all pass
-            if user_id and memory.get("user_id") != user_id:
+            if not self._memory_matches_logical_filters(
+                memory,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                filters=filters,
+            ):
                 continue
-            if agent_id and memory.get("agent_id") != agent_id:
-                continue
-            if run_id and memory.get("run_id") != run_id:
-                continue
-            # Apply extra filters (e.g. metadata or payload fields backend may not have filtered)
-            if filters:
-                for key, expected in filters.items():
-                    if key in ("user_id", "agent_id", "run_id"):
-                        continue
-                    if not self._memory_matches_filter(memory, key, expected):
-                        break
-                else:
-                    pass  # all extra filters matched
-                    memories.append(memory)
-                    continue
-                continue  # one extra filter did not match, skip this memory
-            
+
             memories.append(memory)
+
+        if not filters_fully_pushed:
+            memories = memories[offset:]
+            if limit is not None:
+                memories = memories[:limit]
 
         return memories
 
@@ -637,9 +940,27 @@ class StorageAdapter:
         filters: Optional[Dict[str, Any]] = None,
     ) -> int:
         """Count all memories with optional filtering."""
-        db_filters = self._build_db_filters(user_id, agent_id, run_id, filters)
+        db_filters, filters_fully_pushed = self._build_db_filters(
+            user_id,
+            agent_id,
+            run_id,
+            filters,
+            return_coverage=True,
+        )
 
         try:
+            if not filters_fully_pushed:
+                return len(
+                    self.get_all_memories(
+                        user_id=user_id,
+                        agent_id=agent_id,
+                        run_id=run_id,
+                        limit=None,
+                        offset=0,
+                        filters=filters,
+                    )
+                )
+
             if hasattr(self.vector_store, "count"):
                 try:
                     return int(self.vector_store.count(filters=db_filters or None))
