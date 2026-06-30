@@ -8,6 +8,7 @@ Supports FTS5 fulltext search and hybrid search (vector + FTS5, RRF fusion).
 import json
 import logging
 import os
+import re
 import threading
 
 try:
@@ -38,6 +39,28 @@ def _json_path_for_key(key: str) -> str:
     for segment in segments:
         path += f".{json.dumps(segment)}"
     return path
+
+
+# Word fragments aligned with unicode61-style token characters.
+_FTS5_TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
+
+def _sanitize_fts5_input(query: str) -> str:
+    """Build a literal FTS5 MATCH string from user search text.
+
+    Extracts Unicode word tokens and wraps each in double quotes so FTS5 treats
+    them as literal terms (including ``AND``/``OR``/``NOT``), not query syntax.
+    Punctuation-separated forms such as ``v1.1.6`` become independent token
+    matches (``"v1" "1" "6"``) without preserving original spacing. Returns empty
+    when nothing remains.
+    """
+    if not query or not query.strip():
+        return ""
+
+    tokens = _FTS5_TOKEN_RE.findall(query)
+    if not tokens:
+        return ""
+
+    return " ".join('"' + token.replace('"', '""') + '"' for token in tokens)
 
 
 def _check_sqlite_features(conn) -> None:
@@ -80,11 +103,6 @@ def _extract_fulltext_content(payload: dict) -> str:
         if val and isinstance(val, str):
             return val
     return ""
-
-
-def _quote_fts_query(query: str) -> str:
-    escaped = query.replace('"', '""')
-    return f'"{escaped}"'
 
 
 class SQLiteVectorStore(VectorStoreBase):
@@ -354,6 +372,13 @@ class SQLiteVectorStore(VectorStoreBase):
         if not query or not query.strip():
             return []
 
+        fts_query = _sanitize_fts5_input(query)
+        if not fts_query:
+            logger.debug(
+                "FTS5 query sanitized to empty, skipping fulltext search"
+            )
+            return []
+
         fts_table = f"{self.collection_name}_fts"
         main_table = self.collection_name
 
@@ -364,45 +389,34 @@ class SQLiteVectorStore(VectorStoreBase):
             f"JOIN {main_table} m ON m.id = f.rowid "
             f"WHERE {fts_table} MATCH ? "
         )
-        params: list = [query]
 
-        # Apply payload filters
+        filter_params: List = []
         if filters:
             for key, value in filters.items():
                 sql += " AND (json_extract(m.payload, ?) = ?) "
-                params.extend([_json_path_for_key(key), value])
+                filter_params.extend([_json_path_for_key(key), value])
 
         sql += " ORDER BY rank LIMIT ?"
-        params.append(limit)
 
-        queries = [query]
-        quoted_query = _quote_fts_query(query)
-        if quoted_query != query:
-            queries.append(quoted_query)
-
-        results = []
+        params: List = [fts_query, *filter_params, limit]
+        results: List[OutputData] = []
         with self._lock:
-            for fts_query in queries:
-                params[0] = fts_query
-                try:
-                    cursor = self.connection.execute(sql, params)
-                    for row in cursor.fetchall():
-                        doc_id, payload_str, fts_score = row
-                        payload = json.loads(payload_str)
-                        payload['_fts_score'] = float(fts_score)
-                        payload['_quality_score'] = 1.0
+            try:
+                cursor = self.connection.execute(sql, params)
+                for row in cursor.fetchall():
+                    doc_id, payload_str, fts_score = row
+                    payload = json.loads(payload_str)
+                    payload['_fts_score'] = float(fts_score)
+                    payload['_quality_score'] = 1.0
 
-                        results.append(OutputData(
-                            id=doc_id,
-                            score=float(fts_score),
-                            payload=payload,
-                        ))
-                    return results
-                except sqlite3.OperationalError as e:
-                    logger.warning(
-                        f"FTS5 search failed for query {fts_query!r}: {e}"
-                    )
-                    results = []
+                    results.append(OutputData(
+                        id=doc_id,
+                        score=float(fts_score),
+                        payload=payload,
+                    ))
+            except sqlite3.OperationalError as exc:
+                logger.warning(f"FTS5 search failed, returning empty: {exc}")
+                results = []
 
         return results
 

@@ -1118,7 +1118,8 @@ class OceanBaseVectorStore(VectorStoreBase):
             # Store original similarity in metadata
             metadata = parsed["metadata"]
             metadata['_fts_score'] = fts_score
-            metadata['_quality_score'] = fts_score
+            metadata['_fts_quality_score'] = 1.0
+            metadata['_quality_score'] = 1.0
 
             fts_results.append(self._create_output_data(
                 parsed["vector_id"],
@@ -1519,19 +1520,27 @@ class OceanBaseVectorStore(VectorStoreBase):
             fts_weight=fts_weight,
         )
         logger.debug(f"Coarse ranking completed, candidates: {len(coarse_ranked_results)}")
+
+        def apply_threshold(results: List[OutputData]) -> List[OutputData]:
+            if threshold is None:
+                return results
+            return [
+                result for result in results
+                if result.payload.get("_quality_score", result.score) >= threshold
+            ]
         
         # Step 2: Fine ranking - Use Rerank model for precision sorting (if enabled)
         if self.reranker and query and coarse_ranked_results:
             try:
                 final_results = self._apply_rerank(query, coarse_ranked_results, limit)
                 logger.debug(f"Rerank applied, final results: {len(final_results)}")
-                return final_results
+                return apply_threshold(final_results)
             except Exception as e:
                 logger.warning(f"Rerank failed, falling back to coarse ranking: {e}")
-                return coarse_ranked_results[:limit]
+                return apply_threshold(coarse_ranked_results)[:limit]
         else:
             # No reranker, return coarse ranking results
-            return coarse_ranked_results[:limit]
+            return apply_threshold(coarse_ranked_results)[:limit]
 
     def _apply_rerank(self, query: str, candidates: List[OutputData], limit: int) -> List[OutputData]:
         """
@@ -1785,6 +1794,13 @@ class OceanBaseVectorStore(VectorStoreBase):
                 # Document found in previous searches - combine RRF scores
                 all_docs[result.id]['fts_rank'] = rank
                 all_docs[result.id]['rrf_score'] += fts_rrf_score
+                all_docs[result.id]['result'].payload['_fts_score'] = (
+                    result.payload.get('_fts_score')
+                )
+                if '_fts_quality_score' in result.payload:
+                    all_docs[result.id]['result'].payload['_fts_quality_score'] = (
+                        result.payload.get('_fts_quality_score')
+                    )
             else:
                 # Document only in FTS results
                 all_docs[result.id] = {
@@ -1836,7 +1852,10 @@ class OceanBaseVectorStore(VectorStoreBase):
 
             # Extract original similarity scores from metadata
             vector_similarity = result.payload.get('_vector_similarity')
-            fts_score = result.payload.get('_fts_score')
+            fts_score = result.payload.get(
+                '_fts_quality_score',
+                result.payload.get('_fts_score'),
+            )
             sparse_similarity = result.payload.get('_sparse_similarity')
 
             # Calculate quality score for threshold filtering
@@ -1918,6 +1937,13 @@ class OceanBaseVectorStore(VectorStoreBase):
             if result.id in combined_results:
                 # Update existing result with FTS score
                 combined_results[result.id]['fts_score'] = result.score
+                combined_results[result.id]['result'].payload['_fts_score'] = (
+                    result.payload.get('_fts_score')
+                )
+                if '_fts_quality_score' in result.payload:
+                    combined_results[result.id]['result'].payload[
+                        '_fts_quality_score'
+                    ] = result.payload.get('_fts_quality_score')
             else:
                 # Add new FTS-only result
                 combined_results[result.id] = {
@@ -1959,7 +1985,10 @@ class OceanBaseVectorStore(VectorStoreBase):
 
             # Extract original similarity scores from metadata
             vector_similarity = result.payload.get('_vector_similarity')
-            fts_score = result.payload.get('_fts_score')
+            fts_score = result.payload.get(
+                '_fts_quality_score',
+                result.payload.get('_fts_score'),
+            )
             sparse_similarity = result.payload.get('_sparse_similarity')
 
             # Calculate quality score for threshold filtering

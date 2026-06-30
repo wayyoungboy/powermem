@@ -32,6 +32,7 @@ class StorageAdapter:
     _INTERNAL_SEARCH_PAYLOAD_KEYS = {
         "_vector_similarity",
         "_fts_score",
+        "_fts_quality_score",
         "_sparse_similarity",
         "_quality_score",
         "_fusion_score",
