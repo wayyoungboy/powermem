@@ -13,7 +13,7 @@ RUN sed -i '/^\[main\]/a retries=10' /etc/yum.conf \
     && sed -i 's/^mirrorlist=/#mirrorlist=/' /etc/yum.repos.d/CentOS-*.repo \
     && sed -i "s|^#baseurl=http://mirror.centos.org/centos/|baseurl=${CENTOS_BASEURL_PREFIX}/|" /etc/yum.repos.d/CentOS-*.repo \
     && yum clean all \
-    && yum install -y binutils ca-certificates curl file gcc gcc-c++ gzip make tar \
+    && yum install -y binutils ca-certificates curl file gcc gcc-c++ gzip libjpeg-turbo-devel make tar zlib-devel \
     && update-ca-trust
 
 # Miniconda3-latest requires glibc >= 2.28; CentOS 7 has glibc 2.17.
@@ -28,6 +28,10 @@ RUN curl -fsSL https://astral.sh/uv/install.sh -o /tmp/uv-install.sh \
 
 WORKDIR /powermem
 COPY ./ ./
+
+# CentOS 7 gcc defaults to an older C dialect, while some dependency source
+# builds use C99 declarations when wheels are unavailable for this platform.
+ENV CFLAGS="-std=c99"
 
 RUN /opt/miniconda3/bin/conda create --name powermem python=3.11 -y \
     && uv run --no-project --python /opt/miniconda3/envs/powermem/bin/python python scripts/check_package_versions.py \

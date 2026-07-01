@@ -61,7 +61,7 @@ PowerMem ships first-party plugins and setup guides for the most common AI clien
 <td align="center" width="120"><a href="#claude-code"><img src="https://github.com/anthropics.png?size=120" alt="Claude Code" width="48" height="48" /></a><br /><a href="#claude-code"><sub><b>Claude Code</b></sub></a></td>
 <td align="center" width="120"><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><picture><source media="(prefers-color-scheme: dark)" srcset="https://svgl.app/library/cursor_dark.svg"><img src="https://svgl.app/library/cursor_light.svg" alt="Cursor" width="48" height="48" /></picture></a><br /><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><sub><b>Cursor</b></sub></a></td>
 <td align="center" width="120"><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><img src="https://svgl.app/library/vscode.svg" alt="VS Code" width="48" height="48" /></a><br /><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><sub><b>VS Code</b></sub></a></td>
-<td align="center" width="120"><a href="#any-mcp-client"><img src="https://github.com/openai.png?size=120" alt="Codex" width="48" height="48" /></a><br /><a href="#any-mcp-client"><sub><b>Codex</b></sub></a></td>
+<td align="center" width="120"><a href="#codex"><img src="https://github.com/openai.png?size=120" alt="Codex" width="48" height="48" /></a><br /><a href="#codex"><sub><b>Codex</b></sub></a></td>
 <td align="center" width="120"><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><picture><source media="(prefers-color-scheme: dark)" srcset="https://svgl.app/library/windsurf-dark.svg"><img src="https://svgl.app/library/windsurf-light.svg" alt="Windsurf" width="48" height="48" /></picture></a><br /><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><sub><b>Windsurf</b></sub></a></td>
 <td align="center" width="120"><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><img src="https://github.githubassets.com/images/modules/site/copilot/copilot.png" alt="GitHub Copilot" width="48" height="48" /></a><br /><a href="#cursor-vs-code-windsurf-github-copilot-qoder"><sub><b>GitHub Copilot</b></sub></a></td>
 </tr>
@@ -85,6 +85,7 @@ PowerMem ships first-party plugins and setup guides for the most common AI clien
 | Go apps | [SDKs](#sdks) |
 | Java apps | [SDKs](#sdks) |
 | TypeScript apps | [SDKs](#sdks) |
+| Codex app / CLI | Hook plugin, see [Codex](#codex) |
 | Any MCP client | `powermem-mcp sse` (default :8848), see [MCP client guide](docs/integrations/mcp_client.md) |
 | HTTP REST apps | `powermem-server --host 0.0.0.0 --port 8848`, see [API server](docs/api/0005-api_server.md) |
 
@@ -129,6 +130,31 @@ Claude Code reads [`apps/claude-code-plugin/SETUP.md`](apps/claude-code-plugin/S
 
 Prefer to wire it by hand? See the full walkthrough — environment variables, MCP mode, the `remember` / `recall` skills, Windows hooks, troubleshooting, and uninstall — in **[docs/integrations/claude_code.md](docs/integrations/claude_code.md)**.
 
+<a id="codex"></a>
+
+### Codex
+
+Codex uses a dedicated Codex app hook plugin, not MCP.
+
+```bash
+git clone https://github.com/oceanbase/powermem
+cd powermem
+codex plugin marketplace add "$(pwd)"
+codex plugin add powermem-codex-plugin@powermem-local
+```
+
+Start a new Codex thread, open `/hooks`, review and trust the PowerMem hooks, then ask:
+
+```text
+Use the powermem-codex-plugin init skill to initialize PowerMem.
+```
+
+The plugin injects memories on `UserPromptSubmit` and saves turn summaries on `Stop` through the PowerMem HTTP API. Details: [docs/integrations/codex.md](docs/integrations/codex.md).
+
+The `init` skill guides setup through short choices: connect an existing PowerMem HTTP cluster, start a local backend, or repair the current setup. It also asks whether to configure `POWERMEM_USER_ID` and `POWERMEM_AGENT_ID` for memory scope. Local startup can be zero-config no-LLM, import an existing PowerMem `.env`, or manually configure providers and credentials.
+
+For cleanup, the `uninstall` skill uses three progressive layers: delete Codex hooks/plugin, optionally delete the local marketplace, then optionally delete local PowerMem service configuration.
+
 ### Cursor, VS Code, Windsurf, GitHub Copilot, Qoder
 
 #### Recommended setup — let your IDE agent set it up
@@ -164,7 +190,7 @@ The same extension also provides **Query memories**, **Add selection to memory**
 
 ### Any MCP client 
 
-For Claude Desktop, Codex, Cline, OpenCode, Roo Code, Goose, or any other MCP-compatible client. please use MCP Client mode. 
+For Claude Desktop, Cline, OpenCode, Roo Code, Goose, or any other MCP-compatible client. please use MCP Client mode.
 First download the code and enter the directory:
 
 ```bash
@@ -180,7 +206,7 @@ Read and follow apps/mcp-client/SETUP.md to setup PowerMem
 
 The agent follows [`apps/mcp-client/SETUP.md`](apps/mcp-client/SETUP.md): it uses `powermem-mcp` directly, prefers SSE on port `8848`, falls back to streamable HTTP or stdio only when needed, and configures only the target MCP client.
 
-Prefer to wire it by hand? Use the [Generic MCP client guide](docs/integrations/mcp_client.md). To remove the integration later, follow [`apps/mcp-client/UNINSTALL.md`](apps/mcp-client/UNINSTALL.md). Exposed tools: `add_memory`, `search_memories`, `get_memory_by_id`, `update_memory`, `delete_memory`, `delete_all_memories`, `list_memories`. Full reference: [MCP Server](docs/api/0004-mcp.md). Client-specific notes: [Cline](docs/integrations/cline.md), [Codex](docs/integrations/codex.md), and [OpenCode](docs/integrations/opencode.md).
+Prefer to wire it by hand? Use the [Generic MCP client guide](docs/integrations/mcp_client.md). To remove the integration later, follow [`apps/mcp-client/UNINSTALL.md`](apps/mcp-client/UNINSTALL.md). Exposed tools: `add_memory`, `search_memories`, `get_memory_by_id`, `update_memory`, `delete_memory`, `delete_all_memories`, `list_memories`. Full reference: [MCP Server](docs/api/0004-mcp.md). Client-specific notes: [Cline](docs/integrations/cline.md) and [OpenCode](docs/integrations/opencode.md).
 
 ### LangChain & LangGraph
 
@@ -240,7 +266,7 @@ pip install "powermem[server,seekdb]"
 pip install "powermem[cli,server,seekdb]"
 ```
 
-For zero-install MCP clients such as Cursor, Codex, Claude Desktop, Cline, or
+For zero-install MCP clients such as Cursor, Claude Desktop, Cline, or
 Goose, use the wrapper package:
 
 ```bash

@@ -1,6 +1,8 @@
 # Generic MCP Client
 
-Use this guide for Claude Desktop, Cline, Codex, OpenCode, Roo Code, Goose, or any other MCP client that accepts a standard MCP server definition.
+Use this guide for Claude Desktop, Cline, OpenCode, Roo Code, Goose, or any other MCP client that accepts a standard MCP server definition.
+
+For Codex app and Codex CLI, prefer the hook-based plugin in [Codex](./codex.md). Use this MCP guide for Codex only if you explicitly want an MCP setup.
 
 ## Prerequisites
 

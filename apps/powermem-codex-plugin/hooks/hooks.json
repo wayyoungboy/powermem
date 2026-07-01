@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'root=\"${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-}}\"; if [ -z \"$root\" ]; then script=$(find \"$HOME/.codex/plugins/cache\" -path \"*/powermem-codex-plugin/*/hooks/run-hook.sh\" -type f 2>/dev/null | sort | tail -n 1); root=${script%/hooks/run-hook.sh}; fi; [ -n \"$root\" ] || exit 0; exec /bin/sh \"$root/hooks/run-hook.sh\"'",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}/hooks/run-hook.ps1\"",
+            "timeout": 120,
+            "statusMessage": "Searching PowerMem"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'root=\"${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-}}\"; if [ -z \"$root\" ]; then script=$(find \"$HOME/.codex/plugins/cache\" -path \"*/powermem-codex-plugin/*/hooks/run-hook.sh\" -type f 2>/dev/null | sort | tail -n 1); root=${script%/hooks/run-hook.sh}; fi; [ -n \"$root\" ] || exit 0; exec /bin/sh \"$root/hooks/run-hook.sh\"'",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}/hooks/run-hook.ps1\"",
+            "timeout": 30,
+            "statusMessage": "Saving PowerMem memory"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "powermem-codex-plugin",
+  "version": "0.1.0+codex.20260701074517",
+  "description": "PowerMem lifecycle hooks for Codex app and Codex CLI: retrieve relevant memories on user prompts and save concise turn summaries without MCP.",
+  "author": {
+    "name": "OceanBase / PowerMem",
+    "email": "open_oceanbase@oceanbase.com",
+    "url": "https://github.com/oceanbase"
+  },
+  "homepage": "https://github.com/oceanbase/powermem/tree/main/apps/powermem-codex-plugin",
+  "repository": "https://github.com/oceanbase/powermem",
+  "license": "Apache-2.0",
+  "keywords": [
+    "memory",
+    "powermem",
+    "codex",
+    "hooks",
+    "oceanbase"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "PowerMem for Codex",
+    "shortDescription": "Hook-based persistent memory for Codex.",
+    "longDescription": "PowerMem for Codex uses Codex lifecycle hooks to search long-term memories before each user prompt and, when configured, save useful assistant turn summaries after each turn. It talks to the PowerMem HTTP API directly and does not require an MCP server.",
+    "developerName": "OceanBase / PowerMem",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/oceanbase/powermem",
+    "defaultPrompt": [
+      "Initialize PowerMem hooks for Codex.",
+      "Check the PowerMem hook status.",
+      "Stop the local PowerMem backend.",
+      "Uninstall PowerMem hooks for Codex."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

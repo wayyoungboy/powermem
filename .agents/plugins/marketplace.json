@@ -1,0 +1,20 @@
+{
+  "name": "powermem-local",
+  "interface": {
+    "displayName": "PowerMem Local"
+  },
+  "plugins": [
+    {
+      "name": "powermem-codex-plugin",
+      "source": {
+        "source": "local",
+        "path": "./apps/powermem-codex-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
