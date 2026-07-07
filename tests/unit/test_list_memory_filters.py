@@ -95,6 +95,25 @@ def test_storage_adapter_preserves_sqlite_payload_and_dotted_filter_keys():
     }
 
 
+def test_storage_adapter_sqlite_collision_keys_default_to_metadata():
+    store = SQLiteVectorStore(database_path=":memory:")
+    adapter = StorageAdapter(store)
+
+    assert adapter._build_db_filters(
+        filters={
+            "hash": "metadata-hash",
+            "data": "metadata-data",
+            "payload.hash": "payload-hash",
+            "payload.data": "payload-data",
+        },
+    ) == {
+        "metadata.hash": "metadata-hash",
+        "metadata.data": "metadata-data",
+        "hash": "payload-hash",
+        "data": "payload-data",
+    }
+
+
 def test_storage_adapter_sqlite_filters_payload_and_metadata_keys():
     store = SQLiteVectorStore(database_path=":memory:")
     adapter = StorageAdapter(store)
@@ -119,6 +138,39 @@ def test_storage_adapter_sqlite_filters_payload_and_metadata_keys():
     assert [memory["memory"] for memory in listed_results] == ["python"]
     assert [memory["memory"] for memory in category_results] == ["python"]
     assert [memory["memory"] for memory in priority_results] == ["python"]
+
+
+def test_storage_adapter_sqlite_search_filters_collision_metadata_keys():
+    store = SQLiteVectorStore(database_path=":memory:")
+    adapter = StorageAdapter(store)
+
+    adapter.add_memory(
+        {
+            "content": "alpha collision content",
+            "user_id": "u01",
+            "metadata": {"hash": "user-hash", "data": "user-data"},
+        }
+    )
+    adapter.add_memory(
+        {
+            "content": "alpha other content",
+            "user_id": "u01",
+            "metadata": {"hash": "other-hash", "data": "other-data"},
+        }
+    )
+
+    assert adapter.count_all_memories(filters={"hash": "user-hash"}) == 1
+    assert adapter.count_all_memories(filters={"data": "user-data"}) == 1
+    assert adapter.count_all_memories(filters={"payload.data": "alpha collision content"}) == 1
+
+    results = adapter.search_memories(
+        query_embedding=None,
+        query="alpha",
+        retrieval_mode="fts",
+        filters={"hash": "user-hash", "data": "user-data"},
+    )
+
+    assert [memory["memory"] for memory in results] == ["alpha collision content"]
 
 
 def test_storage_adapter_keeps_oceanbase_metadata_filter_key():
@@ -149,8 +201,8 @@ def test_storage_adapter_strips_oceanbase_dotted_metadata_prefix():
     assert adapter._build_db_filters(
         filters={"metadata.scope": "personal", "metadata.priority": "high"},
     ) == {
-        "scope": "personal",
-        "priority": "high",
+        "metadata.scope": "personal",
+        "metadata.priority": "high",
     }
 
 
@@ -195,7 +247,7 @@ def test_storage_adapter_list_matches_oceanbase_dotted_metadata_filter():
 
     memories = adapter.get_all_memories(filters={"metadata.scope": "personal"})
 
-    assert store.list_kwargs["filters"] == {"scope": "personal"}
+    assert store.list_kwargs["filters"] == {"metadata.scope": "personal"}
     assert [memory["memory"] for memory in memories] == ["personal"]
 
 
@@ -271,7 +323,7 @@ def test_storage_adapter_search_keeps_oceanbase_metadata_filter_key():
     }
 
 
-def test_storage_adapter_search_strips_oceanbase_dotted_metadata_filter_key():
+def test_storage_adapter_search_keeps_oceanbase_dotted_metadata_filter_key():
     class OceanBaseLikeSearchStore:
         collection_name = "memories"
 
@@ -297,7 +349,7 @@ def test_storage_adapter_search_strips_oceanbase_dotted_metadata_filter_key():
         query="pytest",
     )
 
-    assert store.search_kwargs["filters"] == {"scope": "coding_agent"}
+    assert store.search_kwargs["filters"] == {"metadata.scope": "coding_agent"}
 
 
 def test_storage_adapter_count_uses_db_filters_without_fetching_all():
