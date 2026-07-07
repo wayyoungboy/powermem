@@ -21,7 +21,32 @@ This guide provides instructions for building and running PowerMem Server using 
 
 ## Quick Start
 
-### Build and Run
+### Pull and Run Official Image
+
+Use the published image when you only need to deploy PowerMem Server:
+
+```bash
+cp .env.example .env
+# Edit .env and set at least LLM_PROVIDER, LLM_API_KEY, and LLM_MODEL.
+
+docker pull oceanbase/powermem-server:latest
+
+docker run -d \
+  --name powermem-server \
+  -p 8848:8848 \
+  --env-file .env \
+  -v $(pwd)/.env:/app/.env:ro \
+  oceanbase/powermem-server:latest
+```
+
+The server will be available at `http://localhost:8848`, with the Dashboard at
+`http://localhost:8848/dashboard/`.
+
+**Note**: The `--env-file` flag loads variables into the container environment,
+while the volume mount makes the same `.env` file available at `/app/.env` for
+PowerMem's configuration loader.
+
+### Build Locally and Run
 
 ```bash
 # Build the Docker image (from project root)
@@ -547,4 +572,3 @@ docker run -d \
 ```
 
 **Note**: When using `--env-file`, the Server will read from environment variables, but the SDK running locally will still read from the `.env` file. This is fine as long as both have the same values.
-

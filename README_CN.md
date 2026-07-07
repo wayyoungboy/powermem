@@ -268,7 +268,73 @@ powermem-server --host 0.0.0.0 --port 8848
 
 在本地交互式终端中，服务就绪后会自动使用默认浏览器打开 Dashboard；也可手动访问 `http://localhost:8848/dashboard/` 浏览记忆、查看分析数据与系统健康状态。使用 `--no-open-browser` 可禁用自动打开；输出被重定向时，可使用 `--open-browser` 显式请求打开。CI、容器、SSH、无图形环境以及 Dashboard 资源不可用时不会打开浏览器。完整使用说明见 [Web Dashboard 指南](docs/guides/0013-dashboard.md)。
 
-Docker / Compose 部署见 [API Server](docs/api/0005-api_server.md) 与 [Docker 说明](docker/README.md)。官方镜像：`oceanbase/powermem-server:latest`。
+### Docker 部署（`powermem-server`）
+
+官方 Docker 镜像会在 `8848` 端口启动 HTTP API Server 与 Dashboard。
+它与 Python SDK 共用同一份 `.env`，数据库、LLM、Embedding、鉴权、CORS、
+日志等配置都可以放在一个文件里维护。
+
+```bash
+cp .env.example .env
+# 编辑 .env：设置 LLM_PROVIDER、LLM_API_KEY、LLM_MODEL，并按需从 .env.example.full 复制更多配置项。
+
+docker pull oceanbase/powermem-server:latest
+
+docker run -d \
+  --name powermem-server \
+  -p 8848:8848 \
+  --env-file .env \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  oceanbase/powermem-server:latest
+
+curl http://localhost:8848/api/v1/system/health
+```
+
+Dashboard 地址：`http://localhost:8848/dashboard/`；
+Swagger UI 地址：`http://localhost:8848/docs`。
+
+需要持久化或生产部署时，可选择以下存储方式：
+
+- **容器内嵌入式 seekdb**：保持 `OCEANBASE_HOST` 为空。数据会写入
+  `OCEANBASE_PATH`（默认是容器 `/app` 下的 `./seekdb_data`）。如果单容器
+  部署需要在重建容器后保留数据，请挂载 `/app/seekdb_data`。
+- **Docker Compose + seekdb**：仓库内置的 Compose 文件会同时启动
+  `powermem-server` 与独立的 `oceanbase/seekdb` 服务，并使用
+  `seekdb_data` volume 持久化数据库。
+
+```bash
+# 可选：为 seekdb root 账号设置密码。
+SEEKDB_ROOT_PASSWORD=your_password docker compose -f docker/docker-compose.yml up -d
+
+docker compose -f docker/docker-compose.yml logs -f powermem-server
+docker compose -f docker/docker-compose.yml down
+```
+
+- **外部数据库**：设置 `DATABASE_PROVIDER=oceanbase` 或
+  `DATABASE_PROVIDER=postgres`，并提供对应的 `OCEANBASE_*` 或 `POSTGRES_*`
+  变量。如果数据库运行在 Docker 宿主机上，Docker Desktop 环境中请使用
+  `host.docker.internal`，不要在容器内写 `localhost`。
+
+常用服务端配置：
+
+```env
+POWERMEM_SERVER_HOST=0.0.0.0
+POWERMEM_SERVER_PORT=8848
+POWERMEM_SERVER_WORKERS=4
+POWERMEM_SERVER_AUTH_ENABLED=true
+POWERMEM_SERVER_API_KEYS=your-api-key-1,your-api-key-2
+POWERMEM_SERVER_RATE_LIMIT_ENABLED=true
+POWERMEM_SERVER_RATE_LIMIT_PER_MINUTE=100
+POWERMEM_SERVER_LOG_LEVEL=INFO
+POWERMEM_SERVER_LOG_FORMAT=json
+POWERMEM_SERVER_CORS_ENABLED=true
+POWERMEM_SERVER_CORS_ORIGINS=https://your-app.example.com
+```
+
+开启鉴权后，客户端请求需要携带 `X-API-Key: <key>`。不要把
+`POWERMEM_SERVER_AUTH_ENABLED=false` 且 `POWERMEM_SERVER_CORS_ORIGINS=*`
+的服务暴露到不可信网络。更多说明见 [API Server](docs/api/0005-api_server.md)
+与 [Docker 说明](docker/README.md)。
 
 ---
 

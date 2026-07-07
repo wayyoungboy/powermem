@@ -12,6 +12,27 @@ This directory contains all Docker-related files for PowerMem Server.
 
 ## Quick Start
 
+### Pull Official Image
+
+Use the published image when you only need to deploy PowerMem Server:
+
+```bash
+cp .env.example .env
+# Edit .env and set at least your LLM provider, API key, and model.
+
+docker pull oceanbase/powermem-server:latest
+
+docker run -d \
+  --name powermem-server \
+  -p 8848:8848 \
+  --env-file .env \
+  -v $(pwd)/.env:/app/.env:ro \
+  oceanbase/powermem-server:latest
+```
+
+Health check: `http://localhost:8848/api/v1/system/health`
+Dashboard: `http://localhost:8848/dashboard/`
+
 ### Build Docker Image
 
 From the project root directory:

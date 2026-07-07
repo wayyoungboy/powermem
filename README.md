@@ -292,7 +292,75 @@ powermem-server --host 0.0.0.0 --port 8848
 
 On an interactive local terminal, the server automatically opens the Dashboard in your default browser once it is ready. You can also open `http://localhost:8848/dashboard/` manually to browse memories, view analytics, and monitor system health. Use `--no-open-browser` to disable auto-open, or `--open-browser` when output is redirected. Browser opening is skipped in CI, containers, SSH sessions, headless environments, and when Dashboard assets are unavailable. See the [Web Dashboard Guide](docs/guides/0013-dashboard.md) for a complete walkthrough.
 
-Docker / Compose: see [API Server](docs/api/0005-api_server.md) and [Docker & deployment](docker/README.md). The official image is `oceanbase/powermem-server:latest`.
+### Docker deployment (`powermem-server`)
+
+The official Docker image runs the HTTP API server and Dashboard on port `8848`.
+It uses the same `.env` configuration as the Python SDK, so keep database, LLM,
+embedding, authentication, CORS, and logging settings in one file.
+
+```bash
+cp .env.example .env
+# Edit .env: set LLM_PROVIDER, LLM_API_KEY, LLM_MODEL, and any provider-specific settings you need.
+
+docker pull oceanbase/powermem-server:latest
+
+docker run -d \
+  --name powermem-server \
+  -p 8848:8848 \
+  --env-file .env \
+  -v "$(pwd)/.env:/app/.env:ro" \
+  oceanbase/powermem-server:latest
+
+curl http://localhost:8848/api/v1/system/health
+```
+
+Open `http://localhost:8848/dashboard/` for the Dashboard and
+`http://localhost:8848/docs` for Swagger UI.
+
+For persistent or production-style deployment, use one of these storage modes:
+
+- **Embedded seekdb in the container**: leave `OCEANBASE_HOST` empty. Data is
+  written under `OCEANBASE_PATH` (`./seekdb_data` by default inside `/app`).
+  Mount `/app/seekdb_data` if you need the single-container data to survive
+  container recreation.
+- **Docker Compose with seekdb**: the bundled Compose file starts
+  `powermem-server` plus a separate `oceanbase/seekdb` service with a persistent
+  `seekdb_data` volume.
+
+```bash
+# Optional: protect seekdb root access with a password.
+SEEKDB_ROOT_PASSWORD=your_password docker compose -f docker/docker-compose.yml up -d
+
+docker compose -f docker/docker-compose.yml logs -f powermem-server
+docker compose -f docker/docker-compose.yml down
+```
+
+- **External database**: set `DATABASE_PROVIDER=oceanbase` or
+  `DATABASE_PROVIDER=postgres` and provide the matching `OCEANBASE_*` or
+  `POSTGRES_*` variables. If the database runs on the Docker host, use
+  `host.docker.internal` instead of `localhost` on Docker Desktop.
+
+Common server-side options:
+
+```env
+POWERMEM_SERVER_HOST=0.0.0.0
+POWERMEM_SERVER_PORT=8848
+POWERMEM_SERVER_WORKERS=4
+POWERMEM_SERVER_AUTH_ENABLED=true
+POWERMEM_SERVER_API_KEYS=your-api-key-1,your-api-key-2
+POWERMEM_SERVER_RATE_LIMIT_ENABLED=true
+POWERMEM_SERVER_RATE_LIMIT_PER_MINUTE=100
+POWERMEM_SERVER_LOG_LEVEL=INFO
+POWERMEM_SERVER_LOG_FORMAT=json
+POWERMEM_SERVER_CORS_ENABLED=true
+POWERMEM_SERVER_CORS_ORIGINS=https://your-app.example.com
+```
+
+When authentication is enabled, clients must send `X-API-Key: <key>`. Avoid
+exposing a server with `POWERMEM_SERVER_AUTH_ENABLED=false` and
+`POWERMEM_SERVER_CORS_ORIGINS=*` outside a trusted local network. More details:
+[API Server](docs/api/0005-api_server.md) and
+[Docker & deployment](docker/README.md).
 
 ---
 
