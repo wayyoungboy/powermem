@@ -116,6 +116,47 @@ POWERMEM_SERVER_CORS_ENABLED=true
 POWERMEM_SERVER_CORS_ORIGINS=https://your-app.example.com
 ```
 
+Model configuration:
+
+```env
+# Required: model used for memory extraction, update decisions, and answers.
+LLM_PROVIDER=openai
+LLM_API_KEY=your_api_key_here
+LLM_MODEL=gpt-4o-mini
+OPENAI_LLM_BASE_URL=https://api.openai.com/v1
+
+# Optional: embedding model used to write/search dense vectors.
+# The default provider runs local all-MiniLM-L6-v2 with no API key.
+EMBEDDING_PROVIDER=default
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+EMBEDDING_DIMS=384
+OCEANBASE_EMBEDDING_MODEL_DIMS=384
+
+# Optional: second-stage reranker for sharper top-k ordering.
+RERANKER_ENABLED=false
+RERANKER_PROVIDER=qwen
+RERANKER_MODEL=qwen3-rerank
+# RERANKER_API_KEY=your_api_key_here
+```
+
+Model configuration notes:
+
+- `LLM_PROVIDER`, `LLM_API_KEY`, and `LLM_MODEL` are the only required model
+  settings for a minimal deployment.
+- `LLM_PROVIDER=openai` can call OpenAI-compatible providers. For example,
+  keep `LLM_PROVIDER=openai`, set `OPENAI_LLM_BASE_URL` to a Qwen, DeepSeek,
+  SiliconFlow, vLLM, or Ollama compatible endpoint, then set `LLM_MODEL` to
+  that provider's model name.
+- The default embedding model is local and emits 384-dimensional vectors. When
+  you switch `EMBEDDING_PROVIDER` or `EMBEDDING_MODEL`, keep `EMBEDDING_DIMS`
+  and the storage dimension, such as `OCEANBASE_EMBEDDING_MODEL_DIMS`, aligned.
+- If a model gateway runs on the Docker host, do not use `localhost` inside the
+  container. Use `host.docker.internal` on Docker Desktop, or the reachable host
+  IP / service DNS name in Linux or Kubernetes.
+- Enable `RERANKER_ENABLED=true` only when you have configured a rerank provider
+  key and endpoint. It improves ordering quality but adds one model call per
+  search.
+
 Storage configuration options:
 
 - Embedded seekdb: leave `OCEANBASE_HOST` empty. Data is written under
@@ -193,6 +234,45 @@ POWERMEM_SERVER_LOG_FORMAT=json
 POWERMEM_SERVER_CORS_ENABLED=true
 POWERMEM_SERVER_CORS_ORIGINS=https://your-app.example.com
 ```
+
+模型配置：
+
+```env
+# 必填：用于记忆抽取、更新决策和回答生成的模型。
+LLM_PROVIDER=openai
+LLM_API_KEY=your_api_key_here
+LLM_MODEL=gpt-4o-mini
+OPENAI_LLM_BASE_URL=https://api.openai.com/v1
+
+# 可选：用于写入和检索稠密向量的 Embedding 模型。
+# 默认 provider 使用本地 all-MiniLM-L6-v2，不需要 API key。
+EMBEDDING_PROVIDER=default
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+EMBEDDING_DIMS=384
+OCEANBASE_EMBEDDING_MODEL_DIMS=384
+
+# 可选：二阶段 reranker，用于提升 top-k 排序质量。
+RERANKER_ENABLED=false
+RERANKER_PROVIDER=qwen
+RERANKER_MODEL=qwen3-rerank
+# RERANKER_API_KEY=your_api_key_here
+```
+
+模型配置说明：
+
+- 最小部署只需要配置 `LLM_PROVIDER`、`LLM_API_KEY` 和 `LLM_MODEL`。
+- `LLM_PROVIDER=openai` 可以连接 OpenAI-compatible 服务。例如保持
+  `LLM_PROVIDER=openai`，把 `OPENAI_LLM_BASE_URL` 指向 Qwen、DeepSeek、
+  SiliconFlow、vLLM 或 Ollama 的兼容接口，再把 `LLM_MODEL` 设置成对应
+  provider 的模型名。
+- 默认 Embedding 模型在本地运行，输出 384 维向量。切换
+  `EMBEDDING_PROVIDER` 或 `EMBEDDING_MODEL` 时，需要保证 `EMBEDDING_DIMS`
+  和存储侧维度（例如 `OCEANBASE_EMBEDDING_MODEL_DIMS`）一致。
+- 如果模型网关运行在 Docker 宿主机上，容器内不要写 `localhost`。Docker
+  Desktop 可使用 `host.docker.internal`；Linux 或 Kubernetes 环境使用可达
+  的宿主机 IP 或服务 DNS 名称。
+- 只有在 rerank provider 的 key 和 endpoint 都配置好后，才开启
+  `RERANKER_ENABLED=true`。Reranker 能提升排序质量，但每次搜索会多一次模型调用。
 
 存储配置选择：
 
